@@ -11,6 +11,8 @@ basalt-types = { workspace = true }
 basalt-protocol = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
+aes = { workspace = true }
+flate2 = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
