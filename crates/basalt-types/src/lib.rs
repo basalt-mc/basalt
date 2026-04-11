@@ -1,5 +1,7 @@
+mod byte_array;
 pub mod error;
 mod primitives;
+mod string;
 pub mod traits;
 mod varint;
 
