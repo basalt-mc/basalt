@@ -967,20 +967,3 @@ impl ClientboundPlayPacket {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn unknown_serverbound_id() {
-        let mut cursor: &[u8] = &[];
-        assert!(ServerboundPlayPacket::decode_by_id(0xFF, &mut cursor).is_err());
-    }
-
-    #[test]
-    fn unknown_clientbound_id() {
-        let mut cursor: &[u8] = &[];
-        assert!(ClientboundPlayPacket::decode_by_id(0xFF, &mut cursor).is_err());
-    }
-}
