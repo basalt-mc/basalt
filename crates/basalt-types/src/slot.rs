@@ -154,4 +154,25 @@ mod tests {
         let slot = Slot::default();
         assert!(slot.is_empty());
     }
+
+    #[test]
+    fn non_empty_slot_encode_decode() {
+        let slot = Slot::new(42, 10);
+        let mut buf = Vec::with_capacity(slot.encoded_size());
+        slot.encode(&mut buf).unwrap();
+        assert_eq!(buf.len(), slot.encoded_size());
+
+        // Decode reads item_count + item_id + consumes rest as components
+        let mut cursor = buf.as_slice();
+        let decoded = Slot::decode(&mut cursor).unwrap();
+        assert_eq!(decoded.item_count, 10);
+        assert_eq!(decoded.item_id, Some(42));
+    }
+
+    #[test]
+    fn encoded_size_non_empty() {
+        let slot = Slot::new(1, 1);
+        // VarInt(1) = 1 byte for count + VarInt(1) = 1 byte for id = 2
+        assert_eq!(slot.encoded_size(), 2);
+    }
 }
