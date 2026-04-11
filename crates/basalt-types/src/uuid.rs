@@ -12,7 +12,7 @@ use crate::{Decode, Encode, EncodedSize, Result};
 ///
 /// The standard display format is `8-4-4-4-12` lowercase hex with dashes
 /// (e.g., `550e8400-e29b-41d4-a716-446655440000`).
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct Uuid {
     /// Most significant 64 bits of the UUID.
     pub most: u64,

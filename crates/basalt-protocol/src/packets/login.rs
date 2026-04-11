@@ -11,7 +11,7 @@ use crate::error::{Error, Result};
 
 // -- Serverbound packets --
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x01)]
 pub struct ServerboundLoginEncryptionBegin {
     #[field(length = "varint")]
@@ -20,11 +20,11 @@ pub struct ServerboundLoginEncryptionBegin {
     pub verify_token: Vec<u8>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x03)]
 pub struct ServerboundLoginLoginAcknowledged;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x02)]
 pub struct ServerboundLoginLoginPluginResponse {
     #[field(varint)]
@@ -33,7 +33,7 @@ pub struct ServerboundLoginLoginPluginResponse {
     pub data: Option<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x00)]
 pub struct ServerboundLoginLoginStart {
     pub username: String,
@@ -42,20 +42,20 @@ pub struct ServerboundLoginLoginStart {
 
 // -- Clientbound packets --
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x03)]
 pub struct ClientboundLoginCompress {
     #[field(varint)]
     pub threshold: i32,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x00)]
 pub struct ClientboundLoginDisconnect {
     pub reason: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x01)]
 pub struct ClientboundLoginEncryptionBegin {
     pub server_id: String,
@@ -66,7 +66,7 @@ pub struct ClientboundLoginEncryptionBegin {
     pub should_authenticate: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x04)]
 pub struct ClientboundLoginLoginPluginRequest {
     #[field(varint)]
@@ -77,7 +77,7 @@ pub struct ClientboundLoginLoginPluginRequest {
 }
 
 /// Inline data structure used by [`ClientboundLoginSuccess`].
-#[derive(Debug, Clone, PartialEq, Encode, Decode, EncodedSize)]
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundLoginSuccessProperties {
     pub name: String,
     pub value: String,
@@ -85,7 +85,7 @@ pub struct ClientboundLoginSuccessProperties {
     pub signature: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x02)]
 pub struct ClientboundLoginSuccess {
     pub uuid: Uuid,
@@ -161,6 +161,7 @@ impl ClientboundLoginPacket {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use basalt_types::{Encode as _, EncodedSize as _};
 
     #[test]
     fn serverbound_packet_ids() {
@@ -189,5 +190,113 @@ mod tests {
     fn unknown_clientbound_id() {
         let mut cursor: &[u8] = &[];
         assert!(ClientboundLoginPacket::decode_by_id(0xFF, &mut cursor).is_err());
+    }
+
+    #[test]
+    fn serverbound_login_encryption_begin_roundtrip() {
+        let original = ServerboundLoginEncryptionBegin::default();
+        let mut buf = Vec::with_capacity(original.encoded_size());
+        original.encode(&mut buf).unwrap();
+        assert_eq!(buf.len(), original.encoded_size());
+        let mut cursor = buf.as_slice();
+        let decoded = ServerboundLoginEncryptionBegin::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn serverbound_login_login_acknowledged_roundtrip() {
+        let original = ServerboundLoginLoginAcknowledged;
+        let mut buf = Vec::with_capacity(original.encoded_size());
+        original.encode(&mut buf).unwrap();
+        assert_eq!(buf.len(), original.encoded_size());
+        let mut cursor = buf.as_slice();
+        let decoded = ServerboundLoginLoginAcknowledged::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn serverbound_login_login_plugin_response_roundtrip() {
+        let original = ServerboundLoginLoginPluginResponse::default();
+        let mut buf = Vec::with_capacity(original.encoded_size());
+        original.encode(&mut buf).unwrap();
+        assert_eq!(buf.len(), original.encoded_size());
+        let mut cursor = buf.as_slice();
+        let decoded = ServerboundLoginLoginPluginResponse::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn serverbound_login_login_start_roundtrip() {
+        let original = ServerboundLoginLoginStart::default();
+        let mut buf = Vec::with_capacity(original.encoded_size());
+        original.encode(&mut buf).unwrap();
+        assert_eq!(buf.len(), original.encoded_size());
+        let mut cursor = buf.as_slice();
+        let decoded = ServerboundLoginLoginStart::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn clientbound_login_compress_roundtrip() {
+        let original = ClientboundLoginCompress::default();
+        let mut buf = Vec::with_capacity(original.encoded_size());
+        original.encode(&mut buf).unwrap();
+        assert_eq!(buf.len(), original.encoded_size());
+        let mut cursor = buf.as_slice();
+        let decoded = ClientboundLoginCompress::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn clientbound_login_disconnect_roundtrip() {
+        let original = ClientboundLoginDisconnect::default();
+        let mut buf = Vec::with_capacity(original.encoded_size());
+        original.encode(&mut buf).unwrap();
+        assert_eq!(buf.len(), original.encoded_size());
+        let mut cursor = buf.as_slice();
+        let decoded = ClientboundLoginDisconnect::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn clientbound_login_encryption_begin_roundtrip() {
+        let original = ClientboundLoginEncryptionBegin::default();
+        let mut buf = Vec::with_capacity(original.encoded_size());
+        original.encode(&mut buf).unwrap();
+        assert_eq!(buf.len(), original.encoded_size());
+        let mut cursor = buf.as_slice();
+        let decoded = ClientboundLoginEncryptionBegin::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn clientbound_login_login_plugin_request_roundtrip() {
+        let original = ClientboundLoginLoginPluginRequest::default();
+        let mut buf = Vec::with_capacity(original.encoded_size());
+        original.encode(&mut buf).unwrap();
+        assert_eq!(buf.len(), original.encoded_size());
+        let mut cursor = buf.as_slice();
+        let decoded = ClientboundLoginLoginPluginRequest::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn clientbound_login_success_roundtrip() {
+        let original = ClientboundLoginSuccess::default();
+        let mut buf = Vec::with_capacity(original.encoded_size());
+        original.encode(&mut buf).unwrap();
+        assert_eq!(buf.len(), original.encoded_size());
+        let mut cursor = buf.as_slice();
+        let decoded = ClientboundLoginSuccess::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(decoded, original);
     }
 }
