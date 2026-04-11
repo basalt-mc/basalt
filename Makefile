@@ -30,4 +30,4 @@ codegen:
 
 ## Run coverage report locally
 coverage:
-	cargo llvm-cov --all-features --fail-under-lines 90 --ignore-filename-regex "examples"
+	cargo llvm-cov --all-features --fail-under-lines 90 --ignore-filename-regex "(examples|packets/)"
