@@ -12,7 +12,7 @@ use basalt_protocol::packets::status::{
 use basalt_types::{Encode, EncodedSize};
 
 use crate::error::{Error, Result};
-use crate::framing;
+use crate::stream::EncryptedStream;
 
 /// Marker type for the Handshake connection state.
 pub struct Handshake;
@@ -37,12 +37,12 @@ pub enum HandshakeResult {
 
 /// A type-safe Minecraft protocol connection.
 ///
-/// The connection wraps a TCP stream and enforces the protocol state machine
-/// at compile time using Rust's type system. Each state transition consumes
-/// the old connection and returns a new one in the next state, making it
-/// impossible to call methods for the wrong state.
+/// The connection wraps an `EncryptedStream` (TCP with optional AES/CFB-8
+/// encryption) and enforces the protocol state machine at compile time
+/// using Rust's type system. Each state transition consumes the old
+/// connection and returns a new one in the next state.
 pub struct Connection<S> {
-    stream: TcpStream,
+    stream: EncryptedStream,
     _state: PhantomData<S>,
 }
 
@@ -50,25 +50,19 @@ impl Connection<Handshake> {
     /// Wraps a TCP stream as a new Handshake connection.
     pub fn accept(stream: TcpStream) -> Self {
         Self {
-            stream,
+            stream: EncryptedStream::new(stream),
             _state: PhantomData,
         }
     }
 
     /// Reads the client's Handshake packet and transitions to the next state.
-    ///
-    /// Returns a `HandshakeResult` indicating whether the client wants
-    /// Status (server list ping) or Login (joining the game). The connection
-    /// is consumed and returned in the appropriate next state.
     pub async fn read_handshake(mut self) -> Result<HandshakeResult> {
-        let raw = framing::read_raw_packet(&mut self.stream)
-            .await?
-            .ok_or_else(|| {
-                Error::Io(std::io::Error::new(
-                    std::io::ErrorKind::UnexpectedEof,
-                    "connection closed before handshake",
-                ))
-            })?;
+        let raw = self.stream.read_raw_packet().await?.ok_or_else(|| {
+            Error::Io(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "connection closed before handshake",
+            ))
+        })?;
 
         let mut cursor = raw.payload.as_slice();
         let packet = match ServerboundHandshakePacket::decode_by_id(raw.id, &mut cursor)? {
@@ -107,14 +101,12 @@ impl Connection<Handshake> {
 impl Connection<Status> {
     /// Reads a serverbound Status packet from the client.
     pub async fn read_packet(&mut self) -> Result<ServerboundStatusPacket> {
-        let raw = framing::read_raw_packet(&mut self.stream)
-            .await?
-            .ok_or_else(|| {
-                Error::Io(std::io::Error::new(
-                    std::io::ErrorKind::UnexpectedEof,
-                    "connection closed during status",
-                ))
-            })?;
+        let raw = self.stream.read_raw_packet().await?.ok_or_else(|| {
+            Error::Io(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "connection closed during status",
+            ))
+        })?;
 
         let mut cursor = raw.payload.as_slice();
         Ok(ServerboundStatusPacket::decode_by_id(raw.id, &mut cursor)?)
@@ -145,30 +137,34 @@ impl Connection<Status> {
         packet
             .encode(&mut payload)
             .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
-        framing::write_raw_packet(&mut self.stream, packet_id, &payload).await
+        self.stream.write_raw_packet(packet_id, &payload).await
     }
 }
 
 impl Connection<Login> {
     /// Reads a serverbound Login packet from the client.
     pub async fn read_packet(&mut self) -> Result<ServerboundLoginPacket> {
-        let raw = framing::read_raw_packet(&mut self.stream)
-            .await?
-            .ok_or_else(|| {
-                Error::Io(std::io::Error::new(
-                    std::io::ErrorKind::UnexpectedEof,
-                    "connection closed during login",
-                ))
-            })?;
+        let raw = self.stream.read_raw_packet().await?.ok_or_else(|| {
+            Error::Io(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "connection closed during login",
+            ))
+        })?;
 
         let mut cursor = raw.payload.as_slice();
         Ok(ServerboundLoginPacket::decode_by_id(raw.id, &mut cursor)?)
     }
 
-    /// Writes a Disconnect packet to the client and closes the connection.
+    /// Enables AES-128 CFB-8 encryption on this connection.
     ///
-    /// The reason is a JSON text component string (e.g., `{"text":"Bye"}`).
-    /// After sending this packet, the connection should be dropped.
+    /// All subsequent reads and writes will be encrypted/decrypted
+    /// transparently. Called after receiving the client's Encryption
+    /// Response packet.
+    pub fn enable_encryption(&mut self, shared_secret: &[u8; 16]) {
+        self.stream.enable_encryption(shared_secret);
+    }
+
+    /// Writes a Disconnect packet to the client.
     pub async fn disconnect(&mut self, reason: &str) -> Result<()> {
         let packet = ClientboundLoginDisconnect {
             reason: reason.to_string(),
@@ -187,13 +183,14 @@ impl Connection<Login> {
         packet
             .encode(&mut payload)
             .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
-        framing::write_raw_packet(&mut self.stream, packet_id, &payload).await
+        self.stream.write_raw_packet(packet_id, &payload).await
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::framing;
     use basalt_protocol::packets::status::{ServerboundStatusPing, ServerboundStatusPingStart};
     use basalt_types::Decode as _;
     use tokio::net::TcpListener;
@@ -243,8 +240,6 @@ mod tests {
         match conn.read_handshake().await.unwrap() {
             HandshakeResult::Status(mut conn, pkt) => {
                 assert_eq!(pkt, handshake);
-
-                // Status flow works
                 client_send(
                     &mut client_stream,
                     ServerboundStatusPingStart::PACKET_ID,
@@ -274,8 +269,6 @@ mod tests {
         match conn.read_handshake().await.unwrap() {
             HandshakeResult::Login(mut conn, pkt) => {
                 assert_eq!(pkt, handshake);
-
-                // Send disconnect
                 conn.disconnect(r#"{"text":"Not implemented"}"#)
                     .await
                     .unwrap();
@@ -301,7 +294,6 @@ mod tests {
             panic!("expected Status");
         };
 
-        // StatusRequest
         client_send(
             &mut client_stream,
             ServerboundStatusPingStart::PACKET_ID,
@@ -310,7 +302,6 @@ mod tests {
         .await;
         conn.read_packet().await.unwrap();
 
-        // StatusResponse
         let response = ClientboundStatusServerInfo {
             response: r#"{"version":{"name":"1.21","protocol":767}}"#.into(),
         };
@@ -321,7 +312,6 @@ mod tests {
             .unwrap();
         assert_eq!(raw.id, ClientboundStatusServerInfo::PACKET_ID);
 
-        // Ping
         let ping = ServerboundStatusPing { time: 1234567890 };
         client_send(&mut client_stream, ServerboundStatusPing::PACKET_ID, &ping).await;
 
