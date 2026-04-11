@@ -143,12 +143,20 @@ pub struct ClientboundPlayCraftProgressBar {
     pub value: i16,
 }
 
+/// Inline data structure used by [`ClientboundPlayCraftRecipeResponse`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayCraftRecipeResponseRecipedisplay {
+    #[field(varint)]
+    pub r#type: i32,
+    pub data: Vec<u8>,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x39)]
 pub struct ClientboundPlayCraftRecipeResponse {
     #[field(varint)]
     pub window_id: i32,
-    pub recipe_display: Vec<u8>,
+    pub recipe_display: ClientboundPlayCraftRecipeResponseRecipedisplay,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

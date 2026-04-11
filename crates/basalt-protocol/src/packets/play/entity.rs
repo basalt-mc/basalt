@@ -205,7 +205,8 @@ pub struct ClientboundPlayEntityTeleport {
 /// Inline data structure used by [`ClientboundPlayEntityUpdateAttributes`].
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayEntityUpdateAttributesProperties {
-    pub key: Vec<u8>,
+    #[field(varint)]
+    pub key: i32,
     pub value: f64,
     #[field(length = "varint")]
     pub modifiers: Vec<u8>,
