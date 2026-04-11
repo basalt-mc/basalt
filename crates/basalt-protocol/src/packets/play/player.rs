@@ -24,7 +24,7 @@ pub struct ServerboundPlayClientCommand {
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x1f)]
 pub struct ServerboundPlayFlying {
-    pub flags: Vec<u8>,
+    pub flags: u8,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -38,13 +38,13 @@ pub struct ServerboundPlayLockDifficulty {
 pub struct ServerboundPlayLook {
     pub yaw: f32,
     pub pitch: f32,
-    pub flags: Vec<u8>,
+    pub flags: u8,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x29)]
 pub struct ServerboundPlayPlayerInput {
-    pub inputs: Vec<u8>,
+    pub inputs: u8,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -57,7 +57,7 @@ pub struct ServerboundPlayPosition {
     pub x: f64,
     pub y: f64,
     pub z: f64,
-    pub flags: Vec<u8>,
+    pub flags: u8,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -68,7 +68,7 @@ pub struct ServerboundPlayPositionLook {
     pub z: f64,
     pub yaw: f32,
     pub pitch: f32,
-    pub flags: Vec<u8>,
+    pub flags: u8,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -181,6 +181,25 @@ pub struct ClientboundPlayGameStateChange {
     pub game_mode: f32,
 }
 
+/// Inline data structure used by [`ClientboundPlayLogin`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayLoginSpawninfo {
+    #[field(varint)]
+    pub dimension: i32,
+    pub name: String,
+    pub hashed_seed: i64,
+    pub gamemode: i8,
+    pub previous_gamemode: u8,
+    pub is_debug: bool,
+    pub is_flat: bool,
+    #[field(optional)]
+    pub death: Option<Vec<u8>>,
+    #[field(varint)]
+    pub portal_cooldown: i32,
+    #[field(varint)]
+    pub sea_level: i32,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x2c)]
 pub struct ClientboundPlayLogin {
@@ -197,7 +216,7 @@ pub struct ClientboundPlayLogin {
     pub reduced_debug_info: bool,
     pub enable_respawn_screen: bool,
     pub do_limited_crafting: bool,
-    pub world_state: Vec<u8>,
+    pub world_state: ClientboundPlayLoginSpawninfo,
     pub enforces_secure_chat: bool,
 }
 
@@ -241,7 +260,7 @@ pub struct ClientboundPlayPlayerInfoData {
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x40)]
 pub struct ClientboundPlayPlayerInfo {
-    pub action: Vec<u8>,
+    pub action: u8,
     #[field(length = "varint")]
     pub data: Vec<ClientboundPlayPlayerInfoData>,
 }
@@ -273,13 +292,32 @@ pub struct ClientboundPlayPosition {
     pub dz: f64,
     pub yaw: f32,
     pub pitch: f32,
-    pub flags: Vec<u8>,
+    pub flags: u32,
+}
+
+/// Inline data structure used by [`ClientboundPlayRespawn`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayRespawnSpawninfo {
+    #[field(varint)]
+    pub dimension: i32,
+    pub name: String,
+    pub hashed_seed: i64,
+    pub gamemode: i8,
+    pub previous_gamemode: u8,
+    pub is_debug: bool,
+    pub is_flat: bool,
+    #[field(optional)]
+    pub death: Option<Vec<u8>>,
+    #[field(varint)]
+    pub portal_cooldown: i32,
+    #[field(varint)]
+    pub sea_level: i32,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x4c)]
 pub struct ClientboundPlayRespawn {
-    pub world_state: Vec<u8>,
+    pub world_state: ClientboundPlayRespawnSpawninfo,
     pub copy_metadata: u8,
 }
 

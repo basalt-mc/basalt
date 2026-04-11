@@ -220,6 +220,7 @@ pub struct ClientboundPlayDeclareRecipesRecipes {
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayDeclareRecipesStonecutterrecipes {
     pub input: Vec<u8>,
+    #[field(length = "varint")]
     pub slot_display: Vec<u8>,
 }
 
@@ -260,7 +261,7 @@ pub struct ClientboundPlayPingResponse {
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayRecipeBookAddEntries {
     pub recipe: Vec<u8>,
-    pub flags: Vec<u8>,
+    pub flags: u8,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
