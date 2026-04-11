@@ -152,16 +152,15 @@ impl Connection<Login> {
         self.write_packet(ClientboundLoginSuccess::PACKET_ID, success)
             .await?;
 
-        // Wait for LoginAcknowledged from the client
-        let raw = self.read_raw().await?;
-        let mut cursor = raw.payload.as_slice();
-        let packet = ServerboundLoginPacket::decode_by_id(raw.id, &mut cursor)?;
-        match packet {
-            ServerboundLoginPacket::LoginAcknowledged(_) => Ok(self.transition()),
-            _ => Err(Error::Io(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "expected LoginAcknowledged",
-            ))),
+        // Read packets until LoginAcknowledged
+        loop {
+            let raw = self.read_raw().await?;
+            let mut cursor = raw.payload.as_slice();
+            let packet = ServerboundLoginPacket::decode_by_id(raw.id, &mut cursor)?;
+            if let ServerboundLoginPacket::LoginAcknowledged(_) = packet {
+                return Ok(self.transition());
+            }
+            // Ignore other login packets
         }
     }
 
@@ -206,16 +205,19 @@ impl Connection<Configuration> {
         )
         .await?;
 
-        // Wait for client's finish_configuration
-        let raw = self.read_raw().await?;
-        let mut cursor = raw.payload.as_slice();
-        let packet = ServerboundConfigurationPacket::decode_by_id(raw.id, &mut cursor)?;
-        match packet {
-            ServerboundConfigurationPacket::FinishConfiguration(_) => Ok(self.transition()),
-            _ => Err(Error::Io(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "expected FinishConfiguration",
-            ))),
+        // Read packets until FinishConfiguration — the client may send
+        // settings, plugin channels, known packs, or common packets
+        // (which our codegen skips) before acknowledging
+        loop {
+            let raw = self.read_raw().await?;
+            let mut cursor = raw.payload.as_slice();
+            match ServerboundConfigurationPacket::decode_by_id(raw.id, &mut cursor) {
+                Ok(ServerboundConfigurationPacket::FinishConfiguration(_)) => {
+                    return Ok(self.transition());
+                }
+                Ok(_) => {}  // Ignore known non-finish packets
+                Err(_) => {} // Ignore unknown/common packets (settings, brand, etc.)
+            }
         }
     }
 
