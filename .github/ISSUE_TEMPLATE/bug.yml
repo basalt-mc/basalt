@@ -1,0 +1,39 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+labels: ["bug"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What were you doing when you encountered the bug? Include the crate, version, and environment.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What went wrong? Include error messages, stack traces, or unexpected output.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to reproduce the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed fix
+      description: If you have an idea of what's causing this or how to fix it, describe it here.
+    validations:
+      required: false
