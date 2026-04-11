@@ -233,9 +233,10 @@ GitHub Actions runs on every push to `main` and on pull requests:
 1. **Format** — `cargo fmt --all --check`
 2. **Clippy** — `cargo clippy --all-targets --all-features -- -D warnings`
 3. **Test** — `cargo test --all-features`
-4. **Cargo Deny** — advisory + license audit
+4. **Coverage** — `cargo llvm-cov --all-features --fail-under 90` (minimum 90%, posts report on PRs)
+5. **Cargo Deny** — advisory + license audit
 
-All four jobs run in parallel. The concurrency group cancels in-progress runs on the same ref.
+All five jobs run in parallel. The concurrency group cancels in-progress runs on the same ref.
 
 ## Testing strategy
 
