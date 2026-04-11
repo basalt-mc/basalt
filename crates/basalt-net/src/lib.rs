@@ -15,6 +15,6 @@ pub mod error;
 pub mod framing;
 pub mod pipeline;
 
-pub use connection::Connection;
+pub use connection::{Connection, HandshakeResult};
 pub use error::{Error, Result};
 pub use pipeline::{Action, Middleware, PacketContext, Pipeline};
