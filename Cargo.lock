@@ -81,6 +81,7 @@ dependencies = [
  "basalt-types",
  "criterion",
  "proptest",
+ "thiserror",
 ]
 
 [[package]]
