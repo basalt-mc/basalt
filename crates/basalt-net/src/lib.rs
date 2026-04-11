@@ -13,6 +13,8 @@ pub mod connection;
 pub mod crypto;
 pub mod error;
 pub mod framing;
+pub mod pipeline;
 
 pub use connection::Connection;
 pub use error::{Error, Result};
+pub use pipeline::{Action, Middleware, PacketContext, Pipeline};
