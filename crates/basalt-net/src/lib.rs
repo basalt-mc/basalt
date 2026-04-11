@@ -8,7 +8,9 @@
 //! Encryption (AES/CFB-8), compression (zlib), and the middleware
 //! pipeline will be added in subsequent issues.
 
+pub mod compression;
 pub mod connection;
+pub mod crypto;
 pub mod error;
 pub mod framing;
 
