@@ -69,6 +69,7 @@ fn codegen() {
             println!("Writing {module_name} packets to {}", output_path.display());
             fs::write(&output_path, &code)
                 .unwrap_or_else(|e| panic!("Failed to write {}: {e}", output_path.display()));
+            format_file(&output_path);
         }
     }
 
@@ -78,8 +79,28 @@ fn codegen() {
     let mod_code = generate_packets_mod(&workspace_root);
     fs::write(&mod_path, mod_code)
         .unwrap_or_else(|e| panic!("Failed to write {}: {e}", mod_path.display()));
+    format_file(&mod_path);
 
-    println!("Done. Run `cargo fmt` to format the generated code.");
+    println!("Done.");
+}
+
+/// Runs rustfmt on a generated file to ensure it matches the project's
+/// formatting standards. This way the codegen output is commit-ready
+/// without a separate `cargo fmt` step.
+fn format_file(path: &std::path::Path) {
+    let status = std::process::Command::new("rustfmt")
+        .arg("--edition")
+        .arg("2024")
+        .arg(path)
+        .status()
+        .unwrap_or_else(|e| panic!("Failed to run rustfmt on {}: {e}", path.display()));
+    if !status.success() {
+        eprintln!(
+            "Warning: rustfmt failed on {} (exit code {:?})",
+            path.display(),
+            status.code()
+        );
+    }
 }
 
 /// Finds the workspace root by looking for Cargo.toml with [workspace].
@@ -904,6 +925,7 @@ fn generate_play_split(state: &Value, workspace_root: &std::path::Path) {
         );
         fs::write(&path, &code)
             .unwrap_or_else(|e| panic!("Failed to write {}: {e}", path.display()));
+        format_file(&path);
     }
 
     // Generate play/mod.rs
@@ -912,6 +934,7 @@ fn generate_play_split(state: &Value, workspace_root: &std::path::Path) {
     println!("Writing play/mod.rs");
     fs::write(&mod_path, &mod_code)
         .unwrap_or_else(|e| panic!("Failed to write {}: {e}", mod_path.display()));
+    format_file(&mod_path);
 }
 
 /// Extracts the short packet name from a full struct name.
@@ -1637,5 +1660,228 @@ mod tests {
     fn map_unknown_type_falls_back() {
         let (ty, _, _) = map_type(&Value::String("unknownType".into()), "", "", false);
         assert_eq!(ty, "Vec<u8>");
+    }
+
+    // -- New type mappings --
+
+    #[test]
+    fn map_position() {
+        let (ty, attr, _) = map_type(&Value::String("position".into()), "", "", false);
+        assert_eq!(ty, "Position");
+        assert!(attr.is_none());
+    }
+
+    #[test]
+    fn map_anonymous_nbt() {
+        let (ty, attr, _) = map_type(&Value::String("anonymousNbt".into()), "", "", false);
+        assert_eq!(ty, "NbtCompound");
+        assert!(attr.is_none());
+    }
+
+    #[test]
+    fn map_anon_optional_nbt() {
+        let (ty, attr, _) = map_type(&Value::String("anonOptionalNbt".into()), "", "", false);
+        assert_eq!(ty, "Option<NbtCompound>");
+        assert_eq!(attr, Some("optional".into()));
+    }
+
+    #[test]
+    fn map_byte_array_type() {
+        let (ty, attr, _) = map_type(&Value::String("ByteArray".into()), "", "", false);
+        assert_eq!(ty, "Vec<u8>");
+        assert_eq!(attr, Some("length = \"varint\"".into()));
+    }
+
+    #[test]
+    fn map_container_id() {
+        let (ty, attr, _) = map_type(&Value::String("ContainerID".into()), "", "", false);
+        assert_eq!(ty, "i32");
+        assert_eq!(attr, Some("varint".into()));
+    }
+
+    #[test]
+    fn map_slot() {
+        let (ty, attr, _) = map_type(&Value::String("Slot".into()), "", "", false);
+        assert_eq!(ty, "Slot");
+        assert!(attr.is_none());
+    }
+
+    #[test]
+    fn map_vec2f() {
+        let (ty, _, _) = map_type(&Value::String("vec2f".into()), "", "", false);
+        assert_eq!(ty, "Vec2f");
+    }
+
+    #[test]
+    fn map_vec3f() {
+        let (ty, _, _) = map_type(&Value::String("vec3f".into()), "", "", false);
+        assert_eq!(ty, "Vec3f");
+    }
+
+    #[test]
+    fn map_vec3f64() {
+        let (ty, _, _) = map_type(&Value::String("vec3f64".into()), "", "", false);
+        assert_eq!(ty, "Vec3f64");
+    }
+
+    #[test]
+    fn map_vec3i16() {
+        let (ty, _, _) = map_type(&Value::String("vec3i16".into()), "", "", false);
+        assert_eq!(ty, "Vec3i16");
+    }
+
+    #[test]
+    fn map_sound_source() {
+        let (ty, attr, _) = map_type(&Value::String("soundSource".into()), "", "", false);
+        assert_eq!(ty, "i32");
+        assert_eq!(attr, Some("varint".into()));
+    }
+
+    #[test]
+    fn map_packed_chunk_pos() {
+        let (ty, _, _) = map_type(&Value::String("packedChunkPos".into()), "", "", false);
+        assert_eq!(ty, "i64");
+    }
+
+    #[test]
+    fn map_optvarint() {
+        let (ty, attr, _) = map_type(&Value::String("optvarint".into()), "", "", false);
+        assert_eq!(ty, "i32");
+        assert_eq!(attr, Some("varint".into()));
+    }
+
+    // -- Play category --
+
+    #[test]
+    fn play_category_entity() {
+        assert_eq!(play_category("spawn_entity"), "entity");
+        assert_eq!(play_category("entity_metadata"), "entity");
+        assert_eq!(play_category("use_entity"), "entity");
+    }
+
+    #[test]
+    fn play_category_world() {
+        assert_eq!(play_category("block_change"), "world");
+        assert_eq!(play_category("map_chunk"), "world");
+        assert_eq!(play_category("explosion"), "world");
+    }
+
+    #[test]
+    fn play_category_player() {
+        assert_eq!(play_category("position"), "player");
+        assert_eq!(play_category("abilities"), "player");
+        assert_eq!(play_category("respawn"), "player");
+    }
+
+    #[test]
+    fn play_category_inventory() {
+        assert_eq!(play_category("window_click"), "inventory");
+        assert_eq!(play_category("set_slot"), "inventory");
+        assert_eq!(play_category("trade_list"), "inventory");
+    }
+
+    #[test]
+    fn play_category_chat() {
+        assert_eq!(play_category("chat_message"), "chat");
+        assert_eq!(play_category("system_chat"), "chat");
+        assert_eq!(play_category("boss_bar"), "chat");
+    }
+
+    #[test]
+    fn play_category_misc_fallback() {
+        assert_eq!(play_category("keep_alive"), "misc");
+        assert_eq!(play_category("unknown_packet_xyz"), "misc");
+    }
+
+    // -- extract_play_short_name --
+
+    #[test]
+    fn extract_serverbound_name() {
+        assert_eq!(
+            extract_play_short_name("ServerboundPlayPosition"),
+            "position"
+        );
+    }
+
+    #[test]
+    fn extract_clientbound_name() {
+        assert_eq!(
+            extract_play_short_name("ClientboundPlayEntityMetadata"),
+            "entity_metadata"
+        );
+    }
+
+    #[test]
+    fn extract_compound_name() {
+        assert_eq!(
+            extract_play_short_name("ServerboundPlayChatCommandSigned"),
+            "chat_command_signed"
+        );
+    }
+
+    // -- generate_category_file --
+
+    #[test]
+    fn generate_category_produces_valid_output() {
+        let packet = PacketDef {
+            name: "ServerboundPlayTest".into(),
+            id: "0x00".into(),
+            fields: vec![FieldDef {
+                name: "value".into(),
+                rust_type: "i32".into(),
+                attribute: None,
+            }],
+            inline_structs: vec![],
+        };
+        let refs = vec![&packet];
+        let code = generate_category_file("test", &refs, &[], "Play");
+        assert!(code.contains("Play state — test packets"));
+        assert!(code.contains("pub struct ServerboundPlayTest"));
+        assert!(code.contains("_roundtrip"));
+    }
+
+    // -- generate_play_mod --
+
+    #[test]
+    fn generate_play_mod_has_enums() {
+        let sb = vec![PacketDef {
+            name: "ServerboundPlayPing".into(),
+            id: "0x00".into(),
+            fields: vec![],
+            inline_structs: vec![],
+        }];
+        let cb = vec![PacketDef {
+            name: "ClientboundPlayPong".into(),
+            id: "0x00".into(),
+            fields: vec![],
+            inline_structs: vec![],
+        }];
+        let sb_refs: Vec<&PacketDef> = sb.iter().collect();
+        let cb_refs: Vec<&PacketDef> = cb.iter().collect();
+        let mut categories = BTreeMap::new();
+        categories.insert("misc", (sb_refs, cb_refs));
+
+        let code = generate_play_mod(&categories, &sb, &cb);
+        assert!(code.contains("pub mod misc;"));
+        assert!(code.contains("ServerboundPlayPacket"));
+        assert!(code.contains("ClientboundPlayPacket"));
+        assert!(code.contains("decode_by_id"));
+    }
+
+    // -- option wrapping inline --
+
+    #[test]
+    fn map_option_with_inline_falls_back() {
+        let json: Value = serde_json::from_str(
+            r#"["option", ["array", {
+            "countType": "varint",
+            "type": ["container", [{"name": "x", "type": "i32"}]]
+        }]]"#,
+        )
+        .unwrap();
+        let (ty, attr, inline) = map_type(&json, "Test", "field", false);
+        assert_eq!(ty, "Option<Vec<u8>>");
+        assert_eq!(attr, Some("optional".into()));
+        assert!(inline.is_none());
     }
 }
