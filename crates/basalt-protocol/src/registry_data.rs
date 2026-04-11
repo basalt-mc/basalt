@@ -96,23 +96,463 @@ fn build_biome_registry() -> ClientboundConfigurationRegistryData {
     }
 }
 
-/// Builds the `minecraft:damage_type` registry with a single
-/// generic damage type.
+/// Definition of a damage type for the registry data table.
 ///
-/// The client requires at least one damage type to initialize
-/// its damage system, even if no damage occurs.
+/// Each entry maps to one `minecraft:damage_type` registry entry
+/// that the client needs during `DamageSources` initialization.
+struct DamageTypeDef {
+    /// Registry key (e.g., "in_fire").
+    key: &'static str,
+    /// Death message translation key (e.g., "inFire").
+    message_id: &'static str,
+    /// Damage scaling rule: "never", "when_caused_by_living_non_player", or "always".
+    scaling: &'static str,
+    /// Hunger exhaustion applied when this damage is taken.
+    exhaustion: f32,
+    /// Optional visual/sound effect: "burning", "drowning", "freezing", "poking", "thorns".
+    effects: Option<&'static str>,
+    /// Optional death message variant: "fall_variants", "intentional_game_design".
+    death_message_type: Option<&'static str>,
+}
+
+/// All damage types required by the Minecraft 1.21.4 client.
+///
+/// The `DamageSources` class looks up these types during world
+/// initialization via `getOrThrow` — any missing entry crashes
+/// the client. This list covers all types from the vanilla data
+/// generator plus 1.21+ additions (wind_charge, mace_smash).
+const DAMAGE_TYPES: &[DamageTypeDef] = &[
+    // -- Environment --
+    DamageTypeDef {
+        key: "in_fire",
+        message_id: "inFire",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: Some("burning"),
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "campfire",
+        message_id: "inFire",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: Some("burning"),
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "on_fire",
+        message_id: "onFire",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: Some("burning"),
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "lava",
+        message_id: "lava",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: Some("burning"),
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "hot_floor",
+        message_id: "hotFloor",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: Some("burning"),
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "in_wall",
+        message_id: "inWall",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "cramming",
+        message_id: "cramming",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "drown",
+        message_id: "drown",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: Some("drowning"),
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "starve",
+        message_id: "starve",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "cactus",
+        message_id: "cactus",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: Some("poking"),
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "sweet_berry_bush",
+        message_id: "sweetBerryBush",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: Some("poking"),
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "freeze",
+        message_id: "freeze",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: Some("freezing"),
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "lightning_bolt",
+        message_id: "lightningBolt",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "dry_out",
+        message_id: "dryOut",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    // -- Physics --
+    DamageTypeDef {
+        key: "fall",
+        message_id: "fall",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: None,
+        death_message_type: Some("fall_variants"),
+    },
+    DamageTypeDef {
+        key: "fly_into_wall",
+        message_id: "flyIntoWall",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "stalagmite",
+        message_id: "stalagmite",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: None,
+        death_message_type: Some("fall_variants"),
+    },
+    DamageTypeDef {
+        key: "falling_anvil",
+        message_id: "anvil",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "falling_block",
+        message_id: "fallingBlock",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "falling_stalactite",
+        message_id: "fallingStalactite",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    // -- System --
+    DamageTypeDef {
+        key: "out_of_world",
+        message_id: "outOfWorld",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "generic",
+        message_id: "generic",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "generic_kill",
+        message_id: "genericKill",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "outside_border",
+        message_id: "outsideBorder",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "bad_respawn_point",
+        message_id: "badRespawnPoint",
+        scaling: "always",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: Some("intentional_game_design"),
+    },
+    // -- Magic / status effects --
+    DamageTypeDef {
+        key: "magic",
+        message_id: "magic",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "indirect_magic",
+        message_id: "indirectMagic",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "wither",
+        message_id: "wither",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "dragon_breath",
+        message_id: "dragonBreath",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "sonic_boom",
+        message_id: "sonic_boom",
+        scaling: "always",
+        exhaustion: 0.0,
+        effects: None,
+        death_message_type: None,
+    },
+    // -- Combat --
+    DamageTypeDef {
+        key: "mob_attack",
+        message_id: "mob_attack",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "mob_attack_no_aggro",
+        message_id: "mob_attack_no_aggro",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "mob_projectile",
+        message_id: "mob_projectile",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "player_attack",
+        message_id: "player_attack",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "player_explosion",
+        message_id: "player_explosion",
+        scaling: "always",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "explosion",
+        message_id: "explosion",
+        scaling: "always",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "thorns",
+        message_id: "thorns",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: Some("thorns"),
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "sting",
+        message_id: "sting",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "spit",
+        message_id: "mob_attack",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    // -- Projectiles --
+    DamageTypeDef {
+        key: "arrow",
+        message_id: "arrow",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "trident",
+        message_id: "trident",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "thrown",
+        message_id: "thrown",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "fireball",
+        message_id: "fireball",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: Some("burning"),
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "unattributed_fireball",
+        message_id: "onFire",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: Some("burning"),
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "fireworks",
+        message_id: "fireworks",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "wither_skull",
+        message_id: "witherSkull",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "wind_charge",
+        message_id: "wind_charge",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "mace_smash",
+        message_id: "mace_smash",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.1,
+        effects: None,
+        death_message_type: None,
+    },
+    DamageTypeDef {
+        key: "ender_pearl",
+        message_id: "fall",
+        scaling: "when_caused_by_living_non_player",
+        exhaustion: 0.0,
+        effects: None,
+        death_message_type: Some("fall_variants"),
+    },
+];
+
+/// Builds the `minecraft:damage_type` registry with all vanilla
+/// damage types.
+///
+/// The client's `DamageSources` class looks up specific damage
+/// types via `getOrThrow` during world initialization — any
+/// missing entry causes an immediate crash. This sends the
+/// complete set from the 1.21.4 data generator.
 fn build_damage_type_registry() -> ClientboundConfigurationRegistryData {
-    let mut generic = NbtCompound::new();
-    generic.insert("message_id", NbtTag::String("generic".into()));
-    generic.insert("scaling", NbtTag::String("never".into()));
-    generic.insert("exhaustion", NbtTag::Float(0.0));
+    let entries = DAMAGE_TYPES
+        .iter()
+        .map(|def| {
+            let mut nbt = NbtCompound::new();
+            nbt.insert("message_id", NbtTag::String(def.message_id.into()));
+            nbt.insert("scaling", NbtTag::String(def.scaling.into()));
+            nbt.insert("exhaustion", NbtTag::Float(def.exhaustion));
+            if let Some(effects) = def.effects {
+                nbt.insert("effects", NbtTag::String(effects.into()));
+            }
+            if let Some(dmt) = def.death_message_type {
+                nbt.insert("death_message_type", NbtTag::String(dmt.into()));
+            }
+            ClientboundConfigurationRegistryDataEntries {
+                key: format!("minecraft:{}", def.key),
+                value: Some(nbt),
+            }
+        })
+        .collect();
 
     ClientboundConfigurationRegistryData {
         id: "minecraft:damage_type".into(),
-        entries: vec![ClientboundConfigurationRegistryDataEntries {
-            key: "minecraft:generic".into(),
-            value: Some(generic),
-        }],
+        entries,
     }
 }
 
@@ -194,6 +634,25 @@ mod tests {
         let reg = build_biome_registry();
         let value = reg.entries[0].value.as_ref().unwrap();
         assert!(value.get("effects").is_some());
+    }
+
+    #[test]
+    fn damage_type_has_all_entries() {
+        let reg = build_damage_type_registry();
+        assert_eq!(reg.entries.len(), DAMAGE_TYPES.len());
+
+        // Check that critical damage types the client requires are present
+        let keys: Vec<&str> = reg.entries.iter().map(|e| e.key.as_str()).collect();
+        for required in [
+            "minecraft:in_fire",
+            "minecraft:generic",
+            "minecraft:fall",
+            "minecraft:out_of_world",
+            "minecraft:wind_charge",
+            "minecraft:mace_smash",
+        ] {
+            assert!(keys.contains(&required), "missing damage type: {required}");
+        }
     }
 
     #[test]
