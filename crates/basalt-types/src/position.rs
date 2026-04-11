@@ -13,7 +13,7 @@ use crate::{Decode, Encode, EncodedSize, Result};
 /// - y: 12 bits (signed, range -2048 to 2047)
 ///
 /// Encoding: `(x & 0x3FFFFFF) << 38 | (z & 0x3FFFFFF) << 12 | (y & 0xFFF)`
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
