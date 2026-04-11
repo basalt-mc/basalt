@@ -7,17 +7,20 @@ use crate::crypto::CipherPair;
 use crate::error::{Error, Result};
 use crate::framing::{MAX_PACKET_SIZE, RawPacket};
 
-/// A TCP stream with optional transparent encryption.
+/// A TCP stream with optional transparent encryption and compression.
 ///
-/// Wraps a `TcpStream` and an optional `CipherPair`. When encryption is
-/// enabled, all reads are decrypted and all writes are encrypted
-/// automatically. The caller doesn't need to know whether encryption
-/// is active — the API is identical either way.
+/// Wraps a `TcpStream` with optional AES-128 CFB-8 encryption and zlib
+/// compression. Both layers are transparent to the caller — the API is
+/// identical regardless of which layers are active.
 ///
-/// Encryption is activated once during the login handshake via
-/// `enable_encryption()` and stays active for the lifetime of the
-/// connection. There is no way to disable it.
-pub struct EncryptedStream {
+/// The layers are activated during the login handshake:
+/// 1. Encryption via `enable_encryption()` after Encryption Response
+/// 2. Compression via `enable_compression()` after Set Compression
+///
+/// Once enabled, neither layer can be disabled. On the wire, compression
+/// is applied first (at the frame level), then encryption wraps everything
+/// including the length prefix.
+pub struct ProtocolStream {
     /// The underlying TCP stream.
     stream: TcpStream,
     /// The cipher pair, if encryption has been enabled.
@@ -28,7 +31,7 @@ pub struct EncryptedStream {
     compression_threshold: Option<usize>,
 }
 
-impl EncryptedStream {
+impl ProtocolStream {
     /// Creates a new unencrypted stream from a TCP connection.
     pub fn new(stream: TcpStream) -> Self {
         Self {
@@ -215,12 +218,12 @@ mod tests {
     use super::*;
     use tokio::net::TcpListener;
 
-    async fn connected_pair() -> (EncryptedStream, EncryptedStream) {
+    async fn connected_pair() -> (ProtocolStream, ProtocolStream) {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let client = TcpStream::connect(addr).await.unwrap();
         let (server, _) = listener.accept().await.unwrap();
-        (EncryptedStream::new(server), EncryptedStream::new(client))
+        (ProtocolStream::new(server), ProtocolStream::new(client))
     }
 
     #[tokio::test]
