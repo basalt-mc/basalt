@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::packets::handshake::ServerboundHandshakePacket;
+use crate::packets::login::{ClientboundLoginPacket, ServerboundLoginPacket};
 use crate::packets::status::{ClientboundStatusPacket, ServerboundStatusPacket};
 use crate::version::ProtocolVersion;
 
@@ -53,6 +54,24 @@ impl PacketRegistry {
         buf: &mut &[u8],
     ) -> Result<ClientboundStatusPacket> {
         ClientboundStatusPacket::decode_by_id(id, buf)
+    }
+
+    /// Decodes a serverbound Login packet from its ID and payload.
+    pub fn decode_serverbound_login(
+        &self,
+        id: i32,
+        buf: &mut &[u8],
+    ) -> Result<ServerboundLoginPacket> {
+        ServerboundLoginPacket::decode_by_id(id, buf)
+    }
+
+    /// Decodes a clientbound Login packet from its ID and payload.
+    pub fn decode_clientbound_login(
+        &self,
+        id: i32,
+        buf: &mut &[u8],
+    ) -> Result<ClientboundLoginPacket> {
+        ClientboundLoginPacket::decode_by_id(id, buf)
     }
 }
 
