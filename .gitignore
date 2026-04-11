@@ -1,0 +1,102 @@
+## Rust
+target/
+
+## logs
+logs
+*.log
+
+## archives and compressed files
+*.7z
+*.jar
+*.rar
+*.zip
+*.gz
+*.bzip
+*.xz
+*.lzma
+*.tar
+*.tgz
+*.tar.gz
+*.iso
+*.dmg
+*.xpi
+*.gem
+*.egg
+*.deb
+*.rpm
+
+## common temp file patterns
+*~
+*.*~
+.#*
+\#*#
+.*.sw[a-z]
+
+## editors and ides
+
+### emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+.elc
+auto-save-list
+tramp
+.\#*
+
+### vim
+*.un~
+Session.vim
+
+### vscode
+.vscode/
+!.vscode/extensions.json
+
+### jetbrains
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+## os-specific noise files
+
+### linux
+.directory
+
+### osx
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+### windows
+Desktop.ini
+$RECYCLE.BIN/
+Thumbs.db
+
+## commonly used temp files and directories
+*.pid
+tmp
+temp
+
+## tags, gtags, etags, ctags
+GPATH
+GRTAGS
+GSYMS
+GTAGS
+TAGS
+
+## dependencies
+node_modules/
+
+## local env files
+.env
+.env*.local
+
+## misc
+/coverage
+
+## superpowers specs (local only)
+docs/superpowers/
