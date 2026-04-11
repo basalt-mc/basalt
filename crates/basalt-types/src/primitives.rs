@@ -1,15 +1,27 @@
 use crate::{Decode, Encode, EncodedSize, Error, Result};
 
-// -- bool --
-
+/// Encodes a boolean as a single byte in the Minecraft protocol.
+///
+/// The Minecraft protocol represents booleans as a single unsigned byte:
+/// `0x00` for `false`, `0x01` for `true`. This is used in many packets
+/// for flags like on-ground state, sneaking, sprinting, etc.
 impl Encode for bool {
+    /// Writes `0x01` if true, `0x00` if false. Always writes exactly one byte.
     fn encode(&self, buf: &mut Vec<u8>) -> Result<()> {
         buf.push(if *self { 0x01 } else { 0x00 });
         Ok(())
     }
 }
 
+/// Decodes a boolean from a single byte in the Minecraft protocol.
+///
+/// Any non-zero byte is interpreted as `true`, matching the Minecraft
+/// server behavior. This is intentionally lenient — the protocol spec
+/// says `0x01` for true, but servers may send other non-zero values.
 impl Decode for bool {
+    /// Reads one byte. Returns `true` for any non-zero value, `false` for `0x00`.
+    ///
+    /// Fails with `BufferUnderflow` if the buffer is empty.
     fn decode(buf: &mut &[u8]) -> Result<Self> {
         if buf.is_empty() {
             return Err(Error::BufferUnderflow {
@@ -23,24 +35,45 @@ impl Decode for bool {
     }
 }
 
+/// A boolean always occupies exactly one byte on the wire.
 impl EncodedSize for bool {
     fn encoded_size(&self) -> usize {
         1
     }
 }
 
-// -- Macro for fixed-size numeric types --
-
+/// Generates `Encode`, `Decode`, and `EncodedSize` implementations for
+/// fixed-size numeric types using big-endian byte order.
+///
+/// The Minecraft protocol uses big-endian (network byte order) for all
+/// fixed-size integers and floating-point values. Each type occupies a
+/// fixed number of bytes on the wire, regardless of the value.
 macro_rules! impl_numeric {
     ($ty:ty, $size:expr) => {
+        /// Encodes as a fixed-size big-endian value.
+        ///
+        /// The Minecraft protocol uses big-endian (network byte order) for all
+        /// fixed-size numeric types. The value is written as exactly
+        #[doc = concat!(stringify!($size), " bytes.")]
         impl Encode for $ty {
+            /// Writes the value as big-endian bytes. Always writes exactly
+            #[doc = concat!(stringify!($size), " bytes.")]
             fn encode(&self, buf: &mut Vec<u8>) -> Result<()> {
                 buf.extend_from_slice(&self.to_be_bytes());
                 Ok(())
             }
         }
 
+        /// Decodes from a fixed-size big-endian value.
+        ///
+        /// Reads exactly
+        #[doc = concat!(stringify!($size), " bytes from the buffer and interprets them as big-endian.")]
         impl Decode for $ty {
+            /// Reads
+            #[doc = concat!(stringify!($size), " big-endian bytes and advances the cursor.")]
+            ///
+            /// Fails with `BufferUnderflow` if fewer than
+            #[doc = concat!(stringify!($size), " bytes remain.")]
             fn decode(buf: &mut &[u8]) -> Result<Self> {
                 if buf.len() < $size {
                     return Err(Error::BufferUnderflow {
@@ -55,6 +88,8 @@ macro_rules! impl_numeric {
             }
         }
 
+        /// The encoded size is always
+        #[doc = concat!(stringify!($size), " bytes, regardless of the value.")]
         impl EncodedSize for $ty {
             fn encoded_size(&self) -> usize {
                 $size

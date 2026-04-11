@@ -3,19 +3,31 @@ use crate::{Decode, Encode, EncodedSize, Error, Result};
 const SEGMENT_BITS: u8 = 0x7F;
 const CONTINUE_BIT: u8 = 0x80;
 
-/// Variable-length i32, encoded in 1-5 bytes.
+/// A variable-length encoded 32-bit signed integer, occupying 1 to 5 bytes.
 ///
-/// MSB of each byte is the continuation bit. Lower 7 bits carry the value,
-/// least significant group first.
+/// VarInt is the most common type in the Minecraft protocol. It is used for
+/// packet IDs, packet lengths, string length prefixes, array lengths, enum
+/// discriminants, and many field values. The encoding uses the MSB of each
+/// byte as a continuation bit (1 = more bytes follow, 0 = last byte), with
+/// the lower 7 bits carrying the value in little-endian order (least
+/// significant group first). Negative values use two's complement and
+/// always require 5 bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct VarInt(pub i32);
 
 impl VarInt {
-    /// Maximum number of bytes a VarInt can occupy.
+    /// Maximum number of bytes a VarInt can occupy on the wire.
     pub const MAX_BYTES: usize = 5;
 }
 
+/// Encodes the VarInt as 1-5 bytes using MSB continuation bit encoding.
+///
+/// Each byte carries 7 bits of the value (least significant first). The MSB
+/// is set to 1 if more bytes follow, 0 on the final byte. Negative values
+/// are encoded as their unsigned two's complement representation and always
+/// produce 5 bytes.
 impl Encode for VarInt {
+    /// Writes the variable-length encoded bytes to the buffer.
     fn encode(&self, buf: &mut Vec<u8>) -> Result<()> {
         let mut value = self.0 as u32;
         loop {
@@ -29,7 +41,15 @@ impl Encode for VarInt {
     }
 }
 
+/// Decodes a VarInt by reading 1-5 bytes from the buffer.
+///
+/// Reads bytes one at a time, accumulating 7-bit groups until a byte
+/// without the continuation bit is found. If more than 5 bytes have
+/// the continuation bit set, the value would exceed 32 bits and the
+/// decoder returns `Error::VarIntTooLarge`. If the buffer runs out
+/// mid-VarInt, returns `Error::BufferUnderflow`.
 impl Decode for VarInt {
+    /// Reads and decodes a VarInt, advancing the cursor past all consumed bytes.
     fn decode(buf: &mut &[u8]) -> Result<Self> {
         let mut value: u32 = 0;
         let mut position: u32 = 0;
@@ -62,6 +82,11 @@ impl Decode for VarInt {
     }
 }
 
+/// Computes the number of bytes this VarInt will occupy when encoded.
+///
+/// Returns 1-5 based on the unsigned magnitude of the value. Small
+/// positive values (0-127) take 1 byte, while negative values always
+/// take 5 bytes due to two's complement sign extension.
 impl EncodedSize for VarInt {
     fn encoded_size(&self) -> usize {
         let value = self.0 as u32;
@@ -75,29 +100,39 @@ impl EncodedSize for VarInt {
     }
 }
 
+/// Wraps a raw `i32` into a `VarInt` for protocol encoding.
 impl From<i32> for VarInt {
     fn from(value: i32) -> Self {
         VarInt(value)
     }
 }
 
+/// Extracts the inner `i32` value from a `VarInt`.
 impl From<VarInt> for i32 {
     fn from(value: VarInt) -> Self {
         value.0
     }
 }
 
-/// Variable-length i64, encoded in 1-10 bytes.
+/// A variable-length encoded 64-bit signed integer, occupying 1 to 10 bytes.
 ///
-/// Same encoding as VarInt but for 64-bit values.
+/// VarLong uses the same MSB continuation bit encoding as [`VarInt`] but
+/// for 64-bit values. It is used in the protocol for large values like
+/// entity UUIDs in some contexts, timestamps, and world seed. Negative
+/// values use two's complement and always require 10 bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct VarLong(pub i64);
 
 impl VarLong {
-    /// Maximum number of bytes a VarLong can occupy.
+    /// Maximum number of bytes a VarLong can occupy on the wire.
     pub const MAX_BYTES: usize = 10;
 }
 
+/// Encodes the VarLong as 1-10 bytes using MSB continuation bit encoding.
+///
+/// Same algorithm as [`VarInt`] but operating on 64-bit values. Negative
+/// values are encoded as their unsigned two's complement representation
+/// and always produce 10 bytes.
 impl Encode for VarLong {
     fn encode(&self, buf: &mut Vec<u8>) -> Result<()> {
         let mut value = self.0 as u64;
@@ -112,6 +147,12 @@ impl Encode for VarLong {
     }
 }
 
+/// Decodes a VarLong by reading 1-10 bytes from the buffer.
+///
+/// Same algorithm as [`VarInt`] decoding but allowing up to 10 bytes
+/// (64 bits). Returns `Error::VarIntTooLarge` if more than 10 bytes
+/// carry continuation bits, `Error::BufferUnderflow` if the buffer
+/// ends mid-value.
 impl Decode for VarLong {
     fn decode(buf: &mut &[u8]) -> Result<Self> {
         let mut value: u64 = 0;
@@ -144,6 +185,11 @@ impl Decode for VarLong {
     }
 }
 
+/// Computes the number of bytes this VarLong will occupy when encoded.
+///
+/// Returns 1-10 based on the unsigned magnitude. Small positive values
+/// (0-127) take 1 byte, `i64::MAX` takes 9, and negative values always
+/// take 10 bytes.
 impl EncodedSize for VarLong {
     fn encoded_size(&self) -> usize {
         let value = self.0 as u64;
@@ -162,12 +208,14 @@ impl EncodedSize for VarLong {
     }
 }
 
+/// Wraps a raw `i64` into a `VarLong` for protocol encoding.
 impl From<i64> for VarLong {
     fn from(value: i64) -> Self {
         VarLong(value)
     }
 }
 
+/// Extracts the inner `i64` value from a `VarLong`.
 impl From<VarLong> for i64 {
     fn from(value: VarLong) -> Self {
         value.0
