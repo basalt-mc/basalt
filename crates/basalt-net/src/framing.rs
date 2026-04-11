@@ -9,7 +9,7 @@ use crate::error::{Error, Result};
 /// Packets larger than this are rejected to prevent memory exhaustion
 /// from malicious or corrupted data. This matches the vanilla Minecraft
 /// server's practical limit.
-const MAX_PACKET_SIZE: usize = 2 * 1024 * 1024;
+pub(crate) const MAX_PACKET_SIZE: usize = 2 * 1024 * 1024;
 
 /// A raw framed packet read from the wire.
 ///

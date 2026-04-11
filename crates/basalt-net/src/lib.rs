@@ -14,6 +14,7 @@ pub mod crypto;
 pub mod error;
 pub mod framing;
 pub mod pipeline;
+pub mod stream;
 
 pub use connection::{Connection, HandshakeResult};
 pub use error::{Error, Result};
