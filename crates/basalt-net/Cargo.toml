@@ -7,11 +7,10 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+basalt-types = { workspace = true }
 basalt-protocol = { workspace = true }
 tokio = { workspace = true }
-aes = { workspace = true }
-cfb8 = { workspace = true }
-flate2 = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-criterion = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
