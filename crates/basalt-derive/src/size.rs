@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, Result};
 
-use crate::attrs::{parse_field_attr, parse_packet_attr, parse_variant_attr};
+use crate::attrs::{parse_field_attr, parse_variant_attr};
 
 /// Generates the `EncodedSize` implementation for a struct or enum.
 pub fn derive_encoded_size(input: &DeriveInput) -> Result<TokenStream> {
@@ -16,13 +16,27 @@ pub fn derive_encoded_size(input: &DeriveInput) -> Result<TokenStream> {
     }
 }
 
-/// Generates `EncodedSize` for a struct: sums the encoded size of each field.
+/// Generates `EncodedSize` encoding only the struct's fields.
 ///
-/// If `#[packet(id = ...)]` is present, includes the VarInt packet ID size.
+/// Called by the `#[packet]` attribute macro.
+pub fn derive_encoded_size_fields_only(input: &DeriveInput) -> Result<TokenStream> {
+    match &input.data {
+        Data::Struct(data) => derive_encoded_size_struct(input, data),
+        Data::Enum(_) => Err(syn::Error::new_spanned(
+            input,
+            "#[packet] cannot be used on enums",
+        )),
+        Data::Union(_) => Err(syn::Error::new_spanned(
+            input,
+            "#[packet] cannot be used on unions",
+        )),
+    }
+}
+
+/// Generates `EncodedSize` for a struct: sums the encoded size of each field.
 fn derive_encoded_size_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenStream> {
     let name = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-    let packet_attr = parse_packet_attr(&input.attrs)?;
 
     let fields = match &data.fields {
         Fields::Named(fields) => &fields.named,
@@ -33,25 +47,15 @@ fn derive_encoded_size_struct(input: &DeriveInput, data: &DataStruct) -> Result<
             ));
         }
         Fields::Unit => {
-            let packet_size = packet_attr.map(|p| {
-                let id = p.id;
-                quote! { basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(#id)) }
-            });
-            let total = packet_size.unwrap_or(quote! { 0 });
             return Ok(quote! {
                 impl #impl_generics basalt_types::EncodedSize for #name #ty_generics #where_clause {
                     fn encoded_size(&self) -> usize {
-                        #total
+                        0
                     }
                 }
             });
         }
     };
-
-    let packet_size = packet_attr.map(|p| {
-        let id = p.id;
-        quote! { basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(#id)) + }
-    });
 
     let mut field_sizes = Vec::new();
     for field in fields {
@@ -90,7 +94,6 @@ fn derive_encoded_size_struct(input: &DeriveInput, data: &DataStruct) -> Result<
     Ok(quote! {
         impl #impl_generics basalt_types::EncodedSize for #name #ty_generics #where_clause {
             fn encoded_size(&self) -> usize {
-                #packet_size
                 #(#field_sizes)+*
             }
         }
