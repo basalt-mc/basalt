@@ -12,7 +12,7 @@ use basalt_protocol::packets::status::{
 use basalt_types::{Encode, EncodedSize};
 
 use crate::error::{Error, Result};
-use crate::stream::EncryptedStream;
+use crate::stream::ProtocolStream;
 
 /// Marker type for the Handshake connection state.
 pub struct Handshake;
@@ -37,12 +37,12 @@ pub enum HandshakeResult {
 
 /// A type-safe Minecraft protocol connection.
 ///
-/// The connection wraps an `EncryptedStream` (TCP with optional AES/CFB-8
+/// The connection wraps an `ProtocolStream` (TCP with optional AES/CFB-8
 /// encryption) and enforces the protocol state machine at compile time
 /// using Rust's type system. Each state transition consumes the old
 /// connection and returns a new one in the next state.
 pub struct Connection<S> {
-    stream: EncryptedStream,
+    stream: ProtocolStream,
     _state: PhantomData<S>,
 }
 
@@ -50,7 +50,7 @@ impl Connection<Handshake> {
     /// Wraps a TCP stream as a new Handshake connection.
     pub fn accept(stream: TcpStream) -> Self {
         Self {
-            stream: EncryptedStream::new(stream),
+            stream: ProtocolStream::new(stream),
             _state: PhantomData,
         }
     }
