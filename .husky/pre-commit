@@ -1,0 +1,2 @@
+. "$HOME/.cargo/env" 2>/dev/null
+npx --no -- lint-staged
