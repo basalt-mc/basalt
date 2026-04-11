@@ -1,6 +1,10 @@
 use crate::error::Result;
+use crate::packets::configuration::{
+    ClientboundConfigurationPacket, ServerboundConfigurationPacket,
+};
 use crate::packets::handshake::ServerboundHandshakePacket;
 use crate::packets::login::{ClientboundLoginPacket, ServerboundLoginPacket};
+use crate::packets::play::{ClientboundPlayPacket, ServerboundPlayPacket};
 use crate::packets::status::{ClientboundStatusPacket, ServerboundStatusPacket};
 use crate::version::ProtocolVersion;
 
@@ -72,6 +76,42 @@ impl PacketRegistry {
         buf: &mut &[u8],
     ) -> Result<ClientboundLoginPacket> {
         ClientboundLoginPacket::decode_by_id(id, buf)
+    }
+
+    /// Decodes a serverbound Configuration packet from its ID and payload.
+    pub fn decode_serverbound_configuration(
+        &self,
+        id: i32,
+        buf: &mut &[u8],
+    ) -> Result<ServerboundConfigurationPacket> {
+        ServerboundConfigurationPacket::decode_by_id(id, buf)
+    }
+
+    /// Decodes a clientbound Configuration packet from its ID and payload.
+    pub fn decode_clientbound_configuration(
+        &self,
+        id: i32,
+        buf: &mut &[u8],
+    ) -> Result<ClientboundConfigurationPacket> {
+        ClientboundConfigurationPacket::decode_by_id(id, buf)
+    }
+
+    /// Decodes a serverbound Play packet from its ID and payload.
+    pub fn decode_serverbound_play(
+        &self,
+        id: i32,
+        buf: &mut &[u8],
+    ) -> Result<ServerboundPlayPacket> {
+        ServerboundPlayPacket::decode_by_id(id, buf)
+    }
+
+    /// Decodes a clientbound Play packet from its ID and payload.
+    pub fn decode_clientbound_play(
+        &self,
+        id: i32,
+        buf: &mut &[u8],
+    ) -> Result<ClientboundPlayPacket> {
+        ClientboundPlayPacket::decode_by_id(id, buf)
     }
 }
 
