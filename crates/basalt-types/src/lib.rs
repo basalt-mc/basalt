@@ -1,4 +1,5 @@
 mod angle;
+mod bit_set;
 mod byte_array;
 pub mod error;
 mod identifier;
@@ -10,6 +11,7 @@ mod uuid;
 mod varint;
 
 pub use angle::Angle;
+pub use bit_set::BitSet;
 pub use error::{Error, Result};
 pub use identifier::Identifier;
 pub use position::{BlockPosition, ChunkPosition, Position};
