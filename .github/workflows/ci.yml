@@ -43,6 +43,42 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --all-features
 
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Run tests with coverage
+        run: cargo llvm-cov --no-report --all-features
+      - name: Generate coverage report
+        env:
+          NO_COLOR: "1"
+        run: cargo llvm-cov report --fail-under-lines 90 2>&1 | tee coverage-report.txt
+      - name: Format coverage comment
+        if: github.event_name == 'pull_request' && always()
+        run: |
+          {
+            echo "## Coverage report"
+            echo ""
+            echo '```'
+            cat coverage-report.txt
+            echo '```'
+          } > coverage-comment.md
+      - name: Coverage comment
+        if: github.event_name == 'pull_request' && always()
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: coverage
+          path: coverage-comment.md
+
   deny:
     name: Cargo Deny
     runs-on: ubuntu-latest
