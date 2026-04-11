@@ -79,6 +79,25 @@ jobs:
           header: coverage
           path: coverage-comment.md
 
+  codegen:
+    name: Codegen Drift Check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo run --package xtask -- codegen
+      - run: cargo fmt --all
+      - name: Check generated code is up to date
+        run: |
+          if ! git diff --exit-code crates/basalt-protocol/src/packets/; then
+            echo "::error::Generated packets are out of date. Run 'cargo xt codegen && cargo fmt --all' and commit the result."
+            exit 1
+          fi
+
   deny:
     name: Cargo Deny
     runs-on: ubuntu-latest
