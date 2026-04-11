@@ -164,6 +164,15 @@ impl Connection<Login> {
         self.stream.enable_encryption(shared_secret);
     }
 
+    /// Enables zlib compression on this connection.
+    ///
+    /// Packets with uncompressed size >= threshold bytes will be
+    /// zlib-compressed. Called after sending the Set Compression
+    /// packet during login.
+    pub fn enable_compression(&mut self, threshold: usize) {
+        self.stream.enable_compression(threshold);
+    }
+
     /// Writes a Disconnect packet to the client.
     pub async fn disconnect(&mut self, reason: &str) -> Result<()> {
         let packet = ClientboundLoginDisconnect {
