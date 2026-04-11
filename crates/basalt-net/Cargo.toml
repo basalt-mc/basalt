@@ -1,0 +1,17 @@
+[package]
+name = "basalt-net"
+version = "0.1.0"
+description = "Async networking layer with encryption, compression, and middleware pipeline"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+basalt-protocol = { workspace = true }
+tokio = { workspace = true }
+aes = { workspace = true }
+cfb8 = { workspace = true }
+flate2 = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }

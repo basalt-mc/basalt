@@ -1,0 +1,15 @@
+[package]
+name = "basalt-protocol"
+version = "0.1.0"
+description = "Minecraft packet definitions and version-aware packet registry"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+basalt-types = { workspace = true }
+basalt-derive = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+proptest = { workspace = true }
