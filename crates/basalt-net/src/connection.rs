@@ -2,10 +2,17 @@ use std::marker::PhantomData;
 
 use tokio::net::TcpStream;
 
+use basalt_protocol::packets::configuration::{
+    ClientboundConfigurationDisconnect, ClientboundConfigurationFinishConfiguration,
+    ServerboundConfigurationPacket,
+};
 use basalt_protocol::packets::handshake::{
     ServerboundHandshakePacket, ServerboundHandshakeSetProtocol,
 };
-use basalt_protocol::packets::login::{ClientboundLoginDisconnect, ServerboundLoginPacket};
+use basalt_protocol::packets::login::{
+    ClientboundLoginDisconnect, ClientboundLoginSuccess, ServerboundLoginPacket,
+};
+use basalt_protocol::packets::play::ServerboundPlayPacket;
 use basalt_protocol::packets::status::{
     ClientboundStatusPing, ClientboundStatusServerInfo, ServerboundStatusPacket,
 };
@@ -23,11 +30,22 @@ pub struct Status;
 /// Marker type for the Login connection state.
 pub struct Login;
 
+/// Marker type for the Configuration connection state.
+///
+/// In this state, the server sends registry data, resource packs,
+/// feature flags, and tags before transitioning to Play.
+pub struct Configuration;
+
+/// Marker type for the Play connection state.
+///
+/// Active gameplay state. The majority of packets (movement, block
+/// changes, chat, entity updates) are exchanged here.
+pub struct Play;
+
 /// The result of reading a Handshake packet.
 ///
 /// The client's Handshake declares which state to transition to:
-/// Status (server list ping) or Login (joining the game). This enum
-/// lets the caller handle both cases with exhaustive pattern matching.
+/// Status (server list ping) or Login (joining the game).
 pub enum HandshakeResult {
     /// Client wants server status (next_state = 1).
     Status(Connection<Status>, ServerboundHandshakeSetProtocol),
@@ -37,10 +55,10 @@ pub enum HandshakeResult {
 
 /// A type-safe Minecraft protocol connection.
 ///
-/// The connection wraps an `ProtocolStream` (TCP with optional AES/CFB-8
-/// encryption) and enforces the protocol state machine at compile time
-/// using Rust's type system. Each state transition consumes the old
-/// connection and returns a new one in the next state.
+/// The connection wraps a `ProtocolStream` (TCP with optional encryption
+/// and compression) and enforces the protocol state machine at compile
+/// time. Each state transition consumes the old connection and returns
+/// a new one in the next state.
 pub struct Connection<S> {
     stream: ProtocolStream,
     _state: PhantomData<S>,
@@ -57,12 +75,7 @@ impl Connection<Handshake> {
 
     /// Reads the client's Handshake packet and transitions to the next state.
     pub async fn read_handshake(mut self) -> Result<HandshakeResult> {
-        let raw = self.stream.read_raw_packet().await?.ok_or_else(|| {
-            Error::Io(std::io::Error::new(
-                std::io::ErrorKind::UnexpectedEof,
-                "connection closed before handshake",
-            ))
-        })?;
+        let raw = self.read_raw().await?;
 
         let mut cursor = raw.payload.as_slice();
         let packet = match ServerboundHandshakePacket::decode_by_id(raw.id, &mut cursor)? {
@@ -76,20 +89,8 @@ impl Connection<Handshake> {
         };
 
         match packet.next_state {
-            1 => Ok(HandshakeResult::Status(
-                Connection {
-                    stream: self.stream,
-                    _state: PhantomData,
-                },
-                packet,
-            )),
-            2 => Ok(HandshakeResult::Login(
-                Connection {
-                    stream: self.stream,
-                    _state: PhantomData,
-                },
-                packet,
-            )),
+            1 => Ok(HandshakeResult::Status(self.transition(), packet)),
+            2 => Ok(HandshakeResult::Login(self.transition(), packet)),
             other => Err(Error::Io(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 format!("unknown next_state: {other}"),
@@ -101,13 +102,7 @@ impl Connection<Handshake> {
 impl Connection<Status> {
     /// Reads a serverbound Status packet from the client.
     pub async fn read_packet(&mut self) -> Result<ServerboundStatusPacket> {
-        let raw = self.stream.read_raw_packet().await?.ok_or_else(|| {
-            Error::Io(std::io::Error::new(
-                std::io::ErrorKind::UnexpectedEof,
-                "connection closed during status",
-            ))
-        })?;
-
+        let raw = self.read_raw().await?;
         let mut cursor = raw.payload.as_slice();
         Ok(ServerboundStatusPacket::decode_by_id(raw.id, &mut cursor)?)
     }
@@ -126,51 +121,48 @@ impl Connection<Status> {
         self.write_packet(ClientboundStatusPing::PACKET_ID, response)
             .await
     }
-
-    /// Encodes and writes a packet with the given ID to the stream.
-    async fn write_packet<P: Encode + EncodedSize>(
-        &mut self,
-        packet_id: i32,
-        packet: &P,
-    ) -> Result<()> {
-        let mut payload = Vec::with_capacity(packet.encoded_size());
-        packet
-            .encode(&mut payload)
-            .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
-        self.stream.write_raw_packet(packet_id, &payload).await
-    }
 }
 
 impl Connection<Login> {
     /// Reads a serverbound Login packet from the client.
     pub async fn read_packet(&mut self) -> Result<ServerboundLoginPacket> {
-        let raw = self.stream.read_raw_packet().await?.ok_or_else(|| {
-            Error::Io(std::io::Error::new(
-                std::io::ErrorKind::UnexpectedEof,
-                "connection closed during login",
-            ))
-        })?;
-
+        let raw = self.read_raw().await?;
         let mut cursor = raw.payload.as_slice();
         Ok(ServerboundLoginPacket::decode_by_id(raw.id, &mut cursor)?)
     }
 
     /// Enables AES-128 CFB-8 encryption on this connection.
-    ///
-    /// All subsequent reads and writes will be encrypted/decrypted
-    /// transparently. Called after receiving the client's Encryption
-    /// Response packet.
     pub fn enable_encryption(&mut self, shared_secret: &[u8; 16]) {
         self.stream.enable_encryption(shared_secret);
     }
 
     /// Enables zlib compression on this connection.
-    ///
-    /// Packets with uncompressed size >= threshold bytes will be
-    /// zlib-compressed. Called after sending the Set Compression
-    /// packet during login.
     pub fn enable_compression(&mut self, threshold: usize) {
         self.stream.enable_compression(threshold);
+    }
+
+    /// Sends LoginSuccess and transitions to Configuration.
+    ///
+    /// After sending this packet, the server waits for the client's
+    /// LoginAcknowledged, then transitions to the Configuration state.
+    pub async fn send_login_success(
+        mut self,
+        success: &ClientboundLoginSuccess,
+    ) -> Result<Connection<Configuration>> {
+        self.write_packet(ClientboundLoginSuccess::PACKET_ID, success)
+            .await?;
+
+        // Wait for LoginAcknowledged from the client
+        let raw = self.read_raw().await?;
+        let mut cursor = raw.payload.as_slice();
+        let packet = ServerboundLoginPacket::decode_by_id(raw.id, &mut cursor)?;
+        match packet {
+            ServerboundLoginPacket::LoginAcknowledged(_) => Ok(self.transition()),
+            _ => Err(Error::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "expected LoginAcknowledged",
+            ))),
+        }
     }
 
     /// Writes a Disconnect packet to the client.
@@ -181,6 +173,92 @@ impl Connection<Login> {
         self.write_packet(ClientboundLoginDisconnect::PACKET_ID, &packet)
             .await
     }
+}
+
+impl Connection<Configuration> {
+    /// Reads a serverbound Configuration packet from the client.
+    pub async fn read_packet(&mut self) -> Result<ServerboundConfigurationPacket> {
+        let raw = self.read_raw().await?;
+        let mut cursor = raw.payload.as_slice();
+        Ok(ServerboundConfigurationPacket::decode_by_id(
+            raw.id,
+            &mut cursor,
+        )?)
+    }
+
+    /// Writes a clientbound Configuration packet to the client.
+    pub async fn write_packet_typed<P: Encode + EncodedSize>(
+        &mut self,
+        packet_id: i32,
+        packet: &P,
+    ) -> Result<()> {
+        self.write_packet(packet_id, packet).await
+    }
+
+    /// Sends FinishConfiguration and transitions to Play.
+    ///
+    /// After sending this packet, the server waits for the client's
+    /// FinishConfiguration acknowledgement, then transitions to Play.
+    pub async fn finish_configuration(mut self) -> Result<Connection<Play>> {
+        self.write_packet(
+            ClientboundConfigurationFinishConfiguration::PACKET_ID,
+            &ClientboundConfigurationFinishConfiguration,
+        )
+        .await?;
+
+        // Wait for client's finish_configuration
+        let raw = self.read_raw().await?;
+        let mut cursor = raw.payload.as_slice();
+        let packet = ServerboundConfigurationPacket::decode_by_id(raw.id, &mut cursor)?;
+        match packet {
+            ServerboundConfigurationPacket::FinishConfiguration(_) => Ok(self.transition()),
+            _ => Err(Error::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "expected FinishConfiguration",
+            ))),
+        }
+    }
+
+    /// Writes a Disconnect packet to the client.
+    ///
+    /// The reason is an NBT text component (since 1.20.3+).
+    pub async fn disconnect(&mut self, reason: basalt_types::NbtCompound) -> Result<()> {
+        let packet = ClientboundConfigurationDisconnect { reason };
+        self.write_packet(ClientboundConfigurationDisconnect::PACKET_ID, &packet)
+            .await
+    }
+}
+
+impl Connection<Play> {
+    /// Reads a serverbound Play packet from the client.
+    pub async fn read_packet(&mut self) -> Result<ServerboundPlayPacket> {
+        let raw = self.read_raw().await?;
+        let mut cursor = raw.payload.as_slice();
+        Ok(ServerboundPlayPacket::decode_by_id(raw.id, &mut cursor)?)
+    }
+
+    /// Writes a clientbound Play packet to the client.
+    pub async fn write_packet_typed<P: Encode + EncodedSize>(
+        &mut self,
+        packet_id: i32,
+        packet: &P,
+    ) -> Result<()> {
+        self.write_packet(packet_id, packet).await
+    }
+}
+
+// -- Shared helpers --
+
+impl<S> Connection<S> {
+    /// Reads a raw framed packet from the stream.
+    async fn read_raw(&mut self) -> Result<crate::framing::RawPacket> {
+        self.stream.read_raw_packet().await?.ok_or_else(|| {
+            Error::Io(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "connection closed",
+            ))
+        })
+    }
 
     /// Encodes and writes a packet with the given ID to the stream.
     async fn write_packet<P: Encode + EncodedSize>(
@@ -193,6 +271,14 @@ impl Connection<Login> {
             .encode(&mut payload)
             .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
         self.stream.write_raw_packet(packet_id, &payload).await
+    }
+
+    /// Transitions this connection to a new state, consuming the old one.
+    fn transition<T>(self) -> Connection<T> {
+        Connection {
+            stream: self.stream,
+            _state: PhantomData,
+        }
     }
 }
 
@@ -348,5 +434,55 @@ mod tests {
 
         let conn = Connection::<Handshake>::accept(server_stream);
         assert!(conn.read_handshake().await.is_err());
+    }
+
+    #[tokio::test]
+    async fn login_to_configuration_transition() {
+        use basalt_protocol::packets::login::{
+            ServerboundLoginLoginAcknowledged, ServerboundLoginLoginStart,
+        };
+        use basalt_types::Uuid;
+
+        let (server_stream, mut client_stream) = connected_pair().await;
+
+        // Handshake → Login
+        client_send(
+            &mut client_stream,
+            ServerboundHandshakeSetProtocol::PACKET_ID,
+            &handshake_packet(2),
+        )
+        .await;
+
+        let conn = Connection::<Handshake>::accept(server_stream);
+        let HandshakeResult::Login(mut conn, _) = conn.read_handshake().await.unwrap() else {
+            panic!("expected Login");
+        };
+
+        // Client sends LoginStart
+        let login_start = ServerboundLoginLoginStart {
+            username: "TestPlayer".into(),
+            player_uuid: Uuid::new(0, 0),
+        };
+        client_send(
+            &mut client_stream,
+            ServerboundLoginLoginStart::PACKET_ID,
+            &login_start,
+        )
+        .await;
+        conn.read_packet().await.unwrap();
+
+        // Server sends LoginSuccess → client sends LoginAcknowledged
+        let success = ClientboundLoginSuccess::default();
+        // Queue LoginAcknowledged from client before calling send_login_success
+        client_send(
+            &mut client_stream,
+            ServerboundLoginLoginAcknowledged::PACKET_ID,
+            &ServerboundLoginLoginAcknowledged,
+        )
+        .await;
+
+        let config_conn = conn.send_login_success(&success).await.unwrap();
+        // We're now in Configuration state
+        drop(config_conn);
     }
 }
