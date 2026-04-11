@@ -12,6 +12,7 @@
 pub mod error;
 pub mod packets;
 pub mod registry;
+pub mod registry_data;
 pub mod state;
 pub mod version;
 
