@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 basalt-types = { workspace = true }
 basalt-derive = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
