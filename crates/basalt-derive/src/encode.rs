@@ -2,9 +2,13 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, Result};
 
-use crate::attrs::{parse_field_attr, parse_packet_attr, parse_variant_attr};
+use crate::attrs::{parse_field_attr, parse_variant_attr};
 
 /// Generates the `Encode` implementation for a struct or enum.
+///
+/// Used by the `#[derive(Encode)]` macro for non-packet types (inner data
+/// structures, enums, etc.). For packet structs, use `#[packet(id = N)]`
+/// which calls `derive_encode_fields_only` instead.
 pub fn derive_encode(input: &DeriveInput) -> Result<TokenStream> {
     match &input.data {
         Data::Struct(data) => derive_encode_struct(input, data),
@@ -16,14 +20,28 @@ pub fn derive_encode(input: &DeriveInput) -> Result<TokenStream> {
     }
 }
 
-/// Generates `Encode` for a struct: encodes each field in declaration order.
+/// Generates the `Encode` implementation encoding only the struct's fields.
 ///
-/// If `#[packet(id = ...)]` is present, the packet ID is encoded as a VarInt
-/// before the fields.
+/// Called by the `#[packet]` attribute macro. Does not generate any packet
+/// ID handling — the ID is managed by the framing layer and registry.
+pub fn derive_encode_fields_only(input: &DeriveInput) -> Result<TokenStream> {
+    match &input.data {
+        Data::Struct(data) => derive_encode_struct(input, data),
+        Data::Enum(_) => Err(syn::Error::new_spanned(
+            input,
+            "#[packet] cannot be used on enums",
+        )),
+        Data::Union(_) => Err(syn::Error::new_spanned(
+            input,
+            "#[packet] cannot be used on unions",
+        )),
+    }
+}
+
+/// Generates `Encode` for a struct: encodes each field in declaration order.
 fn derive_encode_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenStream> {
     let name = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-    let packet_attr = parse_packet_attr(&input.attrs)?;
 
     let fields = match &data.fields {
         Fields::Named(fields) => &fields.named,
@@ -34,30 +52,15 @@ fn derive_encode_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenS
             ));
         }
         Fields::Unit => {
-            // Unit struct — nothing to encode beyond packet ID
-            let packet_encode = packet_attr.map(|p| {
-                let id = p.id;
-                quote! {
-                    basalt_types::Encode::encode(&basalt_types::VarInt(#id), buf)?;
-                }
-            });
             return Ok(quote! {
                 impl #impl_generics basalt_types::Encode for #name #ty_generics #where_clause {
                     fn encode(&self, buf: &mut Vec<u8>) -> basalt_types::Result<()> {
-                        #packet_encode
                         Ok(())
                     }
                 }
             });
         }
     };
-
-    let packet_encode = packet_attr.map(|p| {
-        let id = p.id;
-        quote! {
-            basalt_types::Encode::encode(&basalt_types::VarInt(#id), buf)?;
-        }
-    });
 
     let mut field_encodes = Vec::new();
     for field in fields {
@@ -103,7 +106,6 @@ fn derive_encode_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenS
     Ok(quote! {
         impl #impl_generics basalt_types::Encode for #name #ty_generics #where_clause {
             fn encode(&self, buf: &mut Vec<u8>) -> basalt_types::Result<()> {
-                #packet_encode
                 #(#field_encodes)*
                 Ok(())
             }
