@@ -134,6 +134,16 @@ const protocol = [
   // Error type for protocol-level errors.
   // Example: "feat(protocol/error): add PacketTooLarge variant"
   'protocol/error',
+
+  // Chunk data construction: empty chunk builder, section encoding,
+  // heightmaps, paletted containers.
+  // Example: "feat(protocol/chunk): add stone flat world chunk"
+  'protocol/chunk',
+
+  // Registry data construction: dimension types, biomes, damage types,
+  // and other registries required during Configuration state.
+  // Example: "feat(protocol/registry-data): add nether dimension type"
+  'protocol/registry-data',
 ];
 
 const net = [
