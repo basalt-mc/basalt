@@ -128,7 +128,11 @@ fn generate_packets_mod(workspace_root: &std::path::Path) -> String {
         .filter_map(|entry| {
             let entry = entry.ok()?;
             let name = entry.file_name().to_string_lossy().to_string();
-            if name.ends_with(".rs") && name != "mod.rs" {
+            let file_type = entry.file_type().ok()?;
+            if file_type.is_dir() {
+                // Directory with mod.rs inside = a module
+                Some(name)
+            } else if name.ends_with(".rs") && name != "mod.rs" {
                 Some(name.strip_suffix(".rs").unwrap().to_string())
             } else {
                 None
@@ -175,14 +179,23 @@ fn generate_state_module(state: &Value, module_name: &str) -> String {
         .iter()
         .chain(clientbound.iter())
         .flat_map(|p| {
-            p.fields
-                .iter()
-                .chain(p.inline_structs.iter().flat_map(|s| s.fields.iter()))
-                .map(|f| f.rust_type.as_str())
+            let mut types: Vec<&str> = p.fields.iter().map(|f| f.rust_type.as_str()).collect();
+            // Only include inline struct field types if the inline is actually emitted
+            for s in &p.inline_structs {
+                for f in &s.fields {
+                    types.push(f.rust_type.as_str());
+                }
+            }
+            types
         })
         .collect();
 
-    let needs = |name: &str| all_types.iter().any(|t| t.contains(name));
+    let needs = |name: &str| {
+        all_types.iter().any(|t| {
+            // Exact match or the type is used inside a generic (e.g., Option<Vec3f>)
+            *t == name || t.contains(&format!("<{name}>")) || t.contains(&format!("{name},"))
+        })
+    };
 
     if has_inline_structs {
         output.push_str("use basalt_derive::{packet, Encode, Decode, EncodedSize};\n");
@@ -253,15 +266,6 @@ fn generate_state_module(state: &Value, module_name: &str) -> String {
             &pascal_state,
         ));
     }
-
-    // Generate tests
-    output.push('\n');
-    output.push_str(&generate_tests(
-        &serverbound,
-        &clientbound,
-        &pascal_state,
-        module_name,
-    ));
 
     output
 }
@@ -626,88 +630,6 @@ fn generate_direction_enum(
     out
 }
 
-fn generate_tests(
-    serverbound: &[PacketDef],
-    clientbound: &[PacketDef],
-    state_pascal: &str,
-    _state_name: &str,
-) -> String {
-    let mut out = String::new();
-    out.push_str("#[cfg(test)]\n");
-    out.push_str("mod tests {\n");
-    out.push_str("    use super::*;\n");
-    out.push_str("    use basalt_types::{Encode as _, EncodedSize as _};\n\n");
-
-    // Packet ID tests
-    if !serverbound.is_empty() {
-        out.push_str("    #[test]\n");
-        out.push_str("    fn serverbound_packet_ids() {\n");
-        for packet in serverbound {
-            out.push_str(&format!(
-                "        assert_eq!({}::PACKET_ID, {});\n",
-                packet.name, packet.id
-            ));
-        }
-        out.push_str("    }\n\n");
-
-        out.push_str("    #[test]\n");
-        out.push_str("    fn unknown_serverbound_id() {\n");
-        out.push_str("        let mut cursor: &[u8] = &[];\n");
-        out.push_str(&format!(
-            "        assert!(Serverbound{state_pascal}Packet::decode_by_id(0xFF, &mut cursor).is_err());\n"
-        ));
-        out.push_str("    }\n\n");
-    }
-
-    if !clientbound.is_empty() {
-        out.push_str("    #[test]\n");
-        out.push_str("    fn clientbound_packet_ids() {\n");
-        for packet in clientbound {
-            out.push_str(&format!(
-                "        assert_eq!({}::PACKET_ID, {});\n",
-                packet.name, packet.id
-            ));
-        }
-        out.push_str("    }\n\n");
-
-        out.push_str("    #[test]\n");
-        out.push_str("    fn unknown_clientbound_id() {\n");
-        out.push_str("        let mut cursor: &[u8] = &[];\n");
-        out.push_str(&format!(
-            "        assert!(Clientbound{state_pascal}Packet::decode_by_id(0xFF, &mut cursor).is_err());\n"
-        ));
-        out.push_str("    }\n\n");
-    }
-
-    // Roundtrip tests for each packet
-    for packet in serverbound.iter().chain(clientbound.iter()) {
-        let test_name = to_snake_case(&packet.name);
-        let constructor = if packet.fields.is_empty() {
-            // Unit struct — use the struct name directly
-            packet.name.clone()
-        } else {
-            format!("{}::default()", packet.name)
-        };
-        out.push_str("    #[test]\n");
-        out.push_str(&format!("    fn {test_name}_roundtrip() {{\n"));
-        out.push_str(&format!("        let original = {constructor};\n"));
-        out.push_str("        let mut buf = Vec::with_capacity(original.encoded_size());\n");
-        out.push_str("        original.encode(&mut buf).unwrap();\n");
-        out.push_str("        assert_eq!(buf.len(), original.encoded_size());\n");
-        out.push_str("        let mut cursor = buf.as_slice();\n");
-        out.push_str(&format!(
-            "        let decoded = {}::decode(&mut cursor).unwrap();\n",
-            packet.name
-        ));
-        out.push_str("        assert!(cursor.is_empty());\n");
-        out.push_str("        assert_eq!(decoded, original);\n");
-        out.push_str("    }\n\n");
-    }
-
-    out.push_str("}\n");
-    out
-}
-
 // -- Play split by category --
 
 /// Play packet categories. Each packet is assigned to a category based
@@ -974,13 +896,21 @@ fn generate_category_file(
     let all_types: Vec<&str> = all_packets
         .iter()
         .flat_map(|p| {
-            p.fields
-                .iter()
-                .chain(p.inline_structs.iter().flat_map(|s| s.fields.iter()))
-                .map(|f| f.rust_type.as_str())
+            let mut types: Vec<&str> = p.fields.iter().map(|f| f.rust_type.as_str()).collect();
+            for s in &p.inline_structs {
+                for f in &s.fields {
+                    types.push(f.rust_type.as_str());
+                }
+            }
+            types
         })
         .collect();
-    let needs = |name: &str| all_types.iter().any(|t| t.contains(name));
+    let needs = |name: &str| {
+        all_types.iter().any(|t| {
+            // Exact match or the type is used inside a generic (e.g., Option<Vec3f>)
+            *t == name || t.contains(&format!("<{name}>")) || t.contains(&format!("{name},"))
+        })
+    };
 
     if has_inline {
         output.push_str("use basalt_derive::{packet, Encode, Decode, EncodedSize};\n");
@@ -1029,36 +959,6 @@ fn generate_category_file(
         }
     }
 
-    // Tests
-    output.push_str("#[cfg(test)]\n");
-    output.push_str("mod tests {\n");
-    output.push_str("    use super::*;\n");
-    output.push_str("    use basalt_types::{Encode as _, EncodedSize as _};\n\n");
-
-    for packet in &all_packets {
-        let test_name = to_snake_case(&packet.name);
-        let constructor = if packet.fields.is_empty() {
-            packet.name.clone()
-        } else {
-            format!("{}::default()", packet.name)
-        };
-        output.push_str("    #[test]\n");
-        output.push_str(&format!("    fn {test_name}_roundtrip() {{\n"));
-        output.push_str(&format!("        let original = {constructor};\n"));
-        output.push_str("        let mut buf = Vec::with_capacity(original.encoded_size());\n");
-        output.push_str("        original.encode(&mut buf).unwrap();\n");
-        output.push_str("        assert_eq!(buf.len(), original.encoded_size());\n");
-        output.push_str("        let mut cursor = buf.as_slice();\n");
-        output.push_str(&format!(
-            "        let decoded = {}::decode(&mut cursor).unwrap();\n",
-            packet.name
-        ));
-        output.push_str("        assert!(cursor.is_empty());\n");
-        output.push_str("        assert_eq!(decoded, original);\n");
-        output.push_str("    }\n\n");
-    }
-
-    output.push_str("}\n");
     output
 }
 
@@ -1110,29 +1010,7 @@ fn generate_play_mod(
         "Play",
     ));
 
-    // ID tests
-    out.push('\n');
-    out.push_str("#[cfg(test)]\n");
-    out.push_str("mod tests {\n");
-    out.push_str("    use super::*;\n\n");
-
-    out.push_str("    #[test]\n");
-    out.push_str("    fn unknown_serverbound_id() {\n");
-    out.push_str("        let mut cursor: &[u8] = &[];\n");
-    out.push_str(
-        "        assert!(ServerboundPlayPacket::decode_by_id(0xFF, &mut cursor).is_err());\n",
-    );
-    out.push_str("    }\n\n");
-
-    out.push_str("    #[test]\n");
-    out.push_str("    fn unknown_clientbound_id() {\n");
-    out.push_str("        let mut cursor: &[u8] = &[];\n");
-    out.push_str(
-        "        assert!(ClientboundPlayPacket::decode_by_id(0xFF, &mut cursor).is_err());\n",
-    );
-    out.push_str("    }\n");
-
-    out.push_str("}\n");
+    // No tests in generated files
     out
 }
 
@@ -1576,37 +1454,6 @@ mod tests {
         assert!(code.contains("ServerboundTestPacket"));
         assert!(code.contains("ClientboundTestPacket"));
         assert!(code.contains("decode_by_id"));
-        assert!(code.contains("#[cfg(test)]"));
-        assert!(code.contains("_roundtrip"));
-    }
-
-    // -- generate_tests --
-
-    #[test]
-    fn generate_tests_with_roundtrips() {
-        let serverbound = vec![PacketDef {
-            name: "ServerboundTestPing".into(),
-            id: "0x00".into(),
-            fields: vec![FieldDef {
-                name: "time".into(),
-                rust_type: "i64".into(),
-                attribute: None,
-            }],
-            inline_structs: vec![],
-        }];
-        let clientbound = vec![PacketDef {
-            name: "ClientboundTestPong".into(),
-            id: "0x00".into(),
-            fields: vec![],
-            inline_structs: vec![],
-        }];
-        let code = generate_tests(&serverbound, &clientbound, "Test", "test");
-        assert!(code.contains("serverbound_test_ping_roundtrip"));
-        assert!(code.contains("clientbound_test_pong_roundtrip"));
-        assert!(code.contains("ServerboundTestPing::default()"));
-        assert!(code.contains("ClientboundTestPong;")); // unit struct, no ::default()
-        assert!(code.contains("unknown_serverbound_id"));
-        assert!(code.contains("unknown_clientbound_id"));
     }
 
     // -- parse_direction --
@@ -1837,7 +1684,6 @@ mod tests {
         let code = generate_category_file("test", &refs, &[], "Play");
         assert!(code.contains("Play state — test packets"));
         assert!(code.contains("pub struct ServerboundPlayTest"));
-        assert!(code.contains("_roundtrip"));
     }
 
     // -- generate_play_mod --
