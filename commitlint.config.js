@@ -49,6 +49,11 @@ const keywords = [
   // Example: "ci(ci): add cargo-deny advisory check"
   'ci',
 
+  // Code coverage: cargo-llvm-cov configuration, coverage thresholds,
+  // coverage CI job, coverage reporting.
+  // Example: "ci(coverage): add coverage job with 90% threshold"
+  'coverage',
+
   // CLAUDE.md guidelines: conventions, architectural decisions, patterns.
   // Example: "docs(claude): document commit scope convention"
   'claude',
