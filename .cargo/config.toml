@@ -1,0 +1,5 @@
+[alias]
+t = "test"
+c = "clippy"
+b = "bench"
+xt = "run --package xtask --"
