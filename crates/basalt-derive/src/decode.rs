@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, Result};
 
-use crate::attrs::{parse_field_attr, parse_packet_attr, parse_variant_attr};
+use crate::attrs::{parse_field_attr, parse_variant_attr};
 
 /// Generates the `Decode` implementation for a struct or enum.
 pub fn derive_decode(input: &DeriveInput) -> Result<TokenStream> {
@@ -18,12 +18,11 @@ pub fn derive_decode(input: &DeriveInput) -> Result<TokenStream> {
 
 /// Generates `Decode` for a struct: decodes each field in declaration order.
 ///
-/// If `#[packet(id = ...)]` is present, the packet ID is decoded as a VarInt
-/// and validated before reading the fields.
+/// The packet ID is NOT decoded here — it is handled by the framing layer
+/// and the packet registry dispatch. The struct only decodes its own fields.
 fn derive_decode_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenStream> {
     let name = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-    let packet_attr = parse_packet_attr(&input.attrs)?;
 
     let fields = match &data.fields {
         Fields::Named(fields) => &fields.named,
@@ -34,37 +33,15 @@ fn derive_decode_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenS
             ));
         }
         Fields::Unit => {
-            let packet_decode = packet_attr.map(|p| {
-                let id = p.id;
-                let err_msg = format!("expected packet ID {id:#04x}");
-                quote! {
-                    let packet_id = basalt_types::Decode::decode(buf)?;
-                    if basalt_types::VarInt(#id) != packet_id {
-                        return Err(basalt_types::Error::InvalidData(#err_msg.into()));
-                    }
-                }
-            });
             return Ok(quote! {
                 impl #impl_generics basalt_types::Decode for #name #ty_generics #where_clause {
                     fn decode(buf: &mut &[u8]) -> basalt_types::Result<Self> {
-                        #packet_decode
                         Ok(#name)
                     }
                 }
             });
         }
     };
-
-    let packet_decode = packet_attr.map(|p| {
-        let id = p.id;
-        let err_msg = format!("expected packet ID {id:#04x}");
-        quote! {
-            let packet_id: basalt_types::VarInt = basalt_types::Decode::decode(buf)?;
-            if packet_id != basalt_types::VarInt(#id) {
-                return Err(basalt_types::Error::InvalidData(#err_msg.into()));
-            }
-        }
-    });
 
     let mut field_decodes = Vec::new();
     let mut field_names = Vec::new();
@@ -126,7 +103,6 @@ fn derive_decode_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenS
     Ok(quote! {
         impl #impl_generics basalt_types::Decode for #name #ty_generics #where_clause {
             fn decode(buf: &mut &[u8]) -> basalt_types::Result<Self> {
-                #packet_decode
                 #(#field_decodes)*
                 Ok(#name {
                     #(#field_names),*
