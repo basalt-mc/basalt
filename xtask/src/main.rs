@@ -446,7 +446,7 @@ fn generate_packet_struct(packet: &PacketDef) -> String {
             "/// Inline data structure used by [`{}`].\n",
             packet.name
         ));
-        out.push_str("#[derive(Debug, Clone, PartialEq, Encode, Decode, EncodedSize)]\n");
+        out.push_str("#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]\n");
         out.push_str(&format!("pub struct {} {{\n", inline.name));
         for field in &inline.fields {
             if let Some(attr) = &field.attribute {
@@ -458,11 +458,11 @@ fn generate_packet_struct(packet: &PacketDef) -> String {
     }
 
     if packet.fields.is_empty() {
-        out.push_str("#[derive(Debug, Clone, PartialEq)]\n");
+        out.push_str("#[derive(Debug, Clone, Default, PartialEq)]\n");
         out.push_str(&format!("#[packet(id = {})]\n", packet.id));
         out.push_str(&format!("pub struct {};\n", packet.name));
     } else {
-        out.push_str("#[derive(Debug, Clone, PartialEq)]\n");
+        out.push_str("#[derive(Debug, Clone, Default, PartialEq)]\n");
         out.push_str(&format!("#[packet(id = {})]\n", packet.id));
         out.push_str(&format!("pub struct {} {{\n", packet.name));
         for field in &packet.fields {
@@ -531,8 +531,10 @@ fn generate_tests(
     let mut out = String::new();
     out.push_str("#[cfg(test)]\n");
     out.push_str("mod tests {\n");
-    out.push_str("    use super::*;\n\n");
+    out.push_str("    use super::*;\n");
+    out.push_str("    use basalt_types::{Encode as _, EncodedSize as _};\n\n");
 
+    // Packet ID tests
     if !serverbound.is_empty() {
         out.push_str("    #[test]\n");
         out.push_str("    fn serverbound_packet_ids() {\n");
@@ -570,7 +572,32 @@ fn generate_tests(
         out.push_str(&format!(
             "        assert!(Clientbound{state_pascal}Packet::decode_by_id(0xFF, &mut cursor).is_err());\n"
         ));
-        out.push_str("    }\n");
+        out.push_str("    }\n\n");
+    }
+
+    // Roundtrip tests for each packet
+    for packet in serverbound.iter().chain(clientbound.iter()) {
+        let test_name = to_snake_case(&packet.name);
+        let constructor = if packet.fields.is_empty() {
+            // Unit struct — use the struct name directly
+            packet.name.clone()
+        } else {
+            format!("{}::default()", packet.name)
+        };
+        out.push_str("    #[test]\n");
+        out.push_str(&format!("    fn {test_name}_roundtrip() {{\n"));
+        out.push_str(&format!("        let original = {constructor};\n"));
+        out.push_str("        let mut buf = Vec::with_capacity(original.encoded_size());\n");
+        out.push_str("        original.encode(&mut buf).unwrap();\n");
+        out.push_str("        assert_eq!(buf.len(), original.encoded_size());\n");
+        out.push_str("        let mut cursor = buf.as_slice();\n");
+        out.push_str(&format!(
+            "        let decoded = {}::decode(&mut cursor).unwrap();\n",
+            packet.name
+        ));
+        out.push_str("        assert!(cursor.is_empty());\n");
+        out.push_str("        assert_eq!(decoded, original);\n");
+        out.push_str("    }\n\n");
     }
 
     out.push_str("}\n");
@@ -625,5 +652,481 @@ fn to_snake_case(s: &str) -> String {
         "type" => "r#type".to_string(),
         "match" => "r#match".to_string(),
         _ => result,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -- to_snake_case --
+
+    #[test]
+    fn snake_case_simple() {
+        assert_eq!(to_snake_case("serverHost"), "server_host");
+    }
+
+    #[test]
+    fn snake_case_consecutive_uppercase() {
+        assert_eq!(to_snake_case("playerUUID"), "player_uuid");
+    }
+
+    #[test]
+    fn snake_case_all_lowercase() {
+        assert_eq!(to_snake_case("username"), "username");
+    }
+
+    #[test]
+    fn snake_case_leading_uppercase() {
+        assert_eq!(to_snake_case("ServerHost"), "server_host");
+    }
+
+    #[test]
+    fn snake_case_single_char() {
+        assert_eq!(to_snake_case("x"), "x");
+    }
+
+    #[test]
+    fn snake_case_keyword_type() {
+        assert_eq!(to_snake_case("type"), "r#type");
+    }
+
+    #[test]
+    fn snake_case_keyword_match() {
+        assert_eq!(to_snake_case("match"), "r#match");
+    }
+
+    #[test]
+    fn snake_case_camel_multi() {
+        assert_eq!(to_snake_case("shouldAuthenticate"), "should_authenticate");
+    }
+
+    #[test]
+    fn snake_case_message_id() {
+        assert_eq!(to_snake_case("messageId"), "message_id");
+    }
+
+    // -- to_pascal_case --
+
+    #[test]
+    fn pascal_case_simple() {
+        assert_eq!(to_pascal_case("set_protocol"), "SetProtocol");
+    }
+
+    #[test]
+    fn pascal_case_single_word() {
+        assert_eq!(to_pascal_case("login"), "Login");
+    }
+
+    #[test]
+    fn pascal_case_multiple_words() {
+        assert_eq!(
+            to_pascal_case("login_plugin_response"),
+            "LoginPluginResponse"
+        );
+    }
+
+    #[test]
+    fn pascal_case_already_capitalized() {
+        assert_eq!(to_pascal_case("Login"), "Login");
+    }
+
+    #[test]
+    fn pascal_case_with_numbers() {
+        assert_eq!(
+            to_pascal_case("legacy_server_list_ping"),
+            "LegacyServerListPing"
+        );
+    }
+
+    // -- short_variant_name --
+
+    #[test]
+    fn short_variant_strips_direction_and_state() {
+        assert_eq!(
+            short_variant_name("ServerboundLoginEncryptionBegin", "Login"),
+            "EncryptionBegin"
+        );
+    }
+
+    #[test]
+    fn short_variant_clientbound() {
+        assert_eq!(
+            short_variant_name("ClientboundStatusServerInfo", "Status"),
+            "ServerInfo"
+        );
+    }
+
+    #[test]
+    fn short_variant_no_prefix() {
+        assert_eq!(short_variant_name("SomePacket", "Login"), "SomePacket");
+    }
+
+    // -- map_type --
+
+    #[test]
+    fn map_varint() {
+        let (ty, attr, _) = map_type(&Value::String("varint".into()), "", "", false);
+        assert_eq!(ty, "i32");
+        assert_eq!(attr, Some("varint".into()));
+    }
+
+    #[test]
+    fn map_string() {
+        let (ty, attr, _) = map_type(&Value::String("string".into()), "", "", false);
+        assert_eq!(ty, "String");
+        assert!(attr.is_none());
+    }
+
+    #[test]
+    fn map_uuid() {
+        let (ty, attr, _) = map_type(&Value::String("UUID".into()), "", "", false);
+        assert_eq!(ty, "Uuid");
+        assert!(attr.is_none());
+    }
+
+    #[test]
+    fn map_bool() {
+        let (ty, attr, _) = map_type(&Value::String("bool".into()), "", "", false);
+        assert_eq!(ty, "bool");
+        assert!(attr.is_none());
+    }
+
+    #[test]
+    fn map_rest_buffer_last() {
+        let (ty, attr, _) = map_type(&Value::String("restBuffer".into()), "", "", true);
+        assert_eq!(ty, "Vec<u8>");
+        assert_eq!(attr, Some("rest".into()));
+    }
+
+    #[test]
+    fn map_rest_buffer_not_last() {
+        let (ty, attr, _) = map_type(&Value::String("restBuffer".into()), "", "", false);
+        assert_eq!(ty, "Vec<u8>");
+        assert!(attr.is_none());
+    }
+
+    #[test]
+    fn map_buffer_varint() {
+        let json: Value = serde_json::from_str(r#"["buffer", {"countType": "varint"}]"#).unwrap();
+        let (ty, attr, _) = map_type(&json, "", "", false);
+        assert_eq!(ty, "Vec<u8>");
+        assert_eq!(attr, Some("length = \"varint\"".into()));
+    }
+
+    #[test]
+    fn map_option_string() {
+        let json: Value = serde_json::from_str(r#"["option", "string"]"#).unwrap();
+        let (ty, attr, _) = map_type(&json, "", "", false);
+        assert_eq!(ty, "Option<String>");
+        assert_eq!(attr, Some("optional".into()));
+    }
+
+    #[test]
+    fn map_numeric_types() {
+        for (json_type, rust_type) in [
+            ("u8", "u8"),
+            ("u16", "u16"),
+            ("i8", "i8"),
+            ("i16", "i16"),
+            ("i32", "i32"),
+            ("i64", "i64"),
+            ("f32", "f32"),
+            ("f64", "f64"),
+        ] {
+            let (ty, attr, _) = map_type(&Value::String(json_type.into()), "", "", false);
+            assert_eq!(ty, rust_type, "failed for {json_type}");
+            assert!(attr.is_none(), "unexpected attr for {json_type}");
+        }
+    }
+
+    // -- parse_container_fields --
+
+    #[test]
+    fn parse_simple_container() {
+        let json: Value = serde_json::from_str(
+            r#"
+            ["container", [
+                {"name": "username", "type": "string"},
+                {"name": "age", "type": "varint"}
+            ]]
+        "#,
+        )
+        .unwrap();
+
+        let (fields, inlines) = parse_container_fields(&json, "TestPacket");
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0].name, "username");
+        assert_eq!(fields[0].rust_type, "String");
+        assert!(fields[0].attribute.is_none());
+        assert_eq!(fields[1].name, "age");
+        assert_eq!(fields[1].rust_type, "i32");
+        assert_eq!(fields[1].attribute, Some("varint".into()));
+        assert!(inlines.is_empty());
+    }
+
+    #[test]
+    fn parse_container_with_rest_buffer() {
+        let json: Value = serde_json::from_str(
+            r#"
+            ["container", [
+                {"name": "id", "type": "varint"},
+                {"name": "data", "type": "restBuffer"}
+            ]]
+        "#,
+        )
+        .unwrap();
+
+        let (fields, _) = parse_container_fields(&json, "TestPacket");
+        assert_eq!(fields[1].name, "data");
+        assert_eq!(fields[1].rust_type, "Vec<u8>");
+        assert_eq!(fields[1].attribute, Some("rest".into()));
+    }
+
+    #[test]
+    fn parse_container_with_inline_struct() {
+        let json: Value = serde_json::from_str(
+            r#"
+            ["container", [
+                {"name": "items", "type": ["array", {
+                    "countType": "varint",
+                    "type": ["container", [
+                        {"name": "name", "type": "string"},
+                        {"name": "value", "type": "i32"}
+                    ]]
+                }]}
+            ]]
+        "#,
+        )
+        .unwrap();
+
+        let (fields, inlines) = parse_container_fields(&json, "TestPacket");
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].rust_type, "Vec<TestPacketItems>");
+        assert_eq!(fields[0].attribute, Some("length = \"varint\"".into()));
+        assert_eq!(inlines.len(), 1);
+        assert_eq!(inlines[0].name, "TestPacketItems");
+        assert_eq!(inlines[0].fields.len(), 2);
+    }
+
+    #[test]
+    fn parse_empty_container() {
+        let json: Value = serde_json::from_str(r#"["container", []]"#).unwrap();
+        let (fields, inlines) = parse_container_fields(&json, "TestPacket");
+        assert!(fields.is_empty());
+        assert!(inlines.is_empty());
+    }
+
+    // -- generate_packet_struct --
+
+    #[test]
+    fn generate_unit_struct() {
+        let packet = PacketDef {
+            name: "TestPingStart".into(),
+            id: "0x00".into(),
+            fields: vec![],
+            inline_structs: vec![],
+        };
+        let code = generate_packet_struct(&packet);
+        assert!(code.contains("#[packet(id = 0x00)]"));
+        assert!(code.contains("pub struct TestPingStart;"));
+    }
+
+    #[test]
+    fn generate_struct_with_fields() {
+        let packet = PacketDef {
+            name: "TestLogin".into(),
+            id: "0x01".into(),
+            fields: vec![
+                FieldDef {
+                    name: "username".into(),
+                    rust_type: "String".into(),
+                    attribute: None,
+                },
+                FieldDef {
+                    name: "protocol_version".into(),
+                    rust_type: "i32".into(),
+                    attribute: Some("varint".into()),
+                },
+            ],
+            inline_structs: vec![],
+        };
+        let code = generate_packet_struct(&packet);
+        assert!(code.contains("#[packet(id = 0x01)]"));
+        assert!(code.contains("pub struct TestLogin"));
+        assert!(code.contains("pub username: String"));
+        assert!(code.contains("#[field(varint)]"));
+        assert!(code.contains("pub protocol_version: i32"));
+    }
+
+    #[test]
+    fn generate_struct_with_inline() {
+        let packet = PacketDef {
+            name: "TestSuccess".into(),
+            id: "0x02".into(),
+            fields: vec![FieldDef {
+                name: "items".into(),
+                rust_type: "Vec<TestSuccessItems>".into(),
+                attribute: Some("length = \"varint\"".into()),
+            }],
+            inline_structs: vec![InlineStruct {
+                name: "TestSuccessItems".into(),
+                fields: vec![FieldDef {
+                    name: "name".into(),
+                    rust_type: "String".into(),
+                    attribute: None,
+                }],
+            }],
+        };
+        let code = generate_packet_struct(&packet);
+        assert!(code.contains("pub struct TestSuccessItems"));
+        assert!(code.contains("pub struct TestSuccess"));
+    }
+
+    // -- generate_direction_enum --
+
+    #[test]
+    fn generate_enum_with_dispatch() {
+        let packets = vec![
+            PacketDef {
+                name: "ServerboundTestPing".into(),
+                id: "0x00".into(),
+                fields: vec![],
+                inline_structs: vec![],
+            },
+            PacketDef {
+                name: "ServerboundTestStart".into(),
+                id: "0x01".into(),
+                fields: vec![],
+                inline_structs: vec![],
+            },
+        ];
+        let code = generate_direction_enum("ServerboundTestPacket", &packets, "test", "Test");
+        assert!(code.contains("pub enum ServerboundTestPacket"));
+        assert!(code.contains("Ping(ServerboundTestPing)"));
+        assert!(code.contains("Start(ServerboundTestStart)"));
+        assert!(code.contains("decode_by_id"));
+        assert!(code.contains("ServerboundTestPing::PACKET_ID"));
+        assert!(code.contains("state: \"test\""));
+    }
+
+    // -- generate_state_module --
+
+    #[test]
+    fn generate_module_from_mock_json() {
+        let json: Value = serde_json::from_str(r#"{
+            "toServer": {
+                "types": {
+                    "packet": ["container", [
+                        {"name": "name", "type": ["mapper", {"type": "varint", "mappings": {"0x00": "ping_start", "0x01": "ping"}}]},
+                        {"name": "params", "type": ["switch", {"compareTo": "name", "fields": {"ping_start": "packet_ping_start", "ping": "packet_ping"}}]}
+                    ]],
+                    "packet_ping_start": ["container", []],
+                    "packet_ping": ["container", [{"name": "time", "type": "i64"}]]
+                }
+            },
+            "toClient": {
+                "types": {
+                    "packet": ["container", [
+                        {"name": "name", "type": ["mapper", {"type": "varint", "mappings": {"0x00": "response"}}]},
+                        {"name": "params", "type": ["switch", {"compareTo": "name", "fields": {"response": "packet_response"}}]}
+                    ]],
+                    "packet_response": ["container", [{"name": "data", "type": "string"}]]
+                }
+            }
+        }"#).unwrap();
+
+        let code = generate_state_module(&json, "test");
+        assert!(code.contains("Test state packet definitions"));
+        assert!(code.contains("ServerboundTestPingStart"));
+        assert!(code.contains("ServerboundTestPing"));
+        assert!(code.contains("ClientboundTestResponse"));
+        assert!(code.contains("ServerboundTestPacket"));
+        assert!(code.contains("ClientboundTestPacket"));
+        assert!(code.contains("decode_by_id"));
+        assert!(code.contains("#[cfg(test)]"));
+        assert!(code.contains("_roundtrip"));
+    }
+
+    // -- generate_tests --
+
+    #[test]
+    fn generate_tests_with_roundtrips() {
+        let serverbound = vec![PacketDef {
+            name: "ServerboundTestPing".into(),
+            id: "0x00".into(),
+            fields: vec![FieldDef {
+                name: "time".into(),
+                rust_type: "i64".into(),
+                attribute: None,
+            }],
+            inline_structs: vec![],
+        }];
+        let clientbound = vec![PacketDef {
+            name: "ClientboundTestPong".into(),
+            id: "0x00".into(),
+            fields: vec![],
+            inline_structs: vec![],
+        }];
+        let code = generate_tests(&serverbound, &clientbound, "Test", "test");
+        assert!(code.contains("serverbound_test_ping_roundtrip"));
+        assert!(code.contains("clientbound_test_pong_roundtrip"));
+        assert!(code.contains("ServerboundTestPing::default()"));
+        assert!(code.contains("ClientboundTestPong;")); // unit struct, no ::default()
+        assert!(code.contains("unknown_serverbound_id"));
+        assert!(code.contains("unknown_clientbound_id"));
+    }
+
+    // -- parse_direction --
+
+    #[test]
+    fn parse_direction_skips_common_packets() {
+        let json: Value = serde_json::from_str(r#"{
+            "toServer": {
+                "types": {
+                    "packet": ["container", [
+                        {"name": "name", "type": ["mapper", {"type": "varint", "mappings": {"0x00": "login_start", "0x01": "cookie_response"}}]},
+                        {"name": "params", "type": ["switch", {"compareTo": "name", "fields": {"login_start": "packet_login_start", "cookie_response": "packet_common_cookie_response"}}]}
+                    ]],
+                    "packet_login_start": ["container", [{"name": "username", "type": "string"}]]
+                }
+            }
+        }"#).unwrap();
+
+        let packets = parse_direction(&json, "toServer", "Serverbound", "Login");
+        // Should only have login_start, cookie_response should be skipped
+        assert_eq!(packets.len(), 1);
+        assert!(packets[0].name.contains("LoginStart"));
+    }
+
+    #[test]
+    fn parse_direction_empty() {
+        let json: Value = serde_json::from_str(r#"{}"#).unwrap();
+        let packets = parse_direction(&json, "toServer", "Serverbound", "Login");
+        assert!(packets.is_empty());
+    }
+
+    // -- map_type edge cases --
+
+    #[test]
+    fn map_array_of_primitives() {
+        let json: Value =
+            serde_json::from_str(r#"["array", {"countType": "varint", "type": "i32"}]"#).unwrap();
+        let (ty, attr, _) = map_type(&json, "", "", false);
+        assert_eq!(ty, "Vec<i32>");
+        assert_eq!(attr, Some("length = \"varint\"".into()));
+    }
+
+    #[test]
+    fn map_varlong() {
+        let (ty, attr, _) = map_type(&Value::String("varlong".into()), "", "", false);
+        assert_eq!(ty, "i64");
+        assert_eq!(attr, Some("varlong".into()));
+    }
+
+    #[test]
+    fn map_unknown_type_falls_back() {
+        let (ty, _, _) = map_type(&Value::String("unknownType".into()), "", "", false);
+        assert_eq!(ty, "Vec<u8>");
     }
 }

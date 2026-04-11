@@ -10,25 +10,25 @@ use crate::error::{Error, Result};
 
 // -- Serverbound packets --
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x01)]
 pub struct ServerboundStatusPing {
     pub time: i64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x00)]
 pub struct ServerboundStatusPingStart;
 
 // -- Clientbound packets --
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x01)]
 pub struct ClientboundStatusPing {
     pub time: i64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x00)]
 pub struct ClientboundStatusServerInfo {
     pub response: String,
@@ -83,6 +83,7 @@ impl ClientboundStatusPacket {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use basalt_types::{Encode as _, EncodedSize as _};
 
     #[test]
     fn serverbound_packet_ids() {
@@ -106,5 +107,53 @@ mod tests {
     fn unknown_clientbound_id() {
         let mut cursor: &[u8] = &[];
         assert!(ClientboundStatusPacket::decode_by_id(0xFF, &mut cursor).is_err());
+    }
+
+    #[test]
+    fn serverbound_status_ping_roundtrip() {
+        let original = ServerboundStatusPing::default();
+        let mut buf = Vec::with_capacity(original.encoded_size());
+        original.encode(&mut buf).unwrap();
+        assert_eq!(buf.len(), original.encoded_size());
+        let mut cursor = buf.as_slice();
+        let decoded = ServerboundStatusPing::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn serverbound_status_ping_start_roundtrip() {
+        let original = ServerboundStatusPingStart;
+        let mut buf = Vec::with_capacity(original.encoded_size());
+        original.encode(&mut buf).unwrap();
+        assert_eq!(buf.len(), original.encoded_size());
+        let mut cursor = buf.as_slice();
+        let decoded = ServerboundStatusPingStart::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn clientbound_status_ping_roundtrip() {
+        let original = ClientboundStatusPing::default();
+        let mut buf = Vec::with_capacity(original.encoded_size());
+        original.encode(&mut buf).unwrap();
+        assert_eq!(buf.len(), original.encoded_size());
+        let mut cursor = buf.as_slice();
+        let decoded = ClientboundStatusPing::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn clientbound_status_server_info_roundtrip() {
+        let original = ClientboundStatusServerInfo::default();
+        let mut buf = Vec::with_capacity(original.encoded_size());
+        original.encode(&mut buf).unwrap();
+        assert_eq!(buf.len(), original.encoded_size());
+        let mut cursor = buf.as_slice();
+        let decoded = ClientboundStatusServerInfo::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(decoded, original);
     }
 }

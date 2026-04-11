@@ -391,4 +391,80 @@ mod tests {
         let mut cursor = buf.as_slice();
         assert!(NbtCompound::decode(&mut cursor).is_err());
     }
+
+    // -- NbtTag non-compound root encoding --
+
+    #[test]
+    fn nbt_tag_non_compound_wraps_in_compound() {
+        use crate::EncodedSize;
+
+        // Encoding a non-compound NbtTag wraps it in a compound
+        let tag = NbtTag::Int(42);
+        let mut buf = Vec::new();
+        tag.encode(&mut buf).unwrap();
+
+        // Should decode as a compound with one entry
+        let mut cursor = buf.as_slice();
+        let decoded = NbtCompound::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(decoded.get(""), Some(&NbtTag::Int(42)));
+
+        // EncodedSize should match actual encoded length
+        assert_eq!(tag.encoded_size(), buf.len());
+    }
+
+    #[test]
+    fn nbt_tag_string_wraps_in_compound() {
+        use crate::EncodedSize;
+
+        let tag = NbtTag::String("hello".into());
+        let mut buf = Vec::new();
+        tag.encode(&mut buf).unwrap();
+        assert_eq!(tag.encoded_size(), buf.len());
+
+        let mut cursor = buf.as_slice();
+        let decoded = NbtCompound::decode(&mut cursor).unwrap();
+        assert_eq!(decoded.get(""), Some(&NbtTag::String("hello".into())));
+    }
+
+    #[test]
+    fn nbt_tag_list_wraps_in_compound() {
+        use crate::EncodedSize;
+
+        let list = NbtList::from_tags(vec![NbtTag::Int(1), NbtTag::Int(2)]).unwrap();
+        let tag = NbtTag::List(list);
+        let mut buf = Vec::new();
+        tag.encode(&mut buf).unwrap();
+        assert_eq!(tag.encoded_size(), buf.len());
+    }
+
+    #[test]
+    fn nbt_tag_byte_array_wraps_in_compound() {
+        use crate::EncodedSize;
+
+        let tag = NbtTag::ByteArray(vec![1, 2, 3]);
+        let mut buf = Vec::new();
+        tag.encode(&mut buf).unwrap();
+        assert_eq!(tag.encoded_size(), buf.len());
+    }
+
+    #[test]
+    fn nbt_tag_int_array_wraps_in_compound() {
+        use crate::EncodedSize;
+
+        let tag = NbtTag::IntArray(vec![100, 200]);
+        let mut buf = Vec::new();
+        tag.encode(&mut buf).unwrap();
+        assert_eq!(tag.encoded_size(), buf.len());
+    }
+
+    #[test]
+    fn nbt_tag_long_array_wraps_in_compound() {
+        use crate::EncodedSize;
+
+        let tag = NbtTag::LongArray(vec![i64::MIN, i64::MAX]);
+        let mut buf = Vec::new();
+        tag.encode(&mut buf).unwrap();
+        assert_eq!(tag.encoded_size(), buf.len());
+    }
 }
