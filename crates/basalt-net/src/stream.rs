@@ -2,6 +2,7 @@ use basalt_types::{Decode, Encode, EncodedSize, VarInt};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
+use crate::compression;
 use crate::crypto::CipherPair;
 use crate::error::{Error, Result};
 use crate::framing::{MAX_PACKET_SIZE, RawPacket};
@@ -21,6 +22,10 @@ pub struct EncryptedStream {
     stream: TcpStream,
     /// The cipher pair, if encryption has been enabled.
     cipher: Option<CipherPair>,
+    /// The compression threshold in bytes, if compression has been enabled.
+    /// Packets with uncompressed size >= threshold are zlib-compressed.
+    /// `None` means compression is disabled.
+    compression_threshold: Option<usize>,
 }
 
 impl EncryptedStream {
@@ -29,6 +34,7 @@ impl EncryptedStream {
         Self {
             stream,
             cipher: None,
+            compression_threshold: None,
         }
     }
 
@@ -49,6 +55,21 @@ impl EncryptedStream {
     /// Returns true if encryption is currently active.
     pub fn is_encrypted(&self) -> bool {
         self.cipher.is_some()
+    }
+
+    /// Enables zlib compression on this stream.
+    ///
+    /// Packets with uncompressed size >= threshold bytes will be
+    /// zlib-compressed. Packets below threshold are sent uncompressed
+    /// with a data_length of 0. This should be called after sending
+    /// the Set Compression packet during login/configuration.
+    pub fn enable_compression(&mut self, threshold: usize) {
+        self.compression_threshold = Some(threshold);
+    }
+
+    /// Returns true if compression is currently active.
+    pub fn is_compressed(&self) -> bool {
+        self.compression_threshold.is_some()
     }
 
     /// Reads exactly `buf.len()` bytes, decrypting if encryption is active.
@@ -119,8 +140,15 @@ impl EncryptedStream {
         let mut frame = vec![0u8; length];
         self.read_exact(&mut frame).await.map_err(Error::Io)?;
 
+        // Decompress if compression is enabled
+        let data = if self.compression_threshold.is_some() {
+            compression::decompress_packet(&frame)?
+        } else {
+            frame
+        };
+
         // Extract packet ID
-        let mut cursor = frame.as_slice();
+        let mut cursor = data.as_slice();
         let packet_id = VarInt::decode(&mut cursor)
             .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
 
@@ -130,23 +158,38 @@ impl EncryptedStream {
         }))
     }
 
-    /// Writes a single VarInt length-prefixed packet, encrypting if needed.
+    /// Writes a single VarInt length-prefixed packet, with optional
+    /// compression and encryption.
     ///
-    /// This is the encrypted-aware equivalent of `framing::write_raw_packet`.
-    /// Builds the full frame (length + id + payload), then writes it through
-    /// the encryption layer.
+    /// When compression is enabled, the packet ID + payload are compressed
+    /// if they exceed the threshold. The compressed (or uncompressed) data
+    /// is then framed with a VarInt length prefix and written through the
+    /// encryption layer.
     pub async fn write_raw_packet(&mut self, packet_id: i32, payload: &[u8]) -> Result<()> {
         let id_varint = VarInt(packet_id);
-        let frame_length = id_varint.encoded_size() + payload.len();
 
-        let mut buf = Vec::with_capacity(VarInt(frame_length as i32).encoded_size() + frame_length);
-        VarInt(frame_length as i32)
-            .encode(&mut buf)
-            .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
+        // Build the uncompressed packet data (id + payload)
+        let mut packet_data = Vec::with_capacity(id_varint.encoded_size() + payload.len());
         id_varint
+            .encode(&mut packet_data)
+            .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
+        packet_data.extend_from_slice(payload);
+
+        // Compress if enabled, then frame with length prefix
+        let frame_content = if let Some(threshold) = self.compression_threshold {
+            compression::compress_packet(&packet_data, threshold)?
+        } else {
+            packet_data
+        };
+
+        // Write length prefix + frame content
+        let mut buf = Vec::with_capacity(
+            VarInt(frame_content.len() as i32).encoded_size() + frame_content.len(),
+        );
+        VarInt(frame_content.len() as i32)
             .encode(&mut buf)
             .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
-        buf.extend_from_slice(payload);
+        buf.extend_from_slice(&frame_content);
 
         self.write_all(&buf).await.map_err(Error::Io)
     }
@@ -254,5 +297,62 @@ mod tests {
         let (server, client) = connected_pair().await;
         assert!(!server.is_encrypted());
         assert!(!client.is_encrypted());
+        assert!(!server.is_compressed());
+        assert!(!client.is_compressed());
+    }
+
+    #[tokio::test]
+    async fn compressed_packet_roundtrip() {
+        let (mut server, mut client) = connected_pair().await;
+
+        server.enable_compression(256);
+        client.enable_compression(256);
+
+        // Small packet — below threshold, not compressed
+        let payload = vec![0x01, 0x02, 0x03];
+        client.write_raw_packet(0x00, &payload).await.unwrap();
+        let raw = server.read_raw_packet().await.unwrap().unwrap();
+        assert_eq!(raw.id, 0x00);
+        assert_eq!(raw.payload, payload);
+    }
+
+    #[tokio::test]
+    async fn compressed_large_packet_roundtrip() {
+        let (mut server, mut client) = connected_pair().await;
+
+        server.enable_compression(256);
+        client.enable_compression(256);
+
+        // Large packet — above threshold, should be compressed
+        let payload = vec![0xAB; 1024];
+        client.write_raw_packet(0x05, &payload).await.unwrap();
+        let raw = server.read_raw_packet().await.unwrap().unwrap();
+        assert_eq!(raw.id, 0x05);
+        assert_eq!(raw.payload, payload);
+    }
+
+    #[tokio::test]
+    async fn encrypted_and_compressed_roundtrip() {
+        let (mut server, mut client) = connected_pair().await;
+
+        let secret = [0x77; 16];
+        server.enable_encryption(&secret);
+        client.enable_encryption(&secret);
+        server.enable_compression(128);
+        client.enable_compression(128);
+
+        // Small packet (below compression threshold)
+        let small = vec![0x01; 10];
+        client.write_raw_packet(0x00, &small).await.unwrap();
+        let raw = server.read_raw_packet().await.unwrap().unwrap();
+        assert_eq!(raw.id, 0x00);
+        assert_eq!(raw.payload, small);
+
+        // Large packet (above compression threshold)
+        let large = vec![0xFF; 512];
+        client.write_raw_packet(0x01, &large).await.unwrap();
+        let raw = server.read_raw_packet().await.unwrap().unwrap();
+        assert_eq!(raw.id, 0x01);
+        assert_eq!(raw.payload, large);
     }
 }
