@@ -1,13 +1,6 @@
 use proc_macro2::Span;
 use syn::{Attribute, Expr, ExprLit, ExprUnary, Lit, Result, UnOp};
 
-/// Parsed `#[packet(id = 0x00)]` attribute on a struct.
-#[derive(Debug, Clone)]
-pub struct PacketAttr {
-    /// The packet ID as an integer literal.
-    pub id: i32,
-}
-
 /// Parsed `#[field(...)]` attribute on a struct field.
 #[derive(Debug, Clone, Default)]
 pub struct FieldAttr {
@@ -56,41 +49,6 @@ fn parse_int_expr(expr: &Expr) -> syn::Result<i32> {
         }
         _ => Err(syn::Error::new_spanned(expr, "expected integer literal")),
     }
-}
-
-/// Extracts the `#[packet(id = ...)]` attribute from a list of attributes.
-///
-/// Returns `None` if no `#[packet]` attribute is present. Returns an error
-/// if the attribute is malformed (missing `id`, wrong type, etc.).
-pub fn parse_packet_attr(attrs: &[Attribute]) -> Result<Option<PacketAttr>> {
-    for attr in attrs {
-        if !attr.path().is_ident("packet") {
-            continue;
-        }
-
-        let mut id = None;
-        attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("id") {
-                let value = meta.value()?;
-                let expr: Expr = value.parse()?;
-                id = Some(parse_int_expr(&expr)?);
-                Ok(())
-            } else {
-                Err(meta.error("expected `id`"))
-            }
-        })?;
-
-        match id {
-            Some(id) => return Ok(Some(PacketAttr { id })),
-            None => {
-                return Err(syn::Error::new(
-                    Span::call_site(),
-                    "#[packet] requires `id` parameter",
-                ));
-            }
-        }
-    }
-    Ok(None)
 }
 
 /// Extracts the `#[field(...)]` attribute from a list of attributes.
