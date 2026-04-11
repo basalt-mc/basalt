@@ -7,6 +7,7 @@ pub mod nbt;
 mod position;
 mod primitives;
 mod string;
+mod text;
 pub mod traits;
 mod uuid;
 mod varint;
@@ -17,6 +18,9 @@ pub use error::{Error, Result};
 pub use identifier::Identifier;
 pub use nbt::{NbtCompound, NbtList, NbtTag};
 pub use position::{BlockPosition, ChunkPosition, Position};
+pub use text::{
+    ClickEvent, HoverEvent, NamedColor, TextColor, TextComponent, TextContent, TextStyle,
+};
 pub use traits::{Decode, Encode, EncodedSize};
 pub use uuid::Uuid;
 pub use varint::{VarInt, VarLong};
