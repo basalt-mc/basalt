@@ -16,7 +16,8 @@ use basalt_protocol::packets::configuration::ClientboundConfigurationRegistryDat
 use basalt_protocol::packets::login::{ClientboundLoginSuccess, ServerboundLoginPacket};
 use basalt_protocol::packets::play::misc::ClientboundPlayKeepAlive;
 use basalt_protocol::packets::play::player::{
-    ClientboundPlayGameStateChange, ClientboundPlayLogin, ClientboundPlayPosition,
+    ClientboundPlayGameStateChange, ClientboundPlayLogin, ClientboundPlayLoginSpawninfo,
+    ClientboundPlayPosition,
 };
 use basalt_protocol::packets::play::world::{
     ClientboundPlayMapChunk, ClientboundPlaySpawnPosition,
@@ -25,7 +26,7 @@ use basalt_protocol::packets::status::{
     ClientboundStatusPing, ClientboundStatusServerInfo, ServerboundStatusPacket,
 };
 use basalt_protocol::registry_data::build_default_registries;
-use basalt_types::{Encode, Position, VarInt};
+use basalt_types::Position;
 use tokio::net::TcpListener;
 
 const SERVER_STATUS: &str = r#"{
@@ -171,11 +172,31 @@ async fn handle_play(
     addr: std::net::SocketAddr,
     username: &str,
 ) -> basalt_net::Result<()> {
-    // Encode Login (Play) manually because world_state is an inline
-    // container that the codegen mapped as Vec<u8> with a length prefix,
-    // but the protocol expects the fields inline without a length prefix.
-    let login_payload = build_login_play_payload();
-    conn.write_packet_typed(ClientboundPlayLogin::PACKET_ID, &RawPayload(login_payload))
+    let login = ClientboundPlayLogin {
+        entity_id: 1,
+        is_hardcore: false,
+        world_names: vec!["minecraft:overworld".into()],
+        max_players: 20,
+        view_distance: 10,
+        simulation_distance: 10,
+        reduced_debug_info: false,
+        enable_respawn_screen: true,
+        do_limited_crafting: false,
+        world_state: ClientboundPlayLoginSpawninfo {
+            dimension: 0,
+            name: "minecraft:overworld".into(),
+            hashed_seed: 0,
+            gamemode: 1,            // creative
+            previous_gamemode: 255, // none
+            is_debug: false,
+            is_flat: true,
+            death: None,
+            portal_cooldown: 0,
+            sea_level: 63,
+        },
+        enforces_secure_chat: false,
+    };
+    conn.write_packet_typed(ClientboundPlayLogin::PACKET_ID, &login)
         .await?;
     println!("[{addr}] -> Login (Play)");
 
@@ -203,7 +224,7 @@ async fn handle_play(
         .await?;
     println!("[{addr}] -> ChunkData (0, 0)");
 
-    // Send player position
+    // Send player position — flags=0 means all coordinates are absolute.
     let position = ClientboundPlayPosition {
         teleport_id: 1,
         x: 0.0,
@@ -214,7 +235,7 @@ async fn handle_play(
         dz: 0.0,
         yaw: 0.0,
         pitch: 0.0,
-        flags: build_position_flags(0),
+        flags: 0,
     };
     conn.write_packet_typed(ClientboundPlayPosition::PACKET_ID, &position)
         .await?;
@@ -246,87 +267,4 @@ async fn handle_play(
     }
 
     Ok(())
-}
-
-/// A wrapper that encodes raw bytes directly without any framing.
-///
-/// Used when we need to encode a packet manually because the codegen
-/// produced a struct with incorrect field types (e.g., Vec<u8> with
-/// length prefix where inline bytes are expected).
-struct RawPayload(Vec<u8>);
-
-impl Encode for RawPayload {
-    fn encode(&self, buf: &mut Vec<u8>) -> basalt_types::Result<()> {
-        buf.extend_from_slice(&self.0);
-        Ok(())
-    }
-}
-
-impl basalt_types::EncodedSize for RawPayload {
-    fn encoded_size(&self) -> usize {
-        self.0.len()
-    }
-}
-
-/// Builds the complete Login (Play) packet payload manually.
-///
-/// The codegen maps `world_state` (SpawnInfo) as `Vec<u8>` with a length
-/// prefix, but the protocol expects the SpawnInfo fields inline. We encode
-/// the entire packet by hand to get the correct wire format.
-fn build_login_play_payload() -> Vec<u8> {
-    let mut buf = Vec::new();
-
-    // entity_id: i32
-    1i32.encode(&mut buf).unwrap();
-    // is_hardcore: bool
-    false.encode(&mut buf).unwrap();
-    // world_names: array of String
-    VarInt(1).encode(&mut buf).unwrap();
-    "minecraft:overworld".to_string().encode(&mut buf).unwrap();
-    // max_players: VarInt
-    VarInt(20).encode(&mut buf).unwrap();
-    // view_distance: VarInt
-    VarInt(10).encode(&mut buf).unwrap();
-    // simulation_distance: VarInt
-    VarInt(10).encode(&mut buf).unwrap();
-    // reduced_debug_info: bool
-    false.encode(&mut buf).unwrap();
-    // enable_respawn_screen: bool
-    true.encode(&mut buf).unwrap();
-    // do_limited_crafting: bool
-    false.encode(&mut buf).unwrap();
-
-    // --- SpawnInfo (world_state) inline, NOT length-prefixed ---
-    // dimension: VarInt (index into dimension_type registry)
-    VarInt(0).encode(&mut buf).unwrap();
-    // name: String (dimension name)
-    "minecraft:overworld".to_string().encode(&mut buf).unwrap();
-    // hashed_seed: i64
-    0i64.encode(&mut buf).unwrap();
-    // game_mode: i8 (1 = creative)
-    1i8.encode(&mut buf).unwrap();
-    // previous_game_mode: u8 (255 = none)
-    255u8.encode(&mut buf).unwrap();
-    // is_debug: bool
-    false.encode(&mut buf).unwrap();
-    // is_flat: bool
-    true.encode(&mut buf).unwrap();
-    // death: Option (false = no death info)
-    false.encode(&mut buf).unwrap();
-    // portal_cooldown: VarInt
-    VarInt(0).encode(&mut buf).unwrap();
-    // sea_level: VarInt
-    VarInt(63).encode(&mut buf).unwrap();
-
-    // enforces_secure_chat: bool
-    false.encode(&mut buf).unwrap();
-
-    buf
-}
-
-/// Builds the position flags bitfield as a VarInt-prefixed bitset.
-fn build_position_flags(flags: i32) -> Vec<u8> {
-    let mut buf = Vec::new();
-    VarInt(flags).encode(&mut buf).unwrap();
-    buf
 }
