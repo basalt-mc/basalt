@@ -2,8 +2,12 @@ use std::marker::PhantomData;
 
 use tokio::net::TcpStream;
 
-use basalt_protocol::packets::handshake::{HandshakePacket, ServerboundHandshakePacket};
-use basalt_protocol::packets::status::{PingResponse, ServerboundStatusPacket, StatusResponse};
+use basalt_protocol::packets::handshake::{
+    ServerboundHandshakePacket, ServerboundHandshakeSetProtocol,
+};
+use basalt_protocol::packets::status::{
+    ClientboundStatusPing, ClientboundStatusServerInfo, ServerboundStatusPacket,
+};
 use basalt_types::{Encode, EncodedSize};
 
 use crate::error::{Error, Result};
@@ -58,7 +62,9 @@ impl Connection<Handshake> {
     /// Currently only supports transitioning to Status (next_state = 1).
     /// Login (next_state = 2) will be supported when Login packets are
     /// implemented.
-    pub async fn read_handshake(mut self) -> Result<(Connection<Status>, HandshakePacket)> {
+    pub async fn read_handshake(
+        mut self,
+    ) -> Result<(Connection<Status>, ServerboundHandshakeSetProtocol)> {
         let raw = framing::read_raw_packet(&mut self.stream)
             .await?
             .ok_or_else(|| {
@@ -69,16 +75,19 @@ impl Connection<Handshake> {
             })?;
 
         let mut cursor = raw.payload.as_slice();
-        let ServerboundHandshakePacket::Handshake(packet) =
-            ServerboundHandshakePacket::decode_by_id(raw.id, &mut cursor)?;
-
-        Ok((
-            Connection {
-                stream: self.stream,
-                _state: PhantomData,
-            },
-            packet,
-        ))
+        match ServerboundHandshakePacket::decode_by_id(raw.id, &mut cursor)? {
+            ServerboundHandshakePacket::SetProtocol(packet) => Ok((
+                Connection {
+                    stream: self.stream,
+                    _state: PhantomData,
+                },
+                packet,
+            )),
+            _ => Err(Error::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "expected SetProtocol handshake packet",
+            ))),
+        }
     }
 }
 
@@ -86,7 +95,7 @@ impl Connection<Status> {
     /// Reads a serverbound Status packet from the client.
     ///
     /// Returns the decoded packet enum, which is either a StatusRequest
-    /// (asking for server info) or a PingRequest (latency measurement).
+    /// (asking for server info) or a ServerboundStatusPing (latency measurement).
     pub async fn read_packet(&mut self) -> Result<ServerboundStatusPacket> {
         let raw = framing::read_raw_packet(&mut self.stream)
             .await?
@@ -101,20 +110,25 @@ impl Connection<Status> {
         Ok(ServerboundStatusPacket::decode_by_id(raw.id, &mut cursor)?)
     }
 
-    /// Writes a StatusResponse packet to the client.
+    /// Writes a ClientboundStatusServerInfo packet to the client.
     ///
     /// Sends the server's status information (MOTD, player count, icon)
     /// as a JSON string. This is the response to a StatusRequest.
-    pub async fn write_status_response(&mut self, response: &StatusResponse) -> Result<()> {
-        self.write_packet(StatusResponse::PACKET_ID, response).await
+    pub async fn write_status_response(
+        &mut self,
+        response: &ClientboundStatusServerInfo,
+    ) -> Result<()> {
+        self.write_packet(ClientboundStatusServerInfo::PACKET_ID, response)
+            .await
     }
 
-    /// Writes a PingResponse packet to the client.
+    /// Writes a ClientboundStatusPing packet to the client.
     ///
-    /// Echoes back the client's ping payload for latency measurement.
-    /// This is the response to a PingRequest.
-    pub async fn write_ping_response(&mut self, response: &PingResponse) -> Result<()> {
-        self.write_packet(PingResponse::PACKET_ID, response).await
+    /// Echoes back the client's ping time for latency measurement.
+    /// This is the response to a ServerboundStatusPing.
+    pub async fn write_ping_response(&mut self, response: &ClientboundStatusPing) -> Result<()> {
+        self.write_packet(ClientboundStatusPing::PACKET_ID, response)
+            .await
     }
 
     /// Encodes and writes a packet with the given ID to the stream.
@@ -134,7 +148,7 @@ impl Connection<Status> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use basalt_protocol::packets::status::{PingRequest, StatusRequest};
+    use basalt_protocol::packets::status::{ServerboundStatusPing, ServerboundStatusPingStart};
     use basalt_types::Decode as _;
     use tokio::net::TcpListener;
 
@@ -165,13 +179,18 @@ mod tests {
         let (server_stream, mut client_stream) = connected_pair().await;
 
         // Client sends handshake
-        let handshake = HandshakePacket {
+        let handshake = ServerboundHandshakeSetProtocol {
             protocol_version: 767,
-            server_address: "localhost".into(),
+            server_host: "localhost".into(),
             server_port: 25565,
             next_state: 1,
         };
-        client_send(&mut client_stream, HandshakePacket::PACKET_ID, &handshake).await;
+        client_send(
+            &mut client_stream,
+            ServerboundHandshakeSetProtocol::PACKET_ID,
+            &handshake,
+        )
+        .await;
 
         // Server reads handshake and transitions to Status
         let conn = Connection::<Handshake>::accept(server_stream);
@@ -179,11 +198,16 @@ mod tests {
         assert_eq!(received_handshake, handshake);
 
         // Client sends StatusRequest
-        client_send(&mut client_stream, StatusRequest::PACKET_ID, &StatusRequest).await;
+        client_send(
+            &mut client_stream,
+            ServerboundStatusPingStart::PACKET_ID,
+            &ServerboundStatusPingStart,
+        )
+        .await;
 
         // Server reads StatusRequest
         let packet = conn.read_packet().await.unwrap();
-        assert!(matches!(packet, ServerboundStatusPacket::StatusRequest(_)));
+        assert!(matches!(packet, ServerboundStatusPacket::PingStart(_)));
     }
 
     #[tokio::test]
@@ -191,64 +215,70 @@ mod tests {
         let (server_stream, mut client_stream) = connected_pair().await;
 
         // Client sends handshake
-        let handshake = HandshakePacket {
+        let handshake = ServerboundHandshakeSetProtocol {
             protocol_version: 767,
-            server_address: "localhost".into(),
+            server_host: "localhost".into(),
             server_port: 25565,
             next_state: 1,
         };
-        client_send(&mut client_stream, HandshakePacket::PACKET_ID, &handshake).await;
+        client_send(
+            &mut client_stream,
+            ServerboundHandshakeSetProtocol::PACKET_ID,
+            &handshake,
+        )
+        .await;
 
         // Server accepts and transitions
         let conn = Connection::<Handshake>::accept(server_stream);
         let (mut conn, _) = conn.read_handshake().await.unwrap();
 
         // Client sends StatusRequest
-        client_send(&mut client_stream, StatusRequest::PACKET_ID, &StatusRequest).await;
+        client_send(
+            &mut client_stream,
+            ServerboundStatusPingStart::PACKET_ID,
+            &ServerboundStatusPingStart,
+        )
+        .await;
         let packet = conn.read_packet().await.unwrap();
-        assert!(matches!(packet, ServerboundStatusPacket::StatusRequest(_)));
+        assert!(matches!(packet, ServerboundStatusPacket::PingStart(_)));
 
-        // Server sends StatusResponse
-        let response = StatusResponse {
-            json_response: r#"{"version":{"name":"1.21","protocol":767}}"#.into(),
+        // Server sends ClientboundStatusServerInfo
+        let response = ClientboundStatusServerInfo {
+            response: r#"{"version":{"name":"1.21","protocol":767}}"#.into(),
         };
         conn.write_status_response(&response).await.unwrap();
 
-        // Client reads StatusResponse
+        // Client reads ClientboundStatusServerInfo
         let raw = framing::read_raw_packet(&mut client_stream)
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(raw.id, StatusResponse::PACKET_ID);
+        assert_eq!(raw.id, ClientboundStatusServerInfo::PACKET_ID);
 
-        // Client sends PingRequest
-        let ping = PingRequest {
-            payload: 1234567890,
-        };
-        client_send(&mut client_stream, PingRequest::PACKET_ID, &ping).await;
+        // Client sends ServerboundStatusPing
+        let ping = ServerboundStatusPing { time: 1234567890 };
+        client_send(&mut client_stream, ServerboundStatusPing::PACKET_ID, &ping).await;
 
-        // Server reads PingRequest and responds
+        // Server reads ServerboundStatusPing and responds
         let packet = conn.read_packet().await.unwrap();
         match packet {
-            ServerboundStatusPacket::PingRequest(req) => {
-                assert_eq!(req.payload, 1234567890);
-                let pong = PingResponse {
-                    payload: req.payload,
-                };
+            ServerboundStatusPacket::Ping(req) => {
+                assert_eq!(req.time, 1234567890);
+                let pong = ClientboundStatusPing { time: req.time };
                 conn.write_ping_response(&pong).await.unwrap();
             }
-            _ => panic!("expected PingRequest"),
+            _ => panic!("expected ServerboundStatusPing"),
         }
 
-        // Client reads PingResponse
+        // Client reads ClientboundStatusPing
         let raw = framing::read_raw_packet(&mut client_stream)
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(raw.id, PingResponse::PACKET_ID);
+        assert_eq!(raw.id, ClientboundStatusPing::PACKET_ID);
         let mut cursor = raw.payload.as_slice();
-        let pong = PingResponse::decode(&mut cursor).unwrap();
-        assert_eq!(pong.payload, 1234567890);
+        let pong = ClientboundStatusPing::decode(&mut cursor).unwrap();
+        assert_eq!(pong.time, 1234567890);
     }
 
     #[tokio::test]
