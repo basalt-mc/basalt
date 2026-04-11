@@ -49,6 +49,11 @@ const keywords = [
   // Example: "ci(ci): add cargo-deny advisory check"
   'ci',
 
+  // Code generation: xtask codegen tool, minecraft-data parsing, generated
+  // packet definitions.
+  // Example: "feat(codegen): add xtask codegen tool"
+  'codegen',
+
   // Code coverage: cargo-llvm-cov configuration, coverage thresholds,
   // coverage CI job, coverage reporting.
   // Example: "ci(coverage): add coverage job with 90% threshold"
