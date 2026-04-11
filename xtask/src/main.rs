@@ -23,6 +23,8 @@ const STATES: &[(&str, &str)] = &[
     ("handshaking", "handshake"),
     ("status", "status"),
     ("login", "login"),
+    ("configuration", "configuration"),
+    ("play", "play"),
 ];
 
 fn main() {
@@ -57,13 +59,17 @@ fn codegen() {
             continue;
         }
 
-        let code = generate_state_module(state_data, module_name);
-        let output_path = workspace_root
-            .join(PACKETS_DIR)
-            .join(format!("{module_name}.rs"));
-        println!("Writing {module_name} packets to {}", output_path.display());
-        fs::write(&output_path, &code)
-            .unwrap_or_else(|e| panic!("Failed to write {}: {e}", output_path.display()));
+        if module_name == "play" {
+            generate_play_split(state_data, &workspace_root);
+        } else {
+            let code = generate_state_module(state_data, module_name);
+            let output_path = workspace_root
+                .join(PACKETS_DIR)
+                .join(format!("{module_name}.rs"));
+            println!("Writing {module_name} packets to {}", output_path.display());
+            fs::write(&output_path, &code)
+                .unwrap_or_else(|e| panic!("Failed to write {}: {e}", output_path.display()));
+        }
     }
 
     // Generate packets/mod.rs from files on disk
@@ -143,12 +149,19 @@ fn generate_state_module(state: &Value, module_name: &str) -> String {
         .chain(clientbound.iter())
         .any(|p| !p.inline_structs.is_empty());
 
-    let needs_uuid = serverbound.iter().chain(clientbound.iter()).any(|p| {
-        p.fields.iter().any(|f| f.rust_type.contains("Uuid"))
-            || p.inline_structs
+    // Collect all type names used across all packets to generate imports
+    let all_types: Vec<&str> = serverbound
+        .iter()
+        .chain(clientbound.iter())
+        .flat_map(|p| {
+            p.fields
                 .iter()
-                .any(|s| s.fields.iter().any(|f| f.rust_type.contains("Uuid")))
-    });
+                .chain(p.inline_structs.iter().flat_map(|s| s.fields.iter()))
+                .map(|f| f.rust_type.as_str())
+        })
+        .collect();
+
+    let needs = |name: &str| all_types.iter().any(|t| t.contains(name));
 
     if has_inline_structs {
         output.push_str("use basalt_derive::{packet, Encode, Decode, EncodedSize};\n");
@@ -156,8 +169,28 @@ fn generate_state_module(state: &Value, module_name: &str) -> String {
         output.push_str("use basalt_derive::packet;\n");
     }
     output.push_str("use basalt_types::Decode as _;\n");
-    if needs_uuid {
-        output.push_str("use basalt_types::Uuid;\n");
+
+    // Import basalt-types types that are used in generated packets
+    let mut basalt_imports = Vec::new();
+    for (type_name, import_name) in [
+        ("Uuid", "Uuid"),
+        ("Position", "Position"),
+        ("NbtCompound", "NbtCompound"),
+        ("Slot", "Slot"),
+        ("Vec2f", "Vec2f"),
+        ("Vec3f64", "Vec3f64"),
+        ("Vec3f", "Vec3f"),
+        ("Vec3i16", "Vec3i16"),
+    ] {
+        if needs(type_name) {
+            basalt_imports.push(import_name);
+        }
+    }
+    if !basalt_imports.is_empty() {
+        output.push_str(&format!(
+            "use basalt_types::{{{}}};\n",
+            basalt_imports.join(", ")
+        ));
     }
 
     output.push_str("\nuse crate::error::{Error, Result};\n\n");
@@ -354,6 +387,18 @@ fn map_type(
             "f32" => ("f32".into(), None, None),
             "f64" => ("f64".into(), None, None),
             "UUID" => ("Uuid".into(), None, None),
+            "position" => ("Position".into(), None, None),
+            "anonymousNbt" => ("NbtCompound".into(), None, None),
+            "anonOptionalNbt" => ("Option<NbtCompound>".into(), Some("optional".into()), None),
+            "ByteArray" => ("Vec<u8>".into(), Some("length = \"varint\"".into()), None),
+            "ContainerID" | "optvarint" => ("i32".into(), Some("varint".into()), None),
+            "soundSource" => ("i32".into(), Some("varint".into()), None),
+            "Slot" => ("Slot".into(), None, None),
+            "vec2f" => ("Vec2f".into(), None, None),
+            "vec3f" => ("Vec3f".into(), None, None),
+            "vec3f64" => ("Vec3f64".into(), None, None),
+            "vec3i16" => ("Vec3i16".into(), None, None),
+            "packedChunkPos" => ("i64".into(), None, None),
             "restBuffer" => {
                 if is_last {
                     ("Vec<u8>".into(), Some("rest".into()), None)
@@ -381,11 +426,18 @@ fn map_type(
                     let inner_type = &arr[1];
                     let (inner_rust, _inner_attr, inline) =
                         map_type(inner_type, parent_name, field_name, is_last);
-                    (
-                        format!("Option<{inner_rust}>"),
-                        Some("optional".into()),
-                        inline,
-                    )
+                    // If the inner type produced an inline struct, we can't
+                    // wrap it in Option because Vec<InlineStruct> doesn't
+                    // implement Encode/Decode. Fall back to opaque bytes.
+                    if inline.is_some() {
+                        ("Option<Vec<u8>>".into(), Some("optional".into()), None)
+                    } else {
+                        (
+                            format!("Option<{inner_rust}>"),
+                            Some("optional".into()),
+                            None,
+                        )
+                    }
                 }
                 "array" => {
                     let count_type = arr[1]["countType"].as_str().unwrap_or("varint");
@@ -393,11 +445,42 @@ fn map_type(
 
                     if inner_type.is_array() && inner_type[0].as_str() == Some("container") {
                         let struct_name = format!("{}{}", parent_name, to_pascal_case(field_name));
-                        let (inner_fields, _nested_inlines) =
+                        let (inner_fields, nested_inlines) =
                             parse_container_fields(inner_type, &struct_name);
+
+                        // For nested inline structs (arrays inside arrays),
+                        // we need to handle them as Vec<u8> because our derive
+                        // system doesn't support nested generic containers.
+                        // The top-level inline struct fields that reference
+                        // nested inlines will use Vec<u8> fallback.
+                        let clean_fields = if nested_inlines.is_empty() {
+                            inner_fields
+                        } else {
+                            // Replace fields that reference nested inlines
+                            // with Vec<u8> — we can't derive Encode/Decode
+                            // for Vec<NestedInlineStruct>
+                            inner_fields
+                                .into_iter()
+                                .map(|f| {
+                                    if nested_inlines
+                                        .iter()
+                                        .any(|ni| f.rust_type.contains(&ni.name))
+                                    {
+                                        FieldDef {
+                                            name: f.name,
+                                            rust_type: "Vec<u8>".into(),
+                                            attribute: Some("length = \"varint\"".into()),
+                                        }
+                                    } else {
+                                        f
+                                    }
+                                })
+                                .collect()
+                        };
+
                         let inline = InlineStruct {
                             name: struct_name.clone(),
-                            fields: inner_fields,
+                            fields: clean_fields,
                         };
 
                         if count_type == "varint" {
@@ -599,6 +682,432 @@ fn generate_tests(
         out.push_str("        assert_eq!(decoded, original);\n");
         out.push_str("    }\n\n");
     }
+
+    out.push_str("}\n");
+    out
+}
+
+// -- Play split by category --
+
+/// Play packet categories. Each packet is assigned to a category based
+/// on its name. This determines which sub-file it goes into.
+const PLAY_CATEGORIES: &[(&str, &[&str])] = &[
+    (
+        "entity",
+        &[
+            "spawn_entity",
+            "spawn_entity_experience_orb",
+            "animation",
+            "entity_status",
+            "entity_metadata",
+            "entity_destroy",
+            "entity_velocity",
+            "entity_equipment",
+            "entity_head_rotation",
+            "entity_look",
+            "entity_move_look",
+            "rel_entity_move",
+            "entity_teleport",
+            "entity_sound_effect",
+            "entity_effect",
+            "remove_entity_effect",
+            "entity_update_attributes",
+            "attach_entity",
+            "set_passengers",
+            "collect",
+            "use_entity",
+            "entity_action",
+            "arm_animation",
+            "damage_event",
+            "hurt_animation",
+            "sync_entity_position",
+            "move_minecart",
+            "set_projectile_power",
+            "query_entity_nbt",
+            "block_break_animation",
+        ],
+    ),
+    (
+        "world",
+        &[
+            "block_change",
+            "multi_block_change",
+            "block_action",
+            "map_chunk",
+            "chunk_batch_finished",
+            "chunk_batch_start",
+            "chunk_batch_received",
+            "chunk_biomes",
+            "unload_chunk",
+            "update_light",
+            "map",
+            "explosion",
+            "world_event",
+            "world_particles",
+            "world_border_center",
+            "world_border_lerp_size",
+            "world_border_size",
+            "world_border_warning_delay",
+            "world_border_warning_reach",
+            "initialize_world_border",
+            "update_time",
+            "spawn_position",
+            "update_view_position",
+            "update_view_distance",
+            "tile_entity_data",
+            "block_dig",
+            "block_place",
+            "acknowledge_player_digging",
+            "query_block_nbt",
+            "nbt_query_response",
+            "generate_structure",
+            "update_sign",
+        ],
+    ),
+    (
+        "player",
+        &[
+            "position",
+            "position_look",
+            "look",
+            "flying",
+            "vehicle_move",
+            "steer_boat",
+            "abilities",
+            "player_info",
+            "player_remove",
+            "player_chat",
+            "player_rotation",
+            "game_state_change",
+            "respawn",
+            "experience",
+            "update_health",
+            "face_player",
+            "camera",
+            "spectate",
+            "teleport_confirm",
+            "client_command",
+            "settings",
+            "login",
+            "difficulty",
+            "set_difficulty",
+            "lock_difficulty",
+            "end_combat_event",
+            "enter_combat_event",
+            "death_combat_event",
+            "simulation_distance",
+            "player_input",
+            "player_loaded",
+        ],
+    ),
+    (
+        "inventory",
+        &[
+            "window_click",
+            "window_items",
+            "close_window",
+            "open_window",
+            "open_horse_window",
+            "set_slot",
+            "set_slot_state",
+            "craft_progress_bar",
+            "craft_recipe_request",
+            "craft_recipe_response",
+            "set_creative_slot",
+            "held_item_slot",
+            "set_cooldown",
+            "trade_list",
+            "select_trade",
+            "enchant_item",
+            "set_beacon_effect",
+            "pick_item_from_block",
+            "pick_item_from_entity",
+            "name_item",
+            "select_bundle_item",
+            "open_book",
+            "open_sign_entity",
+            "set_cursor_item",
+            "set_player_inventory",
+            "collect",
+        ],
+    ),
+    (
+        "chat",
+        &[
+            "chat_message",
+            "chat_command",
+            "chat_command_signed",
+            "chat_session_update",
+            "chat_suggestions",
+            "system_chat",
+            "profileless_chat",
+            "hide_message",
+            "message_acknowledgement",
+            "tab_complete",
+            "declare_commands",
+            "action_bar",
+            "set_title_text",
+            "set_title_subtitle",
+            "set_title_time",
+            "clear_titles",
+            "playerlist_header",
+            "scoreboard_objective",
+            "scoreboard_display_objective",
+            "scoreboard_score",
+            "reset_score",
+            "teams",
+            "boss_bar",
+        ],
+    ),
+];
+
+/// Determines the category for a play packet by its short name.
+fn play_category(packet_short_name: &str) -> &'static str {
+    for &(category, names) in PLAY_CATEGORIES {
+        if names.contains(&packet_short_name) {
+            return category;
+        }
+    }
+    "misc"
+}
+
+/// Generates the play state as a directory with category sub-files.
+fn generate_play_split(state: &Value, workspace_root: &std::path::Path) {
+    let play_dir = workspace_root.join(PACKETS_DIR).join("play");
+    fs::create_dir_all(&play_dir)
+        .unwrap_or_else(|e| panic!("Failed to create {}: {e}", play_dir.display()));
+
+    let pascal_state = "Play";
+    let serverbound = parse_direction(state, "toServer", "Serverbound", pascal_state);
+    let clientbound = parse_direction(state, "toClient", "Clientbound", pascal_state);
+
+    // Categorize packets
+    let mut categories: BTreeMap<&str, (Vec<&PacketDef>, Vec<&PacketDef>)> = BTreeMap::new();
+    for packet in &serverbound {
+        let short = extract_play_short_name(&packet.name);
+        let cat = play_category(&short);
+        categories.entry(cat).or_default().0.push(packet);
+    }
+    for packet in &clientbound {
+        let short = extract_play_short_name(&packet.name);
+        let cat = play_category(&short);
+        categories.entry(cat).or_default().1.push(packet);
+    }
+
+    // Generate a file per category
+    for (&category, (sb, cb)) in &categories {
+        let code = generate_category_file(category, sb, cb, pascal_state);
+        let path = play_dir.join(format!("{category}.rs"));
+        println!(
+            "Writing play/{category}.rs ({} packets)",
+            sb.len() + cb.len()
+        );
+        fs::write(&path, &code)
+            .unwrap_or_else(|e| panic!("Failed to write {}: {e}", path.display()));
+    }
+
+    // Generate play/mod.rs
+    let mod_code = generate_play_mod(&categories, &serverbound, &clientbound);
+    let mod_path = play_dir.join("mod.rs");
+    println!("Writing play/mod.rs");
+    fs::write(&mod_path, &mod_code)
+        .unwrap_or_else(|e| panic!("Failed to write {}: {e}", mod_path.display()));
+}
+
+/// Extracts the short packet name from a full struct name.
+/// e.g., "ServerboundPlayPosition" → "position"
+/// e.g., "ClientboundPlayEntityMetadata" → "entity_metadata"
+fn extract_play_short_name(full_name: &str) -> String {
+    let without_dir = full_name
+        .strip_prefix("Serverbound")
+        .or_else(|| full_name.strip_prefix("Clientbound"))
+        .unwrap_or(full_name);
+    let without_state = without_dir.strip_prefix("Play").unwrap_or(without_dir);
+    to_snake_case(without_state)
+}
+
+/// Generates a category sub-file with packet structs and their tests.
+fn generate_category_file(
+    category: &str,
+    serverbound: &[&PacketDef],
+    clientbound: &[&PacketDef],
+    _state_pascal: &str,
+) -> String {
+    let mut output = String::new();
+
+    output.push_str(&format!("//! Play state — {category} packets.\n"));
+    output.push_str("//!\n");
+    output.push_str("//! Auto-generated by `cargo xt codegen` from minecraft-data.\n");
+    output.push_str("//! Do not edit manually — changes will be overwritten.\n\n");
+
+    // Collect all packets to determine imports
+    let all_packets: Vec<&PacketDef> = serverbound
+        .iter()
+        .chain(clientbound.iter())
+        .copied()
+        .collect();
+    let has_inline = all_packets.iter().any(|p| !p.inline_structs.is_empty());
+
+    let all_types: Vec<&str> = all_packets
+        .iter()
+        .flat_map(|p| {
+            p.fields
+                .iter()
+                .chain(p.inline_structs.iter().flat_map(|s| s.fields.iter()))
+                .map(|f| f.rust_type.as_str())
+        })
+        .collect();
+    let needs = |name: &str| all_types.iter().any(|t| t.contains(name));
+
+    if has_inline {
+        output.push_str("use basalt_derive::{packet, Encode, Decode, EncodedSize};\n");
+    } else {
+        output.push_str("use basalt_derive::packet;\n");
+    }
+
+    let mut basalt_imports = Vec::new();
+    for (type_name, import_name) in [
+        ("Uuid", "Uuid"),
+        ("Position", "Position"),
+        ("NbtCompound", "NbtCompound"),
+        ("Slot", "Slot"),
+        ("Vec2f", "Vec2f"),
+        ("Vec3f64", "Vec3f64"),
+        ("Vec3f", "Vec3f"),
+        ("Vec3i16", "Vec3i16"),
+    ] {
+        if needs(type_name) {
+            basalt_imports.push(import_name);
+        }
+    }
+    if !basalt_imports.is_empty() {
+        output.push_str(&format!(
+            "use basalt_types::{{{}}};\n",
+            basalt_imports.join(", ")
+        ));
+    }
+    output.push('\n');
+
+    // Serverbound structs
+    if !serverbound.is_empty() {
+        output.push_str("// -- Serverbound packets --\n\n");
+        for packet in serverbound {
+            output.push_str(&generate_packet_struct(packet));
+            output.push('\n');
+        }
+    }
+
+    // Clientbound structs
+    if !clientbound.is_empty() {
+        output.push_str("// -- Clientbound packets --\n\n");
+        for packet in clientbound {
+            output.push_str(&generate_packet_struct(packet));
+            output.push('\n');
+        }
+    }
+
+    // Tests
+    output.push_str("#[cfg(test)]\n");
+    output.push_str("mod tests {\n");
+    output.push_str("    use super::*;\n");
+    output.push_str("    use basalt_types::{Encode as _, EncodedSize as _};\n\n");
+
+    for packet in &all_packets {
+        let test_name = to_snake_case(&packet.name);
+        let constructor = if packet.fields.is_empty() {
+            packet.name.clone()
+        } else {
+            format!("{}::default()", packet.name)
+        };
+        output.push_str("    #[test]\n");
+        output.push_str(&format!("    fn {test_name}_roundtrip() {{\n"));
+        output.push_str(&format!("        let original = {constructor};\n"));
+        output.push_str("        let mut buf = Vec::with_capacity(original.encoded_size());\n");
+        output.push_str("        original.encode(&mut buf).unwrap();\n");
+        output.push_str("        assert_eq!(buf.len(), original.encoded_size());\n");
+        output.push_str("        let mut cursor = buf.as_slice();\n");
+        output.push_str(&format!(
+            "        let decoded = {}::decode(&mut cursor).unwrap();\n",
+            packet.name
+        ));
+        output.push_str("        assert!(cursor.is_empty());\n");
+        output.push_str("        assert_eq!(decoded, original);\n");
+        output.push_str("    }\n\n");
+    }
+
+    output.push_str("}\n");
+    output
+}
+
+/// Generates the play/mod.rs that re-exports category modules and defines
+/// the direction enums with decode_by_id spanning all categories.
+fn generate_play_mod(
+    categories: &BTreeMap<&str, (Vec<&PacketDef>, Vec<&PacketDef>)>,
+    all_serverbound: &[PacketDef],
+    all_clientbound: &[PacketDef],
+) -> String {
+    let mut out = String::new();
+    out.push_str("//! Play state packet definitions, split by category.\n");
+    out.push_str("//!\n");
+    out.push_str("//! Auto-generated by `cargo xt codegen` from minecraft-data.\n");
+    out.push_str("//! Do not edit manually — changes will be overwritten.\n\n");
+
+    // Module declarations
+    for category in categories.keys() {
+        out.push_str(&format!("pub mod {category};\n"));
+    }
+    out.push('\n');
+
+    // Re-exports
+    for (&category, (sb, cb)) in categories {
+        for packet in sb.iter().chain(cb.iter()) {
+            out.push_str(&format!("pub use {category}::{};\n", packet.name));
+            for inline in &packet.inline_structs {
+                out.push_str(&format!("pub use {category}::{};\n", inline.name));
+            }
+        }
+    }
+    out.push('\n');
+
+    out.push_str("use basalt_types::Decode as _;\n");
+    out.push_str("use crate::error::{Error, Result};\n\n");
+
+    // Direction enums
+    out.push_str(&generate_direction_enum(
+        "ServerboundPlayPacket",
+        all_serverbound,
+        "play",
+        "Play",
+    ));
+    out.push('\n');
+    out.push_str(&generate_direction_enum(
+        "ClientboundPlayPacket",
+        all_clientbound,
+        "play",
+        "Play",
+    ));
+
+    // ID tests
+    out.push('\n');
+    out.push_str("#[cfg(test)]\n");
+    out.push_str("mod tests {\n");
+    out.push_str("    use super::*;\n\n");
+
+    out.push_str("    #[test]\n");
+    out.push_str("    fn unknown_serverbound_id() {\n");
+    out.push_str("        let mut cursor: &[u8] = &[];\n");
+    out.push_str(
+        "        assert!(ServerboundPlayPacket::decode_by_id(0xFF, &mut cursor).is_err());\n",
+    );
+    out.push_str("    }\n\n");
+
+    out.push_str("    #[test]\n");
+    out.push_str("    fn unknown_clientbound_id() {\n");
+    out.push_str("        let mut cursor: &[u8] = &[];\n");
+    out.push_str(
+        "        assert!(ClientboundPlayPacket::decode_by_id(0xFF, &mut cursor).is_err());\n",
+    );
+    out.push_str("    }\n");
 
     out.push_str("}\n");
     out
