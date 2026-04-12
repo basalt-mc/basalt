@@ -145,14 +145,18 @@ impl ProtocolType {
             Self::VarLong => ("i64".into(), Some("varlong".into())),
             Self::Array { inner, .. } => {
                 let (inner_rust, inner_attr) = inner.to_rust();
-                // All protocol arrays use a VarInt length prefix.
-                // Vec<T> has no blanket Encode/Decode impl without it.
-                // Nested arrays (Vec<Vec<T>>) can't work because the
-                // inner Vec also needs a length attribute — fall back
-                // to Vec<Vec<u8>>.
-                if inner_attr.is_some()
+                // When the inner type is VarInt, use element = "varint"
+                // so the derive encodes each element as a VarInt.
+                if matches!(inner.as_ref(), ProtocolType::VarInt) {
+                    (
+                        "Vec<i32>".into(),
+                        Some("length = \"varint\", element = \"varint\"".into()),
+                    )
+                } else if inner_attr.is_some()
                     && !matches!(inner.as_ref(), ProtocolType::InlineStruct { .. })
                 {
+                    // Nested arrays or other attributed inner types
+                    // can't stack attributes — fall back to opaque bytes.
                     ("Vec<Vec<u8>>".into(), Some("length = \"varint\"".into()))
                 } else {
                     (
