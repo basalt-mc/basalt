@@ -4,6 +4,10 @@
 //! the Minecraft server. The `World` struct is the main entry point —
 //! it lazily generates and caches chunks, with optional disk persistence
 //! via `basalt-storage`.
+//!
+//! Blocks can be read and modified via `get_block` and `set_block`.
+//! Modifications invalidate the packet cache for the affected chunk
+//! and persist to disk if storage is configured.
 
 pub mod block;
 pub mod chunk;
@@ -30,22 +34,77 @@ enum Generator {
     Noise(Box<NoiseTerrainGenerator>),
 }
 
+/// Chunk data and packet cache behind a single lock.
+///
+/// Keeping both in one struct avoids holding two separate locks and
+/// prevents deadlock scenarios. The packet cache is a lazy derivative
+/// of the chunk data — invalidated when a block changes, rebuilt on
+/// next access.
+struct ChunkStore {
+    /// Loaded chunk columns, mutable for block modifications.
+    chunks: HashMap<(i32, i32), ChunkColumn>,
+    /// Cached encoded packets. Invalidated when a chunk is modified.
+    packets: HashMap<(i32, i32), basalt_protocol::packets::play::world::ClientboundPlayMapChunk>,
+}
+
 /// A Minecraft world with lazy chunk generation, in-memory caching,
 /// and optional disk persistence.
 ///
 /// Load order: memory cache → disk → generate.
 /// Generated chunks are saved to disk (if storage is configured)
-/// and cached in memory as encoded packets.
+/// and cached in memory. Blocks can be read and modified at any time;
+/// modifications invalidate the packet cache and persist to disk.
 pub struct World {
-    /// Cached encoded packets for fast repeated access.
-    packets:
-        Mutex<HashMap<(i32, i32), basalt_protocol::packets::play::world::ClientboundPlayMapChunk>>,
+    /// Combined chunk and packet storage behind a single lock.
+    store: Mutex<ChunkStore>,
     /// The terrain generator used for new chunks.
     generator: Generator,
     /// The Y coordinate where players spawn.
     spawn_y: i32,
     /// Optional disk storage for chunk persistence.
     storage: Option<RegionStorage>,
+}
+
+/// Ensures a chunk is loaded in the store, generating or loading from
+/// disk if necessary.
+///
+/// This is a free function to avoid borrow conflicts — it only borrows
+/// the fields it needs (`store` contents, `generator`, `storage`) without
+/// holding `&self`.
+fn ensure_chunk_loaded(
+    store: &mut ChunkStore,
+    cx: i32,
+    cz: i32,
+    generator: &Generator,
+    storage: &Option<RegionStorage>,
+) {
+    if store.chunks.contains_key(&(cx, cz)) {
+        return;
+    }
+
+    // Try loading from disk
+    if let Some(s) = storage
+        && let Ok(Some(data)) = s.load_raw(cx, cz)
+        && let Some(col) = format::deserialize_chunk(&data, cx, cz)
+    {
+        store.chunks.insert((cx, cz), col);
+        return;
+    }
+
+    // Generate new chunk
+    let mut col = ChunkColumn::new(cx, cz);
+    match generator {
+        Generator::Flat(g) => g.generate(&mut col),
+        Generator::Noise(g) => g.generate(&mut col),
+    }
+
+    // Save to disk
+    if let Some(s) = storage {
+        let data = format::serialize_chunk(&col);
+        let _ = s.save_raw(cx, cz, &data);
+    }
+
+    store.chunks.insert((cx, cz), col);
 }
 
 impl World {
@@ -56,7 +115,10 @@ impl World {
         let save_path = save_dir.into();
         let storage = RegionStorage::new(save_path.join("regions")).ok();
         Self {
-            packets: Mutex::new(HashMap::new()),
+            store: Mutex::new(ChunkStore {
+                chunks: HashMap::new(),
+                packets: HashMap::new(),
+            }),
             generator: Generator::Noise(Box::new(NoiseTerrainGenerator::new(seed))),
             spawn_y: NoiseTerrainGenerator::SPAWN_Y,
             storage,
@@ -66,7 +128,10 @@ impl World {
     /// Creates a new world with noise-based terrain, no persistence.
     pub fn new_memory(seed: u32) -> Self {
         Self {
-            packets: Mutex::new(HashMap::new()),
+            store: Mutex::new(ChunkStore {
+                chunks: HashMap::new(),
+                packets: HashMap::new(),
+            }),
             generator: Generator::Noise(Box::new(NoiseTerrainGenerator::new(seed))),
             spawn_y: NoiseTerrainGenerator::SPAWN_Y,
             storage: None,
@@ -76,7 +141,10 @@ impl World {
     /// Creates a new flat world (superflat), no persistence.
     pub fn flat() -> Self {
         Self {
-            packets: Mutex::new(HashMap::new()),
+            store: Mutex::new(ChunkStore {
+                chunks: HashMap::new(),
+                packets: HashMap::new(),
+            }),
             generator: Generator::Flat(FlatWorldGenerator),
             spawn_y: FlatWorldGenerator::SPAWN_Y,
             storage: None,
@@ -90,51 +158,84 @@ impl World {
 
     /// Returns a protocol packet for the chunk at (cx, cz).
     ///
-    /// Load order: memory cache → disk → generate.
-    /// Newly generated chunks are saved to disk and cached in memory.
+    /// Load order: packet cache → encode from chunk → disk → generate.
+    /// Newly generated chunks are saved to disk, stored in memory,
+    /// and their encoded packets are cached.
     pub fn get_chunk_packet(
         &self,
         cx: i32,
         cz: i32,
     ) -> basalt_protocol::packets::play::world::ClientboundPlayMapChunk {
-        let mut cache = self.packets.lock().unwrap();
-        cache
-            .entry((cx, cz))
-            .or_insert_with(|| {
-                // Try loading from disk first
-                if let Some(storage) = &self.storage
-                    && let Ok(Some(data)) = storage.load_raw(cx, cz)
-                    && let Some(col) = format::deserialize_chunk(&data, cx, cz)
-                {
-                    return col.to_packet();
-                }
+        let mut store = self.store.lock().unwrap();
 
-                // Generate new chunk
-                let mut col = ChunkColumn::new(cx, cz);
-                match &self.generator {
-                    Generator::Flat(g) => g.generate(&mut col),
-                    Generator::Noise(g) => g.generate(&mut col),
-                }
+        // Return cached packet if available
+        if let Some(packet) = store.packets.get(&(cx, cz)) {
+            return packet.clone();
+        }
 
-                // Save to disk
-                if let Some(storage) = &self.storage {
-                    let data = format::serialize_chunk(&col);
-                    let _ = storage.save_raw(cx, cz, &data);
-                }
+        // Ensure chunk data is loaded
+        ensure_chunk_loaded(&mut store, cx, cz, &self.generator, &self.storage);
 
-                col.to_packet()
-            })
-            .clone()
+        // Encode and cache
+        let packet = store.chunks[&(cx, cz)].to_packet();
+        store.packets.insert((cx, cz), packet.clone());
+        packet
+    }
+
+    /// Sets a block at absolute world coordinates.
+    ///
+    /// Loads the chunk if it isn't already in memory. Invalidates the
+    /// packet cache for the affected chunk so the next `get_chunk_packet`
+    /// call re-encodes it. Persists the modified chunk to disk if
+    /// storage is configured.
+    pub fn set_block(&self, x: i32, y: i32, z: i32, state: u16) {
+        let cx = x >> 4;
+        let cz = z >> 4;
+        let local_x = x.rem_euclid(16) as usize;
+        let local_z = z.rem_euclid(16) as usize;
+
+        let mut store = self.store.lock().unwrap();
+        ensure_chunk_loaded(&mut store, cx, cz, &self.generator, &self.storage);
+
+        store
+            .chunks
+            .get_mut(&(cx, cz))
+            .unwrap()
+            .set_block(local_x, y, local_z, state);
+
+        // Invalidate cached packet
+        store.packets.remove(&(cx, cz));
+
+        // Persist to disk
+        if let Some(s) = &self.storage {
+            let data = format::serialize_chunk(&store.chunks[&(cx, cz)]);
+            let _ = s.save_raw(cx, cz, &data);
+        }
+    }
+
+    /// Gets a block at absolute world coordinates.
+    ///
+    /// Loads the chunk if it isn't already in memory.
+    pub fn get_block(&self, x: i32, y: i32, z: i32) -> u16 {
+        let cx = x >> 4;
+        let cz = z >> 4;
+        let local_x = x.rem_euclid(16) as usize;
+        let local_z = z.rem_euclid(16) as usize;
+
+        let mut store = self.store.lock().unwrap();
+        ensure_chunk_loaded(&mut store, cx, cz, &self.generator, &self.storage);
+
+        store.chunks[&(cx, cz)].get_block(local_x, y, local_z)
     }
 
     /// Returns true if the chunk at (cx, cz) is in the memory cache.
     pub fn is_chunk_loaded(&self, cx: i32, cz: i32) -> bool {
-        self.packets.lock().unwrap().contains_key(&(cx, cz))
+        self.store.lock().unwrap().chunks.contains_key(&(cx, cz))
     }
 
     /// Returns the number of chunks currently in the memory cache.
     pub fn chunk_count(&self) -> usize {
-        self.packets.lock().unwrap().len()
+        self.store.lock().unwrap().chunks.len()
     }
 }
 
@@ -196,5 +297,60 @@ mod tests {
         assert!(!world2.is_chunk_loaded(0, 0)); // not in memory yet
         world2.get_chunk_packet(0, 0); // loads from disk
         assert!(world2.is_chunk_loaded(0, 0));
+    }
+
+    #[test]
+    fn set_block_modifies_chunk() {
+        let world = World::new_memory(42);
+        // Load chunk first
+        world.get_chunk_packet(0, 0);
+        // Modify a block
+        world.set_block(5, 64, 3, block::STONE);
+        assert_eq!(world.get_block(5, 64, 3), block::STONE);
+    }
+
+    #[test]
+    fn set_block_invalidates_packet_cache() {
+        let world = World::new_memory(42);
+        let packet1 = world.get_chunk_packet(0, 0);
+        world.set_block(0, 64, 0, block::STONE);
+        let packet2 = world.get_chunk_packet(0, 0);
+        // The re-encoded packet should reflect the new block
+        assert_ne!(packet1.chunk_data, packet2.chunk_data);
+    }
+
+    #[test]
+    fn set_block_generates_chunk_if_needed() {
+        let world = World::new_memory(42);
+        assert!(!world.is_chunk_loaded(5, 5));
+        world.set_block(80, 64, 80, block::STONE); // chunk (5, 5)
+        assert!(world.is_chunk_loaded(5, 5));
+        assert_eq!(world.get_block(80, 64, 80), block::STONE);
+    }
+
+    #[test]
+    fn get_block_reads_generated_terrain() {
+        let world = World::flat();
+        // Flat world: bedrock at y=-64
+        assert_eq!(world.get_block(0, -64, 0), block::BEDROCK);
+        assert_eq!(world.get_block(0, -60, 0), block::AIR);
+    }
+
+    #[test]
+    fn set_block_negative_coordinates() {
+        let world = World::new_memory(42);
+        world.set_block(-5, 64, -10, block::DIRT);
+        assert_eq!(world.get_block(-5, 64, -10), block::DIRT);
+    }
+
+    #[test]
+    fn set_block_persists_to_disk() {
+        let dir = tempfile::tempdir().unwrap();
+        let world = World::new(42, dir.path());
+        world.set_block(0, 100, 0, block::STONE);
+
+        // Load from fresh world — should read from disk
+        let world2 = World::new(42, dir.path());
+        assert_eq!(world2.get_block(0, 100, 0), block::STONE);
     }
 }
