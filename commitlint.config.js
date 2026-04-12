@@ -216,6 +216,20 @@ const world = [
   'world/block',
 ];
 
+const events = [
+  // Cross-module changes within basalt-events.
+  // Example: "feat(events): add async handler support"
+  'events',
+
+  // Event trait and Stage enum definitions.
+  // Example: "feat(events/event): add Monitor stage"
+  'events/event',
+
+  // EventBus: handler registration and staged dispatch.
+  // Example: "perf(events/bus): optimize dispatch with pre-sorted entries"
+  'events/bus',
+];
+
 const storage = [
   // Cross-module changes within basalt-storage.
   // Example: "feat(storage): add player data persistence"
@@ -286,7 +300,7 @@ const keywords = [
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...storage, ...keywords]],
+    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...storage, ...keywords]],
     'scope-empty': [2, 'never'],
   },
 };

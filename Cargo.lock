@@ -68,6 +68,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "basalt-events"
+version = "0.1.0"
+
+[[package]]
 name = "basalt-net"
 version = "0.1.0"
 dependencies = [
