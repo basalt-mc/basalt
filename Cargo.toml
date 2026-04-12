@@ -14,6 +14,7 @@ basalt-derive = { path = "crates/basalt-derive" }
 basalt-protocol = { path = "crates/basalt-protocol" }
 basalt-net = { path = "crates/basalt-net" }
 basalt-server = { path = "crates/basalt-server" }
+basalt-world = { path = "crates/basalt-world" }
 
 # Error handling
 thiserror = "2"

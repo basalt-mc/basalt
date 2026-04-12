@@ -198,6 +198,24 @@ const server = [
   'server/chat',
 ];
 
+const world = [
+  // Cross-module changes within basalt-world.
+  // Example: "feat(world): add noise-based terrain generator"
+  'world',
+
+  // Chunk storage: ChunkColumn, PalettedContainer, sections.
+  // Example: "fix(world/chunk): correct heightmap computation"
+  'world/chunk',
+
+  // World generators: FlatWorldGenerator, future noise generators.
+  // Example: "feat(world/generator): add perlin noise terrain"
+  'world/generator',
+
+  // Block state IDs and block definitions.
+  // Example: "feat(world/block): add water and sand block IDs"
+  'world/block',
+];
+
 const keywords = [
   // Root workspace configuration: Cargo.toml workspace settings, workspace-wide
   // dependency versions, cross-crate build configuration.
@@ -258,7 +276,7 @@ const keywords = [
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...keywords]],
+    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...keywords]],
     'scope-empty': [2, 'never'],
   },
 };

@@ -97,6 +97,7 @@ dependencies = [
  "basalt-net",
  "basalt-protocol",
  "basalt-types",
+ "basalt-world",
  "dashmap",
  "reqwest",
  "serde",
@@ -112,6 +113,14 @@ dependencies = [
  "criterion",
  "proptest",
  "thiserror",
+]
+
+[[package]]
+name = "basalt-world"
+version = "0.1.0"
+dependencies = [
+ "basalt-protocol",
+ "basalt-types",
 ]
 
 [[package]]
