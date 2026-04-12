@@ -249,6 +249,16 @@ impl Connection<Play> {
     }
 }
 
+impl crate::writer::PacketWriter for Connection<Play> {
+    async fn write_packet_typed<P: Encode + EncodedSize>(
+        &mut self,
+        packet_id: i32,
+        packet: &P,
+    ) -> Result<()> {
+        self.write_packet(packet_id, packet).await
+    }
+}
+
 // -- Shared helpers --
 
 impl<S> Connection<S> {

@@ -15,6 +15,7 @@ pub mod error;
 pub mod framing;
 pub mod pipeline;
 pub mod stream;
+pub mod writer;
 
 pub use connection::{Connection, HandshakeResult};
 pub use error::{Error, Result};
