@@ -15,6 +15,11 @@ pub struct FieldAttr {
 
     /// This field consumes all remaining bytes (must be the last field).
     pub rest: bool,
+
+    /// Each element in a Vec is encoded as VarInt instead of using
+    /// the default `Encode` impl. Used with `length_varint` for
+    /// arrays of VarInts (e.g., entity ID lists).
+    pub element_varint: bool,
 }
 
 /// Parsed `#[variant(id = N)]` attribute on an enum variant.
@@ -86,8 +91,21 @@ pub fn parse_field_attr(attrs: &[Attribute]) -> Result<FieldAttr> {
                 } else {
                     Err(syn::Error::new_spanned(lit, "expected string literal"))
                 }
+            } else if meta.path.is_ident("element") {
+                let value = meta.value()?;
+                let lit: Lit = value.parse()?;
+                if let Lit::Str(s) = lit {
+                    if s.value() == "varint" {
+                        field_attr.element_varint = true;
+                        Ok(())
+                    } else {
+                        Err(syn::Error::new_spanned(s, "expected \"varint\""))
+                    }
+                } else {
+                    Err(syn::Error::new_spanned(lit, "expected string literal"))
+                }
             } else {
-                Err(meta.error("expected `varint`, `optional`, `rest`, or `length`"))
+                Err(meta.error("expected `varint`, `optional`, `rest`, `length`, or `element`"))
             }
         })?;
     }

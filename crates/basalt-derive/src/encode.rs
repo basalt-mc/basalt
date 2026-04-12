@@ -83,6 +83,13 @@ fn derive_encode_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenS
                     }
                 }
             }
+        } else if attr.length_varint && attr.element_varint {
+            quote! {
+                basalt_types::Encode::encode(&basalt_types::VarInt(self.#field_name.len() as i32), buf)?;
+                for item in &self.#field_name {
+                    basalt_types::Encode::encode(&basalt_types::VarInt(*item), buf)?;
+                }
+            }
         } else if attr.length_varint {
             quote! {
                 basalt_types::Encode::encode(&basalt_types::VarInt(self.#field_name.len() as i32), buf)?;

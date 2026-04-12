@@ -73,6 +73,11 @@ fn derive_encoded_size_struct(input: &DeriveInput, data: &DataStruct) -> Result<
                     None => 0,
                 }
             }
+        } else if attr.length_varint && attr.element_varint {
+            quote! {
+                basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(self.#field_name.len() as i32))
+                + self.#field_name.iter().map(|item| basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(*item))).sum::<usize>()
+            }
         } else if attr.length_varint {
             quote! {
                 basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(self.#field_name.len() as i32))
