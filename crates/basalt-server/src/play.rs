@@ -23,7 +23,8 @@ use basalt_protocol::packets::play::player::{
     ClientboundPlayPlayerInfo, ClientboundPlayPlayerRemove, ClientboundPlayPosition,
 };
 use basalt_protocol::packets::play::world::{
-    ClientboundPlayMapChunk, ClientboundPlaySpawnPosition,
+    ClientboundPlayChunkBatchFinished, ClientboundPlayChunkBatchStart, ClientboundPlayMapChunk,
+    ClientboundPlaySpawnPosition,
 };
 use basalt_types::{Encode, Position, VarInt, Vec3i16};
 use tokio::sync::mpsc;
@@ -122,10 +123,31 @@ async fn send_initial_world(
         .await?;
     println!("[{addr}] -> GameEvent (start waiting for chunks)");
 
-    let chunk = build_empty_chunk(0, 0);
-    conn.write_packet_typed(ClientboundPlayMapChunk::PACKET_ID, &chunk)
+    // Send a grid of empty chunks around spawn so the player can
+    // walk around without falling into the void. The view_distance
+    // in the Login packet is 10, so we send a 7x7 grid (enough to
+    // fill the immediate view without sending hundreds of chunks).
+    let radius = 3;
+    let batch_start = ClientboundPlayChunkBatchStart;
+    conn.write_packet_typed(ClientboundPlayChunkBatchStart::PACKET_ID, &batch_start)
         .await?;
-    println!("[{addr}] -> ChunkData (0, 0)");
+
+    let mut chunk_count = 0;
+    for cx in -radius..=radius {
+        for cz in -radius..=radius {
+            let chunk = build_empty_chunk(cx, cz);
+            conn.write_packet_typed(ClientboundPlayMapChunk::PACKET_ID, &chunk)
+                .await?;
+            chunk_count += 1;
+        }
+    }
+
+    let batch_finish = ClientboundPlayChunkBatchFinished {
+        batch_size: chunk_count,
+    };
+    conn.write_packet_typed(ClientboundPlayChunkBatchFinished::PACKET_ID, &batch_finish)
+        .await?;
+    println!("[{addr}] -> ChunkData ({chunk_count} chunks, radius {radius})");
 
     let position = ClientboundPlayPosition {
         teleport_id: 1,

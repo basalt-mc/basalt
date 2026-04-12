@@ -612,15 +612,17 @@ async fn e2e_two_players_second_gets_player_info() {
     .await;
 
     // Read Play packets: Login(5) + PlayerInfo(Alice) + SpawnEntity(Alice) + Welcome = 8
+    // Drain all initial Play packets (chunks, PlayerInfo, SpawnEntity, etc.)
     let mut found_player_info = false;
     let mut found_spawn_entity = false;
     use basalt_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
     use basalt_protocol::packets::play::player::ClientboundPlayPlayerInfo;
-    for _ in 0..8 {
-        let raw = framing::read_raw_packet(&mut client2)
-            .await
-            .unwrap()
-            .unwrap();
+    while let Ok(Ok(Some(raw))) = tokio::time::timeout(
+        std::time::Duration::from_millis(200),
+        framing::read_raw_packet(&mut client2),
+    )
+    .await
+    {
         if raw.id == ClientboundPlayPlayerInfo::PACKET_ID {
             found_player_info = true;
         }
