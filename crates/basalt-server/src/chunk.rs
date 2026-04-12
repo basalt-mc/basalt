@@ -8,7 +8,7 @@
 //! 16×16×16 blocks. Empty sections use a single-value palette with
 //! block state 0 (air) and biome 0.
 
-use crate::packets::play::world::ClientboundPlayMapChunk;
+use basalt_protocol::packets::play::world::ClientboundPlayMapChunk;
 use basalt_types::nbt::{NbtCompound, NbtTag};
 use basalt_types::{Encode, VarInt};
 

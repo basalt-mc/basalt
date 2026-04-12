@@ -9,8 +9,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Instant;
 
+use crate::chunk::build_empty_chunk;
 use basalt_net::connection::{Connection, Play};
-use basalt_protocol::chunk::build_empty_chunk;
 use basalt_protocol::packets::play::ServerboundPlayPacket;
 use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
 use basalt_protocol::packets::play::entity::{

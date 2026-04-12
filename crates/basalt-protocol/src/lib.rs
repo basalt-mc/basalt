@@ -9,7 +9,6 @@
 //! protocol version, connection state, direction, and packet ID, it decodes
 //! the raw bytes into the correct typed enum variant.
 
-pub mod chunk;
 pub mod error;
 pub mod packets;
 pub mod registry;
