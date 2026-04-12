@@ -84,17 +84,51 @@ pub struct ClientboundPlayActionBar {
     pub text: NbtCompound,
 }
 
+/// Switch enum used by [`ClientboundPlayBossBar`].
+#[derive(Debug, Clone, PartialEq, Encode, Decode, EncodedSize)]
+pub enum ClientboundPlayBossBarAction {
+    #[variant(id = 0)]
+    Variant0 {
+        title: NbtCompound,
+        health: f32,
+        #[field(varint)]
+        color: i32,
+        #[field(varint)]
+        dividers: i32,
+        flags: u8,
+    },
+    #[variant(id = 2)]
+    Variant2 { health: f32 },
+    #[variant(id = 3)]
+    Variant3 { title: NbtCompound },
+    #[variant(id = 4)]
+    Variant4 {
+        #[field(varint)]
+        color: i32,
+        #[field(varint)]
+        dividers: i32,
+    },
+    #[variant(id = 5)]
+    Variant5 { flags: u8 },
+}
+
+impl Default for ClientboundPlayBossBarAction {
+    fn default() -> Self {
+        Self::Variant0 {
+            title: Default::default(),
+            health: Default::default(),
+            color: Default::default(),
+            dividers: Default::default(),
+            flags: Default::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x0a)]
 pub struct ClientboundPlayBossBar {
     pub entity_uuid: Uuid,
-    #[field(varint)]
-    pub action: i32,
-    pub title: Vec<u8>,
-    pub health: Vec<u8>,
-    pub color: Vec<u8>,
-    pub dividers: Vec<u8>,
-    pub flags: Vec<u8>,
+    pub action: ClientboundPlayBossBarAction,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -112,21 +146,47 @@ pub struct ClientboundPlayClearTitles {
     pub reset: bool,
 }
 
+/// Inline data structure used by [`ClientboundPlayDeclareCommands`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayDeclareCommandsCommandNode {
+    pub flags: u8,
+    #[field(length = "varint")]
+    pub children: Vec<i32>,
+    pub redirect_node: Vec<u8>,
+    pub extra_node_data: Vec<u8>,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x11)]
 pub struct ClientboundPlayDeclareCommands {
     #[field(length = "varint")]
-    pub nodes: Vec<Vec<u8>>,
+    pub nodes: Vec<ClientboundPlayDeclareCommandsCommandNode>,
     #[field(varint)]
     pub root_index: i32,
+}
+
+/// Switch enum used by [`ClientboundPlayHideMessage`].
+#[derive(Debug, Clone, PartialEq, Encode, Decode, EncodedSize)]
+pub enum ClientboundPlayHideMessageId {
+    #[variant(id = 0)]
+    Variant0 {
+        #[field(length = "varint")]
+        signature: Vec<u8>,
+    },
+}
+
+impl Default for ClientboundPlayHideMessageId {
+    fn default() -> Self {
+        Self::Variant0 {
+            signature: Default::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x1c)]
 pub struct ClientboundPlayHideMessage {
-    #[field(varint)]
-    pub id: i32,
-    pub signature: Vec<u8>,
+    pub id: ClientboundPlayHideMessageId,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -162,15 +222,62 @@ pub struct ClientboundPlayScoreboardDisplayObjective {
     pub name: String,
 }
 
+/// Switch enum used by [`ClientboundPlayScoreboardObjective`].
+#[derive(Debug, Clone, PartialEq, Encode, Decode, EncodedSize)]
+pub enum ClientboundPlayScoreboardObjectiveAction {
+    #[variant(id = 0)]
+    Variant0 {
+        display_text: NbtCompound,
+        #[field(varint)]
+        r#type: i32,
+        #[field(optional)]
+        number_format: Option<i32>,
+        styling: Vec<u8>,
+    },
+    #[variant(id = 2)]
+    Variant2 {
+        display_text: NbtCompound,
+        #[field(varint)]
+        r#type: i32,
+        #[field(optional)]
+        number_format: Option<i32>,
+        styling: Vec<u8>,
+    },
+}
+
+impl Default for ClientboundPlayScoreboardObjectiveAction {
+    fn default() -> Self {
+        Self::Variant0 {
+            display_text: Default::default(),
+            r#type: Default::default(),
+            number_format: Default::default(),
+            styling: Default::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x64)]
 pub struct ClientboundPlayScoreboardObjective {
     pub name: String,
-    pub action: i8,
-    pub display_text: Vec<u8>,
-    pub r#type: Vec<u8>,
-    pub number_format: Vec<u8>,
-    pub styling: Vec<u8>,
+    pub action: ClientboundPlayScoreboardObjectiveAction,
+}
+
+/// Switch enum used by [`ClientboundPlayScoreboardScore`].
+#[derive(Debug, Clone, PartialEq, Encode, Decode, EncodedSize)]
+pub enum ClientboundPlayScoreboardScoreNumberFormat {
+    #[variant(id = 1)]
+    Variant1 { styling: NbtCompound },
+    #[variant(id = 2)]
+    Variant2 { styling: NbtCompound },
+}
+
+impl Default for ClientboundPlayScoreboardScoreNumberFormat {
+    fn default() -> Self {
+        Self::Variant1 {
+            styling: Default::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -182,9 +289,7 @@ pub struct ClientboundPlayScoreboardScore {
     pub value: i32,
     #[field(optional)]
     pub display_name: Option<NbtCompound>,
-    #[field(optional)]
-    pub number_format: Option<i32>,
-    pub styling: Vec<u8>,
+    pub number_format: ClientboundPlayScoreboardScoreNumberFormat,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -235,17 +340,63 @@ pub struct ClientboundPlayTabComplete {
     pub matches: Vec<ClientboundPlayTabCompleteMatches>,
 }
 
+/// Switch enum used by [`ClientboundPlayTeams`].
+#[derive(Debug, Clone, PartialEq, Encode, Decode, EncodedSize)]
+pub enum ClientboundPlayTeamsMode {
+    #[variant(id = 0)]
+    Variant0 {
+        name: NbtCompound,
+        friendly_fire: i8,
+        name_tag_visibility: String,
+        collision_rule: String,
+        #[field(varint)]
+        formatting: i32,
+        prefix: NbtCompound,
+        suffix: NbtCompound,
+        #[field(length = "varint")]
+        players: Vec<String>,
+    },
+    #[variant(id = 2)]
+    Variant2 {
+        name: NbtCompound,
+        friendly_fire: i8,
+        name_tag_visibility: String,
+        collision_rule: String,
+        #[field(varint)]
+        formatting: i32,
+        prefix: NbtCompound,
+        suffix: NbtCompound,
+    },
+    #[variant(id = 3)]
+    Variant3 {
+        #[field(length = "varint")]
+        players: Vec<String>,
+    },
+    #[variant(id = 4)]
+    Variant4 {
+        #[field(length = "varint")]
+        players: Vec<String>,
+    },
+}
+
+impl Default for ClientboundPlayTeamsMode {
+    fn default() -> Self {
+        Self::Variant0 {
+            name: Default::default(),
+            friendly_fire: Default::default(),
+            name_tag_visibility: Default::default(),
+            collision_rule: Default::default(),
+            formatting: Default::default(),
+            prefix: Default::default(),
+            suffix: Default::default(),
+            players: Default::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x67)]
 pub struct ClientboundPlayTeams {
     pub team: String,
-    pub mode: i8,
-    pub name: Vec<u8>,
-    pub friendly_fire: Vec<u8>,
-    pub name_tag_visibility: Vec<u8>,
-    pub collision_rule: Vec<u8>,
-    pub formatting: Vec<u8>,
-    pub prefix: Vec<u8>,
-    pub suffix: Vec<u8>,
-    pub players: Vec<u8>,
+    pub mode: ClientboundPlayTeamsMode,
 }

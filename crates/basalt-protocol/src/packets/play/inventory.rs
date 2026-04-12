@@ -236,6 +236,7 @@ pub struct ClientboundPlaySetSlot {
 /// Inline data structure used by [`ClientboundPlayTradeList`].
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayTradeListTrades {
+    #[field(length = "varint")]
     pub input_item1: Vec<u8>,
     pub output_item: Slot,
     #[field(optional)]

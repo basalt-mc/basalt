@@ -8,12 +8,25 @@ use basalt_types::{NbtCompound, Position, Uuid, Vec2f};
 
 // -- Serverbound packets --
 
+/// Switch enum used by [`ServerboundPlayAdvancementTab`].
+#[derive(Debug, Clone, PartialEq, Encode, Decode, EncodedSize)]
+pub enum ServerboundPlayAdvancementTabAction {
+    #[variant(id = 0)]
+    Variant0 { tab_id: String },
+}
+
+impl Default for ServerboundPlayAdvancementTabAction {
+    fn default() -> Self {
+        Self::Variant0 {
+            tab_id: Default::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x30)]
 pub struct ServerboundPlayAdvancementTab {
-    #[field(varint)]
-    pub action: i32,
-    pub tab_id: Vec<u8>,
+    pub action: ServerboundPlayAdvancementTabAction,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -168,6 +181,7 @@ pub struct ServerboundPlayUseItem {
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayAdvancementsAdvancementmapping {
     pub key: String,
+    #[field(length = "varint")]
     pub value: Vec<u8>,
 }
 
@@ -260,6 +274,7 @@ pub struct ClientboundPlayPingResponse {
 /// Inline data structure used by [`ClientboundPlayRecipeBookAdd`].
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayRecipeBookAddEntries {
+    #[field(length = "varint")]
     pub recipe: Vec<u8>,
     pub flags: u8,
 }
@@ -357,18 +372,43 @@ pub struct ClientboundPlayStepTick {
     pub tick_steps: i32,
 }
 
+/// Switch enum used by [`ClientboundPlayStopSound`].
+#[derive(Debug, Clone, PartialEq, Encode, Decode, EncodedSize)]
+pub enum ClientboundPlayStopSoundFlags {
+    #[variant(id = 1)]
+    Variant1 {
+        #[field(varint)]
+        source: i32,
+    },
+    #[variant(id = 2)]
+    Variant2 { sound: String },
+    #[variant(id = 3)]
+    Variant3 {
+        #[field(varint)]
+        source: i32,
+        sound: String,
+    },
+}
+
+impl Default for ClientboundPlayStopSoundFlags {
+    fn default() -> Self {
+        Self::Variant1 {
+            source: Default::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x71)]
 pub struct ClientboundPlayStopSound {
-    pub flags: i8,
-    pub source: Vec<u8>,
-    pub sound: Vec<u8>,
+    pub flags: ClientboundPlayStopSoundFlags,
 }
 
 /// Inline data structure used by [`ClientboundPlayTags`].
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayTagsTags {
     pub tag_type: String,
+    #[field(length = "varint")]
     pub tags: Vec<u8>,
 }
 
