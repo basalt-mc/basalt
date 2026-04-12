@@ -104,5 +104,5 @@ docs/superpowers/
 ## sniffcraft
 sniffcraft/
 
-## world save data
-world/
+## world save data (runtime-generated, not the plugin crate)
+/world/
