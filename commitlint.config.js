@@ -230,6 +230,28 @@ const events = [
   'events/bus',
 ];
 
+const api = [
+  // Cross-module changes within basalt-api.
+  // Example: "feat(api): add raw packet escape hatch"
+  'api',
+
+  // Plugin trait, PluginMetadata, EventRegistrar.
+  // Example: "feat(api/plugin): add on_tick lifecycle hook"
+  'api/plugin',
+
+  // ServerContext: public handler context with high-level methods.
+  // Example: "feat(api/context): add send_title method"
+  'api/context',
+
+  // Concrete game events dispatched through the event bus.
+  // Example: "feat(api/events): add EntityDamagedEvent"
+  'api/events',
+
+  // BroadcastMessage, PlayerSnapshot, ProfileProperty.
+  // Example: "feat(api/broadcast): add TitleMessage variant"
+  'api/broadcast',
+];
+
 const storage = [
   // Cross-module changes within basalt-storage.
   // Example: "feat(storage): add player data persistence"
@@ -300,7 +322,7 @@ const keywords = [
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...storage, ...keywords]],
+    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...storage, ...keywords]],
     'scope-empty': [2, 'never'],
   },
 };
