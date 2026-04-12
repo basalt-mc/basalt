@@ -287,6 +287,15 @@ impl TextComponent {
         self.extra.push(child);
         self
     }
+
+    /// Converts this text component into an `NbtCompound`.
+    ///
+    /// Useful for protocol packets that accept an `NbtCompound` directly
+    /// (e.g., `SystemChat`, `KickDisconnect`, title packets) instead of
+    /// going through the `Encode` trait.
+    pub fn to_nbt(&self) -> NbtCompound {
+        component_to_nbt(self)
+    }
 }
 
 // -- NBT conversion --
