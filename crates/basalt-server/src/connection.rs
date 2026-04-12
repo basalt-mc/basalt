@@ -18,9 +18,11 @@ use basalt_protocol::packets::status::{
 };
 use basalt_protocol::registry_data::build_default_registries;
 
+use crate::context::{EventContext, Response};
+use crate::events::{PlayerJoinedEvent, PlayerLeftEvent};
 use crate::play::run_play_loop;
 use crate::player::PlayerState;
-use crate::state::{BroadcastMessage, PlayerHandle, PlayerSnapshot, ServerState};
+use crate::state::{PlayerHandle, PlayerSnapshot, ServerState};
 
 /// JSON response for the server list ping.
 const SERVER_STATUS: &str = r#"{
@@ -177,8 +179,8 @@ async fn handle_configuration(
         skin_properties: player.skin_properties.clone(),
     });
 
-    // Notify all players (including ourselves) that we joined.
-    // Our play loop will filter out our own join message.
+    // Dispatch PlayerJoinedEvent through the event bus.
+    // Handlers broadcast to all players (our play loop filters our own).
     let snapshot = PlayerSnapshot {
         username: player.username.clone(),
         uuid: player.uuid,
@@ -190,7 +192,14 @@ async fn handle_configuration(
         pitch: player.pitch,
         skin_properties: player.skin_properties.clone(),
     };
-    state.broadcast(BroadcastMessage::PlayerJoined { info: snapshot });
+    let join_ctx = EventContext::new(Arc::clone(&state));
+    let mut join_event = PlayerJoinedEvent { info: snapshot };
+    state.event_bus.dispatch(&mut join_event, &join_ctx);
+    for response in join_ctx.responses.drain() {
+        if let Response::Broadcast(msg) = response {
+            state.broadcast(msg);
+        }
+    }
 
     // Run the play loop — this blocks until the player disconnects
     let result = run_play_loop(
@@ -203,13 +212,20 @@ async fn handle_configuration(
     )
     .await;
 
-    // Unregister and notify others
+    // Unregister and dispatch PlayerLeftEvent
     state.unregister_player(&player_uuid);
-    state.broadcast(BroadcastMessage::PlayerLeft {
+    let leave_ctx = EventContext::new(Arc::clone(&state));
+    let mut leave_event = PlayerLeftEvent {
         uuid: player_uuid,
         entity_id,
         username: player.username.clone(),
-    });
+    };
+    state.event_bus.dispatch(&mut leave_event, &leave_ctx);
+    for response in leave_ctx.responses.drain() {
+        if let Response::Broadcast(msg) = response {
+            state.broadcast(msg);
+        }
+    }
 
     result
 }
