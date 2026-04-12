@@ -121,6 +121,7 @@ impl TypeRegistry {
         };
 
         let mut fields = Vec::new();
+        let mut has_relative_switches = false;
 
         for (i, field) in field_array.iter().enumerate() {
             let field_name = match field["name"].as_str() {
@@ -147,6 +148,16 @@ impl TypeRegistry {
                 }
             }
 
+            // Switches with relative-path comparisons (e.g., "../action/add_player")
+            // are conditionally encoded based on a parent bitflags field.
+            // We can't represent this in a flat struct, so we skip these
+            // fields and add a single `rest` field at the end to capture
+            // whatever conditional data is present on the wire.
+            if is_relative_switch(field) {
+                has_relative_switches = true;
+                continue;
+            }
+
             let protocol_type = self.resolve(field_type, parent_name, &field_name, is_last);
 
             if matches!(protocol_type, ProtocolType::Void) {
@@ -156,6 +167,15 @@ impl TypeRegistry {
             fields.push(ResolvedField {
                 name: to_snake_case(&field_name),
                 protocol_type,
+            });
+        }
+
+        // If relative switches were skipped, add a rest field to
+        // capture their conditional data.
+        if has_relative_switches {
+            fields.push(ResolvedField {
+                name: "remaining".into(),
+                protocol_type: ProtocolType::Rest,
             });
         }
 
@@ -443,12 +463,27 @@ struct SwitchGroup {
 }
 
 /// Returns true if a container field's type is a switch compound.
+/// Returns true if a container field's type is a switch compound.
 fn is_switch_field(field: &Value) -> bool {
     let field_type = &field["type"];
     field_type.is_array()
         && field_type
             .as_array()
             .is_some_and(|a| a.len() == 2 && a[0].as_str() == Some("switch"))
+}
+
+/// Returns true if a field is a switch with a relative-path `compareTo`
+/// (e.g., `../action/add_player`). These are conditioned on a parent
+/// bitflags field and can't be represented in a flat struct.
+fn is_relative_switch(field: &Value) -> bool {
+    let field_type = &field["type"];
+    field_type.as_array().is_some_and(|a| {
+        a.len() == 2
+            && a[0].as_str() == Some("switch")
+            && a[1]["compareTo"]
+                .as_str()
+                .is_some_and(|ct| ct.contains('/'))
+    })
 }
 
 #[cfg(test)]
