@@ -14,7 +14,7 @@ use basalt_types::{Encode, VarInt};
 ///
 /// Blocks are stored as raw state IDs. The palette is computed
 /// during encoding to determine the optimal bits-per-entry.
-pub(crate) struct PalettedContainer {
+pub struct PalettedContainer {
     /// Block state IDs in XZY order (x varies fastest, then z, then y).
     /// Length must be 4096 (16×16×16).
     blocks: [u16; 4096],
@@ -47,6 +47,31 @@ impl PalettedContainer {
             .iter()
             .filter(|&&state| state != crate::block::AIR)
             .count() as i16
+    }
+
+    /// Returns true if all blocks are the same state (single-value).
+    pub fn is_single_value(&self) -> bool {
+        let first = self.blocks[0];
+        self.blocks.iter().all(|&b| b == first)
+    }
+
+    /// Returns the single block state if this container is homogeneous.
+    pub fn single_value(&self) -> Option<u16> {
+        if self.is_single_value() {
+            Some(self.blocks[0])
+        } else {
+            None
+        }
+    }
+
+    /// Returns a reference to the raw block state array.
+    pub fn blocks(&self) -> &[u16; 4096] {
+        &self.blocks
+    }
+
+    /// Creates a container from a raw block state array.
+    pub fn from_blocks(blocks: [u16; 4096]) -> Self {
+        Self { blocks }
     }
 
     /// Encodes this container into the Minecraft wire format.

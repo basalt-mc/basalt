@@ -124,7 +124,7 @@ impl ServerState {
             next_entity_id: AtomicI32::new(1),
             players: DashMap::new(),
             broadcast_tx,
-            world: basalt_world::World::new(42),
+            world: basalt_world::World::new(42, "world"),
         })
     }
 
