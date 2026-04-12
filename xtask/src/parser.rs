@@ -6,10 +6,10 @@
 
 use std::collections::BTreeMap;
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::helpers::{to_pascal_case, to_snake_case};
-use crate::types::{FieldDef, InlineStruct, PacketDef};
+use crate::types::{FieldDef, InlineStruct, PacketDef, SwitchEnum, SwitchVariant};
 
 /// Parses all packets for one direction (serverbound or clientbound)
 /// within a protocol state.
@@ -23,17 +23,23 @@ pub(crate) fn parse_direction(
     direction: &str,
     dir_prefix: &str,
     state_pascal: &str,
+    global_types: &Value,
 ) -> Vec<PacketDef> {
     let dir_data = &state[direction];
     if dir_data.is_null() {
         return Vec::new();
     }
 
-    let types = &dir_data["types"];
-    let packet_mapper = &types["packet"];
+    let local_types = &dir_data["types"];
+    let packet_mapper = &local_types["packet"];
     if packet_mapper.is_null() {
         return Vec::new();
     }
+
+    // Merge local (per-direction) types with global (top-level) types.
+    // Local types take priority so direction-specific definitions
+    // shadow any global type with the same name.
+    let merged_types = merge_types(local_types, global_types);
 
     let mappings = &packet_mapper[1][0]["type"][1]["mappings"];
     let id_map: BTreeMap<String, String> = mappings
@@ -55,18 +61,26 @@ pub(crate) fn parse_direction(
             continue;
         }
 
-        let packet_type = &types[actual_type_key];
-        if packet_type.is_null() {
-            eprintln!("Warning: packet type {actual_type_key} not found, skipping");
+        let packet_type = &merged_types[actual_type_key];
+        // Skip types that are not containers (e.g., "void" which
+        // resolves to "native" in the global types, or types that
+        // simply don't exist in the merged context).
+        let is_container = packet_type.is_array()
+            && packet_type
+                .as_array()
+                .is_some_and(|a| a[0].as_str() == Some("container"));
+        if packet_type.is_null() || !is_container {
             continue;
         }
 
         let struct_name = format!("{dir_prefix}{state_pascal}{}", to_pascal_case(name));
-        let (fields, inline_structs) = parse_container_fields(packet_type, &struct_name, types);
+        let (fields, inline_structs, switch_enums) =
+            parse_container_fields(packet_type, &struct_name, &merged_types);
 
         packets.push(PacketDef {
             name: struct_name,
             id: id.clone(),
+            switch_enums,
             fields,
             inline_structs,
         });
@@ -85,25 +99,76 @@ pub(crate) fn parse_container_fields(
     container: &Value,
     parent_name: &str,
     types_ctx: &Value,
-) -> (Vec<FieldDef>, Vec<InlineStruct>) {
+) -> (Vec<FieldDef>, Vec<InlineStruct>, Vec<SwitchEnum>) {
+    parse_container_fields_inner(container, parent_name, types_ctx, true)
+}
+
+/// Inner implementation that controls whether switch enum generation
+/// is enabled. Disabled for nested containers (inline structs) to
+/// avoid generating unreachable enum types.
+fn parse_container_fields_inner(
+    container: &Value,
+    parent_name: &str,
+    types_ctx: &Value,
+    resolve_switches: bool,
+) -> (Vec<FieldDef>, Vec<InlineStruct>, Vec<SwitchEnum>) {
     let mut fields = Vec::new();
     let mut inline_structs = Vec::new();
+    let mut switch_enums = Vec::new();
 
     let field_array = container[1]
         .as_array()
         .expect("container fields should be an array");
 
+    // Try to build a switch enum from switch fields that
+    // all share the same compareTo discriminator.
+    let switch_group = if resolve_switches {
+        build_switch_group(field_array, parent_name, types_ctx)
+    } else {
+        None
+    };
+
     for (i, field) in field_array.iter().enumerate() {
-        let field_name = field["name"]
-            .as_str()
-            .expect("field should have a name")
-            .to_string();
+        // Anonymous fields (anon: true) have no name — used for
+        // bitfields that pack values inline. Generate a name from
+        // the parent and index.
+        let field_name = match field["name"].as_str() {
+            Some(name) => name.to_string(),
+            None => format!("anon_{i}"),
+        };
         let rust_name = to_snake_case(&field_name);
         let field_type = &field["type"];
         let is_last = i == field_array.len() - 1;
 
+        // If we have a switch group, handle the discriminator and
+        // switch fields specially.
+        if let Some(ref sg) = switch_group {
+            // Skip the discriminator field — it's encoded inside the enum
+            if field_name == sg.compare_to {
+                continue;
+            }
+            // Skip switch fields absorbed into the enum
+            if sg.switch_indices.contains(&i) {
+                if i == sg.switch_indices[0] {
+                    // Emit the enum field in place of the first switch
+                    switch_enums.push(sg.switch_enum.clone());
+                    fields.push(FieldDef {
+                        name: to_snake_case(&sg.compare_to),
+                        rust_type: sg.switch_enum.name.clone(),
+                        attribute: None,
+                    });
+                }
+                continue;
+            }
+        }
+
         let (rust_type, attribute, inline) =
             map_type(field_type, parent_name, &field_name, is_last, types_ctx);
+
+        // Skip void fields — they carry no data on the wire.
+        if rust_type == "__void__" {
+            continue;
+        }
 
         if let Some(inline_struct) = inline {
             inline_structs.push(inline_struct);
@@ -116,7 +181,149 @@ pub(crate) fn parse_container_fields(
         });
     }
 
-    (fields, inline_structs)
+    (fields, inline_structs, switch_enums)
+}
+
+/// Intermediate result from analyzing a group of switch fields.
+#[derive(Clone)]
+struct SwitchGroup {
+    /// The discriminator field name (the `compareTo` value).
+    compare_to: String,
+    /// Indices of ALL switch fields in the container.
+    switch_indices: Vec<usize>,
+    /// The generated enum definition.
+    switch_enum: SwitchEnum,
+}
+
+/// Analyzes all switch fields in a container and builds a `SwitchGroup`
+/// if they all share the same `compareTo` discriminator.
+///
+/// Handles both trailing switches (all at the end) and interleaved
+/// switches (normal fields after the switch group, e.g., `use_entity`
+/// where `sneaking: bool` comes after the switch fields).
+///
+/// Returns `None` if switches use different discriminators, relative
+/// paths, non-void defaults, or non-numeric variant IDs.
+fn build_switch_group(
+    fields: &[Value],
+    parent_name: &str,
+    types_ctx: &Value,
+) -> Option<SwitchGroup> {
+    // Find ALL switch field indices in the container
+    let switch_indices: Vec<usize> = fields
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| is_switch_field(f))
+        .map(|(i, _)| i)
+        .collect();
+
+    if switch_indices.is_empty() {
+        return None;
+    }
+
+    // Collect all switch definitions and verify they share one compareTo
+    let mut compare_to: Option<String> = None;
+    let mut switch_defs = Vec::new();
+
+    for &idx in &switch_indices {
+        let field = &fields[idx];
+        let sw = &field["type"][1];
+        let ct = sw["compareTo"].as_str()?;
+        // Skip relative-path comparisons (e.g., "../action/add_player")
+        if ct.contains('/') {
+            return None;
+        }
+        match &compare_to {
+            None => compare_to = Some(ct.to_string()),
+            Some(existing) if existing != ct => return None,
+            _ => {}
+        }
+        // Bail out if any switch uses a non-void default — these have
+        // inverted logic ("present unless X") that we can't cleanly
+        // map to an enum.
+        let default = &sw["default"];
+        if !default.is_null() && default.as_str() != Some("void") {
+            return None;
+        }
+
+        switch_defs.push((field["name"].as_str()?.to_string(), sw));
+    }
+
+    let compare_to = compare_to?;
+
+    // Collect all variant IDs across all switch fields
+    let mut all_ids: BTreeMap<i32, Vec<(String, String, Option<String>)>> = BTreeMap::new();
+    for (field_name, sw) in &switch_defs {
+        let sw_fields = sw["fields"].as_object()?;
+        for (id_str, type_def) in sw_fields {
+            let id: i32 = id_str.parse().ok()?;
+            let (rust_type, attr, _) =
+                map_type(type_def, parent_name, field_name, false, types_ctx);
+            if rust_type != "__void__" {
+                all_ids
+                    .entry(id)
+                    .or_default()
+                    .push((to_snake_case(field_name), rust_type, attr));
+            }
+        }
+    }
+
+    // Build the enum name from the parent name + discriminator
+    let enum_name = format!("{}{}", parent_name, to_pascal_case(&compare_to));
+
+    let variants: Vec<SwitchVariant> = all_ids
+        .iter()
+        .map(|(&id, variant_fields)| SwitchVariant {
+            id,
+            variant_name: format!("Variant{id}"),
+            fields: variant_fields
+                .iter()
+                .map(|(name, ty, attr)| FieldDef {
+                    name: name.clone(),
+                    rust_type: ty.clone(),
+                    attribute: attr.clone(),
+                })
+                .collect(),
+        })
+        .collect();
+
+    Some(SwitchGroup {
+        compare_to,
+        switch_indices,
+        switch_enum: SwitchEnum {
+            name: enum_name,
+            variants,
+        },
+    })
+}
+
+/// Merges local (per-direction) types with global (top-level) types.
+///
+/// Local types take priority: if a type name exists in both maps, the
+/// local definition is kept. This ensures direction-specific overrides
+/// (like `SpawnInfo`) shadow any global definition.
+fn merge_types(local: &Value, global: &Value) -> Value {
+    let mut merged = Map::new();
+    if let Some(global_obj) = global.as_object() {
+        for (k, v) in global_obj {
+            merged.insert(k.clone(), v.clone());
+        }
+    }
+    // Local overwrites global
+    if let Some(local_obj) = local.as_object() {
+        for (k, v) in local_obj {
+            merged.insert(k.clone(), v.clone());
+        }
+    }
+    Value::Object(merged)
+}
+
+fn is_switch_field(field: &Value) -> bool {
+    let field_type = &field["type"];
+    field_type.is_array()
+        && field_type
+            .as_array()
+            .is_some_and(|a| a.len() == 2 && a[0].as_str() == Some("switch"))
 }
 
 /// Maps a protocol JSON type definition to a Rust type.
@@ -162,6 +369,18 @@ pub(crate) fn map_type(
             "vec3f64" => ("Vec3f64".into(), None, None),
             "vec3i16" => ("Vec3i16".into(), None, None),
             "packedChunkPos" => ("i64".into(), None, None),
+            // void means "no data" — the field should be skipped.
+            // We return a sentinel that parse_container_fields filters out.
+            "void" => ("__void__".into(), None, None),
+            // "native" types have custom wire formats defined in the
+            // protocol implementation, not describable by JSON schema.
+            "native" => {
+                if is_last {
+                    ("Vec<u8>".into(), Some("rest".into()), None)
+                } else {
+                    ("Vec<u8>".into(), None, None)
+                }
+            }
             "restBuffer" => {
                 if is_last {
                     ("Vec<u8>".into(), Some("rest".into()), None)
@@ -181,8 +400,8 @@ pub(crate) fn map_type(
                         // struct so its fields are encoded/decoded inline
                         // (no length prefix), matching the wire format.
                         let struct_name = format!("{}{}", parent_name, to_pascal_case(other));
-                        let (inner_fields, _nested) =
-                            parse_container_fields(resolved, &struct_name, types_ctx);
+                        let (inner_fields, _nested, _enums) =
+                            parse_container_fields_inner(resolved, &struct_name, types_ctx, false);
                         let inline = InlineStruct {
                             name: struct_name.clone(),
                             fields: inner_fields,
@@ -232,8 +451,12 @@ pub(crate) fn map_type(
 
                     if inner_type.is_array() && inner_type[0].as_str() == Some("container") {
                         let struct_name = format!("{}{}", parent_name, to_pascal_case(field_name));
-                        let (inner_fields, nested_inlines) =
-                            parse_container_fields(inner_type, &struct_name, types_ctx);
+                        let (inner_fields, nested_inlines, _enums) = parse_container_fields_inner(
+                            inner_type,
+                            &struct_name,
+                            types_ctx,
+                            false,
+                        );
 
                         // For nested inline structs (arrays inside arrays),
                         // we need to handle them as Vec<u8> because our derive
@@ -293,6 +516,14 @@ pub(crate) fn map_type(
                         }
                     }
                 }
+                "switch" => {
+                    // A switch is a conditional field whose presence depends
+                    // on another field's value. We can't represent this in a
+                    // flat struct, so we fall back to opaque bytes. When this
+                    // is the last field, `parse_container_fields` will handle
+                    // collapsing trailing switches into a single rest field.
+                    ("Vec<u8>".into(), None, None)
+                }
                 "mapper" | "bitflags" => {
                     // A mapper wraps a numeric type with named constants,
                     // and a bitflags wraps an integer with named bit positions.
@@ -301,6 +532,53 @@ pub(crate) fn map_type(
                     // ["bitflags", {"type": "u32", ...}] → u32).
                     let inner_type = &arr[1]["type"];
                     map_type(inner_type, parent_name, field_name, is_last, types_ctx)
+                }
+                "container" => {
+                    // An inline container used directly as a field type
+                    // (not inside an array). Generate an inline struct.
+                    let struct_name = format!("{}{}", parent_name, to_pascal_case(field_name));
+                    let (inner_fields, _nested, _enums) =
+                        parse_container_fields_inner(type_def, &struct_name, types_ctx, false);
+                    let inline = InlineStruct {
+                        name: struct_name.clone(),
+                        fields: inner_fields,
+                    };
+                    (struct_name, None, Some(inline))
+                }
+                "bitfield" => {
+                    // A bitfield packs multiple named values into a single
+                    // integer. We sum the bit sizes to determine the Rust
+                    // integer type (u8 for ≤8 bits, u16 for ≤16, etc.).
+                    let total_bits: u32 = arr[1]
+                        .as_array()
+                        .map(|fields| {
+                            fields
+                                .iter()
+                                .filter_map(|f| f["size"].as_u64())
+                                .sum::<u64>() as u32
+                        })
+                        .unwrap_or(32);
+                    let rust_type = match total_bits {
+                        0..=8 => "u8",
+                        9..=16 => "u16",
+                        17..=32 => "u32",
+                        _ => "u64",
+                    };
+                    (rust_type.into(), None, None)
+                }
+                // Native compound types with custom wire formats that
+                // can't be described by the JSON schema. We map them to
+                // opaque byte buffers without warnings since they are
+                // known protocol primitives.
+                "registryEntryHolder"
+                | "registryEntryHolderSet"
+                | "topBitSetTerminatedArray"
+                | "entityMetadataLoop" => {
+                    if is_last {
+                        ("Vec<u8>".into(), Some("rest".into()), None)
+                    } else {
+                        ("Vec<u8>".into(), None, None)
+                    }
                 }
                 _ => {
                     eprintln!("Warning: unknown compound type '{type_name}', using Vec<u8>");
@@ -624,7 +902,7 @@ mod tests {
         )
         .unwrap();
 
-        let (fields, inlines) = parse_container_fields(&json, "TestPacket", &Value::Null);
+        let (fields, inlines, _enums) = parse_container_fields(&json, "TestPacket", &Value::Null);
         assert_eq!(fields.len(), 2);
         assert_eq!(fields[0].name, "username");
         assert_eq!(fields[0].rust_type, "String");
@@ -647,7 +925,7 @@ mod tests {
         )
         .unwrap();
 
-        let (fields, _) = parse_container_fields(&json, "TestPacket", &Value::Null);
+        let (fields, _, _) = parse_container_fields(&json, "TestPacket", &Value::Null);
         assert_eq!(fields[1].name, "data");
         assert_eq!(fields[1].rust_type, "Vec<u8>");
         assert_eq!(fields[1].attribute, Some("rest".into()));
@@ -670,7 +948,7 @@ mod tests {
         )
         .unwrap();
 
-        let (fields, inlines) = parse_container_fields(&json, "TestPacket", &Value::Null);
+        let (fields, inlines, _enums) = parse_container_fields(&json, "TestPacket", &Value::Null);
         assert_eq!(fields.len(), 1);
         assert_eq!(fields[0].rust_type, "Vec<TestPacketItems>");
         assert_eq!(fields[0].attribute, Some("length = \"varint\"".into()));
@@ -682,9 +960,88 @@ mod tests {
     #[test]
     fn parse_empty_container() {
         let json: Value = serde_json::from_str(r#"["container", []]"#).unwrap();
-        let (fields, inlines) = parse_container_fields(&json, "TestPacket", &Value::Null);
+        let (fields, inlines, _enums) = parse_container_fields(&json, "TestPacket", &Value::Null);
         assert!(fields.is_empty());
         assert!(inlines.is_empty());
+    }
+
+    // -- switch handling --
+
+    #[test]
+    fn map_switch_returns_vec_u8() {
+        let json: Value = serde_json::from_str(
+            r#"["switch", {"compareTo": "action", "fields": {"0": "string"}, "default": "void"}]"#,
+        )
+        .unwrap();
+        let (ty, attr, _) = map_type(&json, "", "", false, &Value::Null);
+        assert_eq!(ty, "Vec<u8>");
+        assert!(attr.is_none());
+    }
+
+    #[test]
+    fn trailing_switches_generate_enum() {
+        let json: Value = serde_json::from_str(
+            r#"["container", [
+                {"name": "target", "type": "varint"},
+                {"name": "action", "type": "varint"},
+                {"name": "x", "type": ["switch", {"compareTo": "action", "fields": {"2": "f32"}, "default": "void"}]},
+                {"name": "hand", "type": ["switch", {"compareTo": "action", "fields": {"0": "varint", "2": "varint"}, "default": "void"}]}
+            ]]"#,
+        )
+        .unwrap();
+        let (fields, _, enums) = parse_container_fields(&json, "Test", &Value::Null);
+        // target + enum field (action is absorbed into the enum)
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0].name, "target");
+        assert_eq!(fields[1].name, "action");
+        assert_eq!(fields[1].rust_type, "TestAction");
+        // One enum generated
+        assert_eq!(enums.len(), 1);
+        assert_eq!(enums[0].name, "TestAction");
+        // Variant 0 has hand only, variant 2 has x + hand
+        assert!(enums[0].variants.len() >= 2);
+    }
+
+    #[test]
+    fn interleaved_switch_generates_enum() {
+        let json: Value = serde_json::from_str(
+            r#"["container", [
+                {"name": "action", "type": "varint"},
+                {"name": "data", "type": ["switch", {"compareTo": "action", "fields": {"0": "string"}, "default": "void"}]},
+                {"name": "sneaking", "type": "bool"}
+            ]]"#,
+        )
+        .unwrap();
+        let (fields, _, enums) = parse_container_fields(&json, "Test", &Value::Null);
+        // Interleaved switch now generates an enum — the discriminator
+        // "action" is absorbed into the enum, non-switch fields remain.
+        assert_eq!(enums.len(), 1);
+        assert_eq!(enums[0].name, "TestAction");
+        // Fields: action (enum) + sneaking
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0].name, "action");
+        assert_eq!(fields[0].rust_type, "TestAction");
+        assert_eq!(fields[1].name, "sneaking");
+        assert_eq!(fields[1].rust_type, "bool");
+    }
+
+    #[test]
+    fn single_trailing_switch_generates_enum() {
+        let json: Value = serde_json::from_str(
+            r#"["container", [
+                {"name": "id", "type": "varint"},
+                {"name": "data", "type": ["switch", {"compareTo": "id", "fields": {"1": "string"}, "default": "void"}]}
+            ]]"#,
+        )
+        .unwrap();
+        let (fields, _, enums) = parse_container_fields(&json, "Test", &Value::Null);
+        // id is absorbed into the enum, so only 1 field: the enum
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].name, "id");
+        assert_eq!(fields[0].rust_type, "TestId");
+        assert_eq!(enums.len(), 1);
+        assert_eq!(enums[0].variants.len(), 1);
+        assert_eq!(enums[0].variants[0].id, 1);
     }
 
     // -- parse_direction --
@@ -703,7 +1060,7 @@ mod tests {
             }
         }"#).unwrap();
 
-        let packets = parse_direction(&json, "toServer", "Serverbound", "Login");
+        let packets = parse_direction(&json, "toServer", "Serverbound", "Login", &Value::Null);
         // Should only have login_start, cookie_response should be skipped
         assert_eq!(packets.len(), 1);
         assert!(packets[0].name.contains("LoginStart"));
@@ -712,7 +1069,7 @@ mod tests {
     #[test]
     fn parse_direction_empty() {
         let json: Value = serde_json::from_str(r#"{}"#).unwrap();
-        let packets = parse_direction(&json, "toServer", "Serverbound", "Login");
+        let packets = parse_direction(&json, "toServer", "Serverbound", "Login", &Value::Null);
         assert!(packets.is_empty());
     }
 }
