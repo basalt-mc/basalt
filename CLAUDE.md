@@ -11,10 +11,10 @@
 
 ## Architecture
 
-Four crates in a Cargo workspace under `crates/`, plus an `xtask` codegen tool:
+Five crates in a Cargo workspace under `crates/`, plus an `xtask` codegen tool:
 
 ```
-basalt-types → basalt-derive → basalt-protocol → basalt-net
+basalt-types → basalt-derive → basalt-protocol → basalt-net → basalt-server
                                       ↑
                                    xtask (codegen)
 ```
@@ -25,12 +25,36 @@ basalt-types → basalt-derive → basalt-protocol → basalt-net
 | `basalt-derive` | Proc macros for `Encode`/`Decode`/`EncodedSize` | `syn`, `quote`, `proc-macro2` |
 | `basalt-protocol` | Packet definitions, version-aware registry, registry data, chunk builder | `basalt-types`, `basalt-derive` |
 | `basalt-net` | Async networking, encryption, compression, connection typestate, middleware pipeline | `basalt-protocol`, `tokio`, `aes`, `cfb8`, `flate2` |
+| `basalt-server` | Minecraft server: connection lifecycle, play loop, chat, commands, player state | `basalt-net`, `basalt-protocol`, `basalt-types`, `tokio` |
 | `xtask` | Code generation from minecraft-data JSON → Rust packet structs | `serde_json` |
 
 - `basalt-types` and `basalt-derive` have no interdependency.
 - `basalt-protocol` depends on both.
 - `basalt-net` depends on `basalt-protocol`.
+- `basalt-server` depends on `basalt-net` — it is the top-level application crate.
 - `xtask` is a standalone binary that generates code into `basalt-protocol`.
+
+### basalt-server structure
+
+```
+crates/basalt-server/
+├── src/
+│   ├── lib.rs           # Server struct, public API, accept loop
+│   ├── connection.rs    # Per-player lifecycle: handshake → login → config → play
+│   ├── play.rs          # Play loop, packet dispatch (sync) + action execution (async)
+│   ├── player.rs        # PlayerState: position, rotation, keep-alive tracking
+│   └── chat.rs          # Chat message echo, command dispatch (/say, /tp, /gamemode, /help)
+├── examples/
+│   └── server.rs        # 14-line launcher: Server::new("0.0.0.0:25565").run().await
+└── tests/
+    └── e2e.rs           # End-to-end tests: status ping, login flow, chat, commands
+```
+
+The play loop separates sync and async concerns:
+- `dispatch_packet()` — pure sync function that updates `PlayerState` and returns a `PacketAction` enum
+- `execute_action()` — async function that sends response packets (chat echo, command feedback)
+
+This keeps the state-update logic unit-testable without a TCP connection.
 
 ## Architectural principles
 
@@ -74,7 +98,8 @@ basalt/
 │   ├── basalt-types/
 │   ├── basalt-derive/
 │   ├── basalt-protocol/
-│   └── basalt-net/
+│   ├── basalt-net/
+│   └── basalt-server/        # Minecraft server: connection lifecycle, play loop, chat, commands
 ├── minecraft-data/           # Git submodule — PrismarineJS/minecraft-data
 ├── xtask/                    # Codegen tool
 │   └── src/
