@@ -220,14 +220,19 @@ fn extract_play_short_name(full_name: &str) -> String {
 /// Creates `play/` directory with one `.rs` file per category
 /// (entity, world, player, inventory, chat, misc) plus a `mod.rs`
 /// that re-exports all packets and defines the direction enums.
-pub(crate) fn generate_play_split(state: &Value, workspace_root: &Path, packets_dir: &str) {
+pub(crate) fn generate_play_split(
+    state: &Value,
+    workspace_root: &Path,
+    packets_dir: &str,
+    global_types: &Value,
+) {
     let play_dir = workspace_root.join(packets_dir).join("play");
     fs::create_dir_all(&play_dir)
         .unwrap_or_else(|e| panic!("Failed to create {}: {e}", play_dir.display()));
 
     let pascal_state = "Play";
-    let serverbound = parse_direction(state, "toServer", "Serverbound", pascal_state);
-    let clientbound = parse_direction(state, "toClient", "Clientbound", pascal_state);
+    let serverbound = parse_direction(state, "toServer", "Serverbound", pascal_state, global_types);
+    let clientbound = parse_direction(state, "toClient", "Clientbound", pascal_state, global_types);
 
     // Categorize packets
     let mut categories: BTreeMap<&str, (Vec<&PacketDef>, Vec<&PacketDef>)> = BTreeMap::new();
@@ -338,6 +343,9 @@ fn generate_play_mod(
             for inline in &packet.inline_structs {
                 out.push_str(&format!("pub use {category}::{};\n", inline.name));
             }
+            for switch_enum in &packet.switch_enums {
+                out.push_str(&format!("pub use {category}::{};\n", switch_enum.name));
+            }
         }
     }
     out.push('\n');
@@ -444,6 +452,7 @@ mod tests {
                 attribute: None,
             }],
             inline_structs: vec![],
+            switch_enums: vec![],
         };
         let refs = vec![&packet];
         let code = generate_category_file("test", &refs, &[]);
@@ -458,12 +467,14 @@ mod tests {
             id: "0x00".into(),
             fields: vec![],
             inline_structs: vec![],
+            switch_enums: vec![],
         }];
         let cb = vec![PacketDef {
             name: "ClientboundPlayPong".into(),
             id: "0x00".into(),
             fields: vec![],
             inline_structs: vec![],
+            switch_enums: vec![],
         }];
         let sb_refs: Vec<&PacketDef> = sb.iter().collect();
         let cb_refs: Vec<&PacketDef> = cb.iter().collect();
