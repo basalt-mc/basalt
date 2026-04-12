@@ -271,14 +271,8 @@ pub struct ClientboundPlayPlayerChat {
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayPlayerInfoData {
     pub uuid: Uuid,
-    pub player: Vec<u8>,
-    pub chat_session: Vec<u8>,
-    pub gamemode: Vec<u8>,
-    pub listed: Vec<u8>,
-    pub latency: Vec<u8>,
-    pub display_name: Vec<u8>,
-    pub list_priority: Vec<u8>,
-    pub show_hat: Vec<u8>,
+    #[field(rest)]
+    pub remaining: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

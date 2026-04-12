@@ -244,8 +244,8 @@ pub struct ClientboundPlayDebugSample {
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayDeclareRecipesRecipes {
     pub name: String,
-    #[field(length = "varint")]
-    pub items: Vec<Vec<u8>>,
+    #[field(length = "varint", element = "varint")]
+    pub items: Vec<i32>,
 }
 
 /// Inline data structure used by [`ClientboundPlayDeclareRecipes`].
@@ -336,8 +336,8 @@ pub struct ClientboundPlayRecipeBookAdd {
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x45)]
 pub struct ClientboundPlayRecipeBookRemove {
-    #[field(length = "varint")]
-    pub recipe_ids: Vec<Vec<u8>>,
+    #[field(length = "varint", element = "varint")]
+    pub recipe_ids: Vec<i32>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -453,8 +453,8 @@ pub struct ClientboundPlayStopSound {
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayTagsTagsTags {
     pub tag_name: String,
-    #[field(length = "varint")]
-    pub entries: Vec<Vec<u8>>,
+    #[field(length = "varint", element = "varint")]
+    pub entries: Vec<i32>,
 }
 
 /// Inline data structure used by [`ClientboundPlayTags`].

@@ -106,8 +106,8 @@ pub struct ClientboundConfigurationResetChat;
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundConfigurationTagsTagsTags {
     pub tag_name: String,
-    #[field(length = "varint")]
-    pub entries: Vec<Vec<u8>>,
+    #[field(length = "varint", element = "varint")]
+    pub entries: Vec<i32>,
 }
 
 /// Inline data structure used by [`ClientboundConfigurationTags`].
