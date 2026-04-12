@@ -7,6 +7,7 @@
 use basalt_net::framing;
 use basalt_protocol::packets::handshake::ServerboundHandshakeSetProtocol;
 use basalt_protocol::packets::login::ClientboundLoginSuccess;
+use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
 use basalt_protocol::packets::status::{
     ClientboundStatusPing, ClientboundStatusServerInfo, ServerboundStatusPing,
     ServerboundStatusPingStart,
@@ -292,6 +293,11 @@ async fn e2e_server_handles_teleport_confirm() {
 /// packets have been consumed (Login, SpawnPosition, GameEvent, Chunk,
 /// Position, Welcome message).
 async fn connect_to_play(addr: std::net::SocketAddr) -> TcpStream {
+    connect_to_play_as(addr, "ChatTester", Uuid::default()).await
+}
+
+/// Helper: connects a client with a specific username and UUID.
+async fn connect_to_play_as(addr: std::net::SocketAddr, username: &str, uuid: Uuid) -> TcpStream {
     let mut client = TcpStream::connect(addr).await.unwrap();
     client_handshake(&mut client, addr.port(), 2).await;
 
@@ -302,8 +308,8 @@ async fn connect_to_play(addr: std::net::SocketAddr) -> TcpStream {
         &mut client,
         ServerboundLoginLoginStart::PACKET_ID,
         &ServerboundLoginLoginStart {
-            username: "ChatTester".into(),
-            player_uuid: Uuid::default(),
+            username: username.into(),
+            player_uuid: uuid,
         },
     )
     .await;
@@ -340,14 +346,15 @@ async fn connect_to_play(addr: std::net::SocketAddr) -> TcpStream {
     )
     .await;
 
-    // Read initial Play packets (Login, SpawnPosition, GameEvent, Chunk,
-    // Position, Welcome message = 6 packets)
-    for _ in 0..6 {
-        framing::read_raw_packet(&mut client)
-            .await
-            .unwrap()
-            .unwrap();
-    }
+    // Drain all initial Play packets (Login, SpawnPosition, GameEvent,
+    // Chunk, Position, Welcome + possibly PlayerInfo/SpawnEntity for
+    // existing players). Read until no more packets arrive.
+    while let Ok(Ok(Some(_))) = tokio::time::timeout(
+        std::time::Duration::from_millis(100),
+        framing::read_raw_packet(&mut client),
+    )
+    .await
+    {}
 
     client
 }
@@ -545,4 +552,151 @@ async fn e2e_server_command_gamemode() {
 
     let (id, _): (_, ClientboundPlaySystemChat) = recv_packet(&mut client).await;
     assert_eq!(id, ClientboundPlaySystemChat::PACKET_ID);
+}
+
+// -- Multi-player tests --
+
+#[tokio::test]
+async fn e2e_two_players_second_gets_player_info() {
+    let addr = spawn_server().await;
+
+    let uuid1 = Uuid::from_bytes([1; 16]);
+    let uuid2 = Uuid::from_bytes([2; 16]);
+
+    // Player 1 connects
+    let mut client1 = connect_to_play_as(addr, "Alice", uuid1).await;
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+    // Player 2 connects — should receive PlayerInfo for Alice
+    let mut client2 = TcpStream::connect(addr).await.unwrap();
+    client_handshake(&mut client2, addr.port(), 2).await;
+
+    use basalt_protocol::packets::login::{
+        ServerboundLoginLoginAcknowledged, ServerboundLoginLoginStart,
+    };
+    send_packet(
+        &mut client2,
+        ServerboundLoginLoginStart::PACKET_ID,
+        &ServerboundLoginLoginStart {
+            username: "Bob".into(),
+            player_uuid: uuid2,
+        },
+    )
+    .await;
+
+    let _: (_, ClientboundLoginSuccess) = recv_packet(&mut client2).await;
+    send_packet(
+        &mut client2,
+        ServerboundLoginLoginAcknowledged::PACKET_ID,
+        &ServerboundLoginLoginAcknowledged,
+    )
+    .await;
+
+    loop {
+        let raw = framing::read_raw_packet(&mut client2)
+            .await
+            .unwrap()
+            .unwrap();
+        use basalt_protocol::packets::configuration::ClientboundConfigurationFinishConfiguration;
+        if raw.id == ClientboundConfigurationFinishConfiguration::PACKET_ID {
+            break;
+        }
+    }
+
+    use basalt_protocol::packets::configuration::ServerboundConfigurationFinishConfiguration;
+    send_packet(
+        &mut client2,
+        ServerboundConfigurationFinishConfiguration::PACKET_ID,
+        &ServerboundConfigurationFinishConfiguration,
+    )
+    .await;
+
+    // Read Play packets: Login(5) + PlayerInfo(Alice) + SpawnEntity(Alice) + Welcome = 8
+    let mut found_player_info = false;
+    let mut found_spawn_entity = false;
+    use basalt_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
+    use basalt_protocol::packets::play::player::ClientboundPlayPlayerInfo;
+    for _ in 0..8 {
+        let raw = framing::read_raw_packet(&mut client2)
+            .await
+            .unwrap()
+            .unwrap();
+        if raw.id == ClientboundPlayPlayerInfo::PACKET_ID {
+            found_player_info = true;
+        }
+        if raw.id == ClientboundPlaySpawnEntity::PACKET_ID {
+            found_spawn_entity = true;
+        }
+    }
+    assert!(
+        found_player_info,
+        "client2 should receive PlayerInfo for Alice"
+    );
+    assert!(
+        found_spawn_entity,
+        "client2 should receive SpawnEntity for Alice"
+    );
+
+    // Client 1 should have received PlayerJoined broadcast
+    // (PlayerInfo + SpawnEntity + join msg = 3 packets)
+    for _ in 0..3 {
+        let raw = framing::read_raw_packet(&mut client1)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(raw.id >= 0);
+    }
+
+    drop(client1);
+    drop(client2);
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+}
+
+#[tokio::test]
+async fn e2e_chat_broadcast_to_both_players() {
+    let addr = spawn_server().await;
+
+    let uuid1 = Uuid::from_bytes([10; 16]);
+    let uuid2 = Uuid::from_bytes([20; 16]);
+
+    let mut client1 = connect_to_play_as(addr, "Player1", uuid1).await;
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+    let mut client2 = connect_to_play_as(addr, "Player2", uuid2).await;
+
+    // Drain the PlayerJoined packets that client1 receives
+    // (PlayerInfo + SpawnEntity + join message = 3 packets)
+    for _ in 0..3 {
+        framing::read_raw_packet(&mut client1)
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
+    // Player 1 sends a chat message
+    use basalt_protocol::packets::play::chat::ServerboundPlayChatMessage;
+    send_packet(
+        &mut client1,
+        ServerboundPlayChatMessage::PACKET_ID,
+        &ServerboundPlayChatMessage {
+            message: "hello from player1".into(),
+            timestamp: 0,
+            salt: 0,
+            signature: None,
+            offset: 0,
+            acknowledged: vec![],
+        },
+    )
+    .await;
+
+    // Both players should receive the chat via broadcast
+    let (id1, _): (_, ClientboundPlaySystemChat) = recv_packet(&mut client1).await;
+    assert_eq!(id1, ClientboundPlaySystemChat::PACKET_ID);
+
+    let (id2, _): (_, ClientboundPlaySystemChat) = recv_packet(&mut client2).await;
+    assert_eq!(id2, ClientboundPlaySystemChat::PACKET_ID);
+
+    drop(client1);
+    drop(client2);
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 }

@@ -42,21 +42,15 @@ pub(crate) async fn send_welcome(
     send_system_message(conn, &msg, false).await
 }
 
-/// Handles a player chat message by echoing it as a system message.
+/// Builds a formatted chat text component for `<username> message`.
 ///
-/// The message is formatted as `<username> message` and sent back
-/// to the player. In a multi-player setup (#53), this would broadcast
-/// to all connected players.
-pub(crate) async fn handle_chat_message(
-    conn: &mut Connection<Play>,
-    username: &str,
-    message: &str,
-) -> basalt_net::Result<()> {
-    let formatted = TextComponent::text("<")
+/// Returns the `TextComponent` without sending it — the caller
+/// broadcasts it to all players via `ServerState::broadcast`.
+pub(crate) fn build_chat_component(username: &str, message: &str) -> TextComponent {
+    TextComponent::text("<")
         .append(TextComponent::text(username).color(TextColor::Named(NamedColor::Aqua)))
         .append(TextComponent::text("> "))
-        .append(TextComponent::text(message));
-    send_system_message(conn, &formatted, false).await
+        .append(TextComponent::text(message))
 }
 
 /// Handles a slash command from the player.

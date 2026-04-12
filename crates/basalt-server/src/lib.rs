@@ -2,8 +2,8 @@
 //!
 //! A lightweight Minecraft 1.21.4 server built on the Basalt protocol
 //! library. Handles the full client lifecycle from handshake through
-//! play, with support for basic packet handling, position tracking,
-//! and keep-alive management.
+//! play, with support for multi-player, chat broadcast, commands,
+//! and player position tracking.
 //!
 //! # Usage
 //!
@@ -19,16 +19,23 @@
 
 mod chat;
 mod connection;
+mod helpers;
 mod play;
 mod player;
+mod state;
+
+use std::sync::Arc;
 
 use tokio::net::TcpListener;
+
+use state::ServerState;
 
 /// A Basalt Minecraft server instance.
 ///
 /// Listens for incoming TCP connections and spawns a task for each
-/// client. Each task handles the full connection lifecycle: handshake,
-/// login, configuration, and play.
+/// client. All connection tasks share a `ServerState` that tracks
+/// who is online, assigns unique entity IDs, and routes broadcast
+/// messages between players.
 pub struct Server {
     /// The address to bind the TCP listener to.
     bind_addr: String,
@@ -58,15 +65,19 @@ impl Server {
 
     /// Accepts connections on the given listener until it is dropped.
     ///
-    /// Exposed for testing — tests can bind to port 0 and pass the
-    /// listener directly, avoiding port conflicts.
+    /// Creates a shared `ServerState` and passes it to every connection
+    /// task. Exposed for testing — tests can bind to port 0 and pass
+    /// the listener directly, avoiding port conflicts.
     pub async fn accept_loop(listener: TcpListener) {
+        let state = ServerState::new();
+
         loop {
             let (stream, addr) = listener.accept().await.unwrap();
             println!("[{addr}] Connection accepted");
 
+            let state = Arc::clone(&state);
             tokio::spawn(async move {
-                if let Err(e) = connection::handle_connection(stream, addr).await {
+                if let Err(e) = connection::handle_connection(stream, addr, state).await {
                     println!("[{addr}] Error: {e}");
                 }
                 println!("[{addr}] Connection closed");
