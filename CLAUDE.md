@@ -11,12 +11,12 @@
 
 ## Architecture
 
-Six crates in a Cargo workspace under `crates/`, plus an `xtask` codegen tool:
+Eight crates in a Cargo workspace under `crates/`, plus an `xtask` codegen tool:
 
 ```
 basalt-types → basalt-derive → basalt-protocol → basalt-net → basalt-server
                                       ↑                            ↑
-                                   xtask (codegen)           basalt-world
+                                   xtask (codegen)     basalt-events, basalt-world
 ```
 
 | Crate | Purpose | Key dependencies |
@@ -25,16 +25,30 @@ basalt-types → basalt-derive → basalt-protocol → basalt-net → basalt-ser
 | `basalt-derive` | Proc macros for `Encode`/`Decode`/`EncodedSize` | `syn`, `quote`, `proc-macro2` |
 | `basalt-protocol` | Packet definitions, version-aware registry, registry data | `basalt-types`, `basalt-derive` |
 | `basalt-net` | Async networking, encryption, compression, connection typestate, middleware pipeline | `basalt-protocol`, `tokio`, `aes`, `cfb8`, `flate2` |
+| `basalt-events` | Generic event bus with staged handler dispatch (Validate → Process → Post) | none |
 | `basalt-world` | World generation, chunk storage, paletted containers, block state registry | `basalt-types`, `basalt-protocol`, `basalt-storage` |
 | `basalt-storage` | BSR region file format with LZ4 compression for chunk persistence | `lz4_flex` |
-| `basalt-server` | Minecraft server: connection lifecycle, play loop, chat, commands, chunk streaming | `basalt-net`, `basalt-world`, `tokio`, `dashmap`, `reqwest` |
+| `basalt-server` | Minecraft server: connection lifecycle, play loop, chat, commands, chunk streaming | `basalt-net`, `basalt-events`, `basalt-world`, `tokio`, `dashmap`, `reqwest` |
 | `xtask` | Code generation from minecraft-data JSON → Rust packet structs | `serde_json` |
 
 - `basalt-types` and `basalt-derive` have no interdependency.
 - `basalt-protocol` depends on both.
 - `basalt-net` depends on `basalt-protocol`.
-- `basalt-server` depends on `basalt-net` — it is the top-level application crate.
+- `basalt-events` has zero external dependencies — pure Rust event infrastructure.
+- `basalt-server` depends on `basalt-net`, `basalt-events`, and `basalt-world` — it is the top-level application crate.
 - `xtask` is a standalone binary that generates code into `basalt-protocol`.
+
+### basalt-events architecture
+
+The event system provides a generic `EventBus` with three execution stages:
+
+1. **Validate** — read-only checks, can cancel (permissions, anti-cheat, protection plugins)
+2. **Process** — state mutation, one logical owner per event (world changes)
+3. **Post** — side effects, no cancel (broadcasting, persistence, logging)
+
+If any Validate handler cancels an event, Process and Post are skipped entirely. Handlers register for specific event types at specific stages with priority ordering. Type erasure via `TypeId` + `Any::downcast_mut` keeps the crate dependency-free.
+
+Server features are implemented as plugin handlers registered on the event bus. Each plugin can be enabled/disabled via server config — zero overhead for disabled features. This enables composable server profiles: an auth server only registers login + commands, a lobby adds read-only world, a game server enables everything.
 
 ### basalt-server structure
 
@@ -121,6 +135,7 @@ basalt/
 │   ├── basalt-protocol/
 │   ├── basalt-net/
 │   ├── basalt-world/          # World generation, chunk cache, paletted containers
+│   ├── basalt-events/         # Event bus with staged handler dispatch (Validate/Process/Post)
 │   ├── basalt-storage/        # BSR region format, LZ4 compression, disk persistence
 │   └── basalt-server/         # Minecraft server: connection lifecycle, play loop, chat, commands
 ├── minecraft-data/           # Git submodule — PrismarineJS/minecraft-data
