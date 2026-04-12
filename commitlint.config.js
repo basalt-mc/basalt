@@ -216,6 +216,16 @@ const world = [
   'world/block',
 ];
 
+const storage = [
+  // Cross-module changes within basalt-storage.
+  // Example: "feat(storage): add player data persistence"
+  'storage',
+
+  // BSR region file format and LZ4 compression.
+  // Example: "perf(storage/region): optimize offset table reads"
+  'storage/region',
+];
+
 const keywords = [
   // Root workspace configuration: Cargo.toml workspace settings, workspace-wide
   // dependency versions, cross-crate build configuration.
@@ -276,7 +286,7 @@ const keywords = [
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...keywords]],
+    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...storage, ...keywords]],
     'scope-empty': [2, 'never'],
   },
 };

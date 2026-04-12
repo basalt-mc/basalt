@@ -15,6 +15,7 @@ basalt-protocol = { path = "crates/basalt-protocol" }
 basalt-net = { path = "crates/basalt-net" }
 basalt-server = { path = "crates/basalt-server" }
 basalt-world = { path = "crates/basalt-world" }
+basalt-storage = { path = "crates/basalt-storage" }
 
 # Error handling
 thiserror = "2"
@@ -33,6 +34,9 @@ cfb8 = "0.8"
 
 # Compression
 flate2 = "1"
+
+# Compression (storage)
+lz4_flex = "0.11"
 
 # Noise generation
 noise = "0.9"
