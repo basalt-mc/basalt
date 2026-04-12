@@ -23,6 +23,29 @@ pub enum Error {
 
     #[error("nbt error: {0}")]
     Nbt(String),
+
+    /// An error with added context about where it occurred during
+    /// decoding (e.g., which field or packet was being decoded).
+    #[error("{context}: {source}")]
+    Context {
+        /// Human-readable description of what was being decoded.
+        context: String,
+        /// The underlying error.
+        source: Box<Error>,
+    },
+}
+
+impl Error {
+    /// Wraps this error with additional context about where it occurred.
+    ///
+    /// Use this to add field names, packet names, or other location
+    /// information to decode errors for easier debugging.
+    pub fn with_context(self, context: impl Into<String>) -> Self {
+        Self::Context {
+            context: context.into(),
+            source: Box::new(self),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -63,6 +86,19 @@ mod tests {
     fn display_nbt_error() {
         let err = Error::Nbt("unexpected tag type".into());
         assert_eq!(err.to_string(), "nbt error: unexpected tag type");
+    }
+
+    #[test]
+    fn context_wraps_error() {
+        let err = Error::BufferUnderflow {
+            needed: 8,
+            available: 3,
+        }
+        .with_context("decoding field 'x' of PlayerPosition");
+        assert_eq!(
+            err.to_string(),
+            "decoding field 'x' of PlayerPosition: buffer underflow: need 8 bytes, got 3"
+        );
     }
 
     #[test]
