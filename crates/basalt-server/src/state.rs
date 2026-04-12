@@ -8,13 +8,11 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
-use basalt_events::EventBus;
+use basalt_api::broadcast::ProfileProperty;
+pub(crate) use basalt_api::{BroadcastMessage, EventBus, PlayerSnapshot};
 use basalt_types::Uuid;
-use basalt_types::nbt::NbtCompound;
 use dashmap::DashMap;
 use tokio::sync::broadcast;
-
-use crate::skin::ProfileProperty;
 
 /// Shared server state, held behind `Arc` and passed to every connection task.
 pub(crate) struct ServerState {
@@ -46,119 +44,33 @@ pub(crate) struct PlayerHandle {
     pub skin_properties: Vec<ProfileProperty>,
 }
 
-/// A snapshot of a player's state at a point in time.
-///
-/// Used in broadcast messages to share a player's position and
-/// identity with other connected players without holding locks.
-#[derive(Debug, Clone)]
-pub(crate) struct PlayerSnapshot {
-    /// The player's display name.
-    pub username: String,
-    /// The player's UUID.
-    pub uuid: Uuid,
-    /// The player's unique entity ID.
-    pub entity_id: i32,
-    /// Current X coordinate.
-    pub x: f64,
-    /// Current Y coordinate.
-    pub y: f64,
-    /// Current Z coordinate.
-    pub z: f64,
-    /// Current yaw (horizontal look angle, degrees).
-    pub yaw: f32,
-    /// Current pitch (vertical look angle, degrees).
-    pub pitch: f32,
-    /// Mojang profile properties (skin textures).
-    pub skin_properties: Vec<ProfileProperty>,
-}
-
-/// A message broadcast from one player's task to all others.
-///
-/// Sent through the `broadcast::Sender` and received by each player's
-/// `broadcast::Receiver` in their play loop.
-#[derive(Debug, Clone)]
-pub(crate) enum BroadcastMessage {
-    /// A chat message to display in all players' chat windows.
-    Chat {
-        /// The formatted text component as NBT.
-        content: NbtCompound,
-    },
-    /// A new player has joined the server.
-    PlayerJoined {
-        /// Snapshot of the joining player's state.
-        info: PlayerSnapshot,
-    },
-    /// A player has left the server.
-    PlayerLeft {
-        /// The leaving player's UUID (for PlayerRemove packet).
-        uuid: Uuid,
-        /// The leaving player's entity ID (for EntityDestroy packet).
-        entity_id: i32,
-        /// The leaving player's username (for chat message).
-        username: String,
-    },
-    /// A player moved or changed look direction.
-    EntityMoved {
-        /// The moving player's entity ID.
-        entity_id: i32,
-        /// New absolute X coordinate.
-        x: f64,
-        /// New absolute Y coordinate.
-        y: f64,
-        /// New absolute Z coordinate.
-        z: f64,
-        /// New yaw angle (degrees).
-        yaw: f32,
-        /// New pitch angle (degrees).
-        pitch: f32,
-        /// Whether the player is on the ground.
-        on_ground: bool,
-    },
-    /// A block was modified in the world.
-    BlockChanged {
-        /// Block X coordinate (absolute world coordinates).
-        x: i32,
-        /// Block Y coordinate (absolute world coordinates).
-        y: i32,
-        /// Block Z coordinate (absolute world coordinates).
-        z: i32,
-        /// The new block state ID.
-        block_state: i32,
-    },
-}
-
 impl ServerState {
-    /// Creates a new empty server state with a broadcast channel.
+    /// Creates a new server state with default built-in plugins.
     pub fn new() -> Arc<Self> {
-        // Buffer size for broadcast — receivers that fall behind lose
-        // old messages. 256 is enough for ~5 seconds of movement
-        // updates from 10 players at 20Hz.
+        Self::with_plugins(default_plugins())
+    }
+
+    /// Creates a server state with the given plugins registered.
+    ///
+    /// Each plugin's `on_enable` is called with an `EventRegistrar`
+    /// to register its event handlers on the bus.
+    pub fn with_plugins(plugins: Vec<Box<dyn basalt_api::Plugin>>) -> Arc<Self> {
         let (broadcast_tx, _) = broadcast::channel(256);
         let mut event_bus = EventBus::new();
-        crate::handlers::register_all(&mut event_bus);
+        let mut registrar = basalt_api::EventRegistrar::new(&mut event_bus);
+        for plugin in &plugins {
+            println!(
+                "[plugins] Enabling {} v{}",
+                plugin.metadata().name,
+                plugin.metadata().version
+            );
+            plugin.on_enable(&mut registrar);
+        }
         Arc::new(Self {
             next_entity_id: AtomicI32::new(1),
             players: DashMap::new(),
             broadcast_tx,
             world: basalt_world::World::new(42, "world"),
-            event_bus,
-        })
-    }
-
-    /// Creates a server state with a custom world instance.
-    ///
-    /// Used in tests to provide a world with specific configuration
-    /// (e.g., disk persistence for storage handler tests).
-    #[cfg(test)]
-    pub fn new_with_world(world: basalt_world::World) -> Arc<Self> {
-        let (broadcast_tx, _) = broadcast::channel(256);
-        let mut event_bus = EventBus::new();
-        crate::handlers::register_all(&mut event_bus);
-        Arc::new(Self {
-            next_entity_id: AtomicI32::new(1),
-            players: DashMap::new(),
-            broadcast_tx,
-            world,
             event_bus,
         })
     }
@@ -223,8 +135,25 @@ impl ServerState {
     }
 }
 
+/// Returns the default set of built-in plugins.
+///
+/// These cover all core server functionality: lifecycle, chat,
+/// movement, world streaming, block interaction, and storage.
+pub(crate) fn default_plugins() -> Vec<Box<dyn basalt_api::Plugin>> {
+    vec![
+        Box::new(basalt_plugin_lifecycle::LifecyclePlugin),
+        Box::new(basalt_plugin_chat::ChatPlugin),
+        Box::new(basalt_plugin_movement::MovementPlugin),
+        Box::new(basalt_plugin_world::WorldPlugin),
+        Box::new(basalt_plugin_block::BlockPlugin),
+        Box::new(basalt_plugin_storage::StoragePlugin),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
+    use basalt_types::nbt::NbtCompound;
+
     use super::*;
 
     #[test]

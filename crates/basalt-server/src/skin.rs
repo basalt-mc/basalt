@@ -6,22 +6,28 @@
 //! needed for the `PlayerInfo` packet so other players see the correct
 //! skin.
 
+use basalt_api::ProfileProperty;
 use serde::Deserialize;
 
-/// A profile property from the Mojang API (typically skin textures).
+/// Mojang API profile property (deserializable).
 ///
-/// These are sent in the `PlayerInfo` packet's add_player action
-/// as part of the game profile. The client uses the `textures`
-/// property to download and render the player's skin.
-#[derive(Debug, Clone, Deserialize)]
-pub(crate) struct ProfileProperty {
-    /// Property name (always "textures" for skins).
-    pub name: String,
-    /// Base64-encoded JSON containing the skin/cape URLs.
-    pub value: String,
-    /// Mojang signature for the property (base64-encoded).
+/// Converted to [`basalt_api::ProfileProperty`] after fetching.
+#[derive(Deserialize)]
+struct MojangProperty {
+    name: String,
+    value: String,
     #[serde(default)]
-    pub signature: Option<String>,
+    signature: Option<String>,
+}
+
+impl From<MojangProperty> for ProfileProperty {
+    fn from(p: MojangProperty) -> Self {
+        Self {
+            name: p.name,
+            value: p.value,
+            signature: p.signature,
+        }
+    }
 }
 
 /// Response from the Mojang username-to-UUID API.
@@ -38,7 +44,7 @@ struct ProfileResponse {
     id: String,
     #[allow(dead_code)]
     name: String,
-    properties: Vec<ProfileProperty>,
+    properties: Vec<MojangProperty>,
 }
 
 /// Fetches the skin textures for a player from the Mojang API.
@@ -80,5 +86,5 @@ async fn fetch_skin_inner(
         format!("https://sessionserver.mojang.com/session/minecraft/profile/{uuid}?unsigned=false");
     let profile: ProfileResponse = client.get(&url).send().await?.json().await?;
 
-    Ok(profile.properties)
+    Ok(profile.properties.into_iter().map(Into::into).collect())
 }

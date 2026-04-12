@@ -18,11 +18,13 @@ use basalt_protocol::packets::status::{
 };
 use basalt_protocol::registry_data::build_default_registries;
 
-use crate::context::{EventContext, Response};
-use crate::events::{PlayerJoinedEvent, PlayerLeftEvent};
+use basalt_api::PlayerSnapshot;
+use basalt_api::context::{Response, ServerContext};
+use basalt_api::events::{PlayerJoinedEvent, PlayerLeftEvent};
+
 use crate::play::run_play_loop;
 use crate::player::PlayerState;
-use crate::state::{PlayerHandle, PlayerSnapshot, ServerState};
+use crate::state::{PlayerHandle, ServerState};
 
 /// JSON response for the server list ping.
 const SERVER_STATUS: &str = r#"{
@@ -192,10 +194,17 @@ async fn handle_configuration(
         pitch: player.pitch,
         skin_properties: player.skin_properties.clone(),
     };
-    let join_ctx = EventContext::new(Arc::clone(&state));
+    let world: &basalt_world::World = &state.world;
+    let world: &'static basalt_world::World = unsafe { &*(world as *const _) };
+    let join_ctx = ServerContext::new(
+        world,
+        player.uuid,
+        player.entity_id,
+        player.username.clone(),
+    );
     let mut join_event = PlayerJoinedEvent { info: snapshot };
     state.event_bus.dispatch(&mut join_event, &join_ctx);
-    for response in join_ctx.responses.drain() {
+    for response in join_ctx.drain_responses() {
         if let Response::Broadcast(msg) = response {
             state.broadcast(msg);
         }
@@ -214,14 +223,14 @@ async fn handle_configuration(
 
     // Unregister and dispatch PlayerLeftEvent
     state.unregister_player(&player_uuid);
-    let leave_ctx = EventContext::new(Arc::clone(&state));
+    let leave_ctx = ServerContext::new(world, player_uuid, entity_id, player.username.clone());
     let mut leave_event = PlayerLeftEvent {
         uuid: player_uuid,
         entity_id,
         username: player.username.clone(),
     };
     state.event_bus.dispatch(&mut leave_event, &leave_ctx);
-    for response in leave_ctx.responses.drain() {
+    for response in leave_ctx.drain_responses() {
         if let Response::Broadcast(msg) = response {
             state.broadcast(msg);
         }

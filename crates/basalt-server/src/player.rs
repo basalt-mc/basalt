@@ -7,9 +7,8 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
+use basalt_api::ProfileProperty;
 use basalt_types::{Slot, Uuid};
-
-use crate::skin::ProfileProperty;
 
 /// Number of hotbar slots in the player's inventory.
 const HOTBAR_SIZE: usize = 9;
