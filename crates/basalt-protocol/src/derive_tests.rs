@@ -166,6 +166,50 @@ fn length_prefixed_empty_roundtrip() {
     assert_eq!(decoded, original);
 }
 
+// -- Element VarInt Vec --
+
+/// Tests `#[field(length = "varint", element = "varint")]` which
+/// encodes each element as a VarInt instead of using the default
+/// big-endian i32 encoding.
+#[derive(Debug, PartialEq, Encode, Decode, EncodedSize)]
+struct VarIntArray {
+    #[field(length = "varint", element = "varint")]
+    ids: Vec<i32>,
+}
+
+#[test]
+fn element_varint_roundtrip() {
+    let original = VarIntArray {
+        ids: vec![1, 127, 128, 25565, -1],
+    };
+    let mut buf = Vec::with_capacity(original.encoded_size());
+    original.encode(&mut buf).unwrap();
+    assert_eq!(buf.len(), original.encoded_size());
+
+    // Verify wire format: VarInt(5) + 5 VarInts, NOT 5 * 4-byte i32s
+    // VarInt(1)=1 byte, VarInt(127)=1, VarInt(128)=2, VarInt(25565)=3, VarInt(-1)=5
+    // Total = 1 (length) + 1 + 1 + 2 + 3 + 5 = 13 bytes
+    assert_eq!(buf.len(), 13);
+
+    let mut cursor = buf.as_slice();
+    let decoded = VarIntArray::decode(&mut cursor).unwrap();
+    assert!(cursor.is_empty());
+    assert_eq!(decoded, original);
+}
+
+#[test]
+fn element_varint_empty() {
+    let original = VarIntArray { ids: vec![] };
+    let mut buf = Vec::with_capacity(original.encoded_size());
+    original.encode(&mut buf).unwrap();
+    assert_eq!(buf.len(), 1); // just VarInt(0)
+
+    let mut cursor = buf.as_slice();
+    let decoded = VarIntArray::decode(&mut cursor).unwrap();
+    assert!(cursor.is_empty());
+    assert_eq!(decoded, original);
+}
+
 // -- Rest field --
 
 #[derive(Debug, PartialEq, Encode, Decode, EncodedSize)]
