@@ -54,6 +54,7 @@ pub(crate) async fn run_play_loop(
         z: player.z,
         yaw: player.yaw,
         pitch: player.pitch,
+        skin_properties: player.skin_properties.clone(),
     };
     send_player_info_add(&mut conn, &self_snapshot).await?;
 
@@ -479,9 +480,21 @@ async fn send_player_info_add(
     // Entry UUID
     info.uuid.encode(&mut buf).unwrap();
 
-    // Bit 0 data — add_player: name (String) + properties count (VarInt 0)
+    // Bit 0 data — add_player: name (String) + properties
     info.username.encode(&mut buf).unwrap();
-    VarInt(0).encode(&mut buf).unwrap();
+    VarInt(info.skin_properties.len() as i32)
+        .encode(&mut buf)
+        .unwrap();
+    for prop in &info.skin_properties {
+        prop.name.encode(&mut buf).unwrap();
+        prop.value.encode(&mut buf).unwrap();
+        if let Some(sig) = &prop.signature {
+            true.encode(&mut buf).unwrap();
+            sig.encode(&mut buf).unwrap();
+        } else {
+            false.encode(&mut buf).unwrap();
+        }
+    }
 
     // Bit 1 not set — no chat_session data
 
@@ -534,7 +547,7 @@ mod tests {
     use basalt_types::Uuid;
 
     fn test_player() -> PlayerState {
-        PlayerState::new("Steve".into(), Uuid::default(), 1)
+        PlayerState::new("Steve".into(), Uuid::default(), 1, vec![])
     }
 
     fn test_addr() -> SocketAddr {

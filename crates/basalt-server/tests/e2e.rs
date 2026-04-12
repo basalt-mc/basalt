@@ -346,15 +346,18 @@ async fn connect_to_play_as(addr: std::net::SocketAddr, username: &str, uuid: Uu
     )
     .await;
 
-    // Drain all initial Play packets (Login, SpawnPosition, GameEvent,
-    // Chunk, Position, Welcome + possibly PlayerInfo/SpawnEntity for
-    // existing players). Read until no more packets arrive.
-    while let Ok(Ok(Some(_))) = tokio::time::timeout(
-        std::time::Duration::from_millis(100),
-        framing::read_raw_packet(&mut client),
-    )
-    .await
-    {}
+    // Drain all initial Play packets until we receive the welcome
+    // SystemChat message — it's always the last packet sent during
+    // the join sequence. This avoids fragile timeout-based draining.
+    loop {
+        let raw = framing::read_raw_packet(&mut client)
+            .await
+            .unwrap()
+            .unwrap();
+        if raw.id == ClientboundPlaySystemChat::PACKET_ID {
+            break;
+        }
+    }
 
     client
 }
@@ -611,23 +614,25 @@ async fn e2e_two_players_second_gets_player_info() {
     )
     .await;
 
-    // Read Play packets: Login(5) + PlayerInfo(Alice) + SpawnEntity(Alice) + Welcome = 8
-    // Drain all initial Play packets (chunks, PlayerInfo, SpawnEntity, etc.)
+    // Drain initial Play packets until the welcome SystemChat.
+    // Track whether we see PlayerInfo and SpawnEntity for Alice.
     let mut found_player_info = false;
     let mut found_spawn_entity = false;
     use basalt_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
     use basalt_protocol::packets::play::player::ClientboundPlayPlayerInfo;
-    while let Ok(Ok(Some(raw))) = tokio::time::timeout(
-        std::time::Duration::from_millis(200),
-        framing::read_raw_packet(&mut client2),
-    )
-    .await
-    {
+    loop {
+        let raw = framing::read_raw_packet(&mut client2)
+            .await
+            .unwrap()
+            .unwrap();
         if raw.id == ClientboundPlayPlayerInfo::PACKET_ID {
             found_player_info = true;
         }
         if raw.id == ClientboundPlaySpawnEntity::PACKET_ID {
             found_spawn_entity = true;
+        }
+        if raw.id == ClientboundPlaySystemChat::PACKET_ID {
+            break;
         }
     }
     assert!(
@@ -666,13 +671,15 @@ async fn e2e_chat_broadcast_to_both_players() {
 
     let mut client2 = connect_to_play_as(addr, "Player2", uuid2).await;
 
-    // Drain the PlayerJoined packets that client1 receives
-    // (PlayerInfo + SpawnEntity + join message = 3 packets)
-    for _ in 0..3 {
-        framing::read_raw_packet(&mut client1)
+    // Drain PlayerJoined packets until the "joined the game" SystemChat
+    loop {
+        let raw = framing::read_raw_packet(&mut client1)
             .await
             .unwrap()
             .unwrap();
+        if raw.id == ClientboundPlaySystemChat::PACKET_ID {
+            break;
+        }
     }
 
     // Player 1 sends a chat message

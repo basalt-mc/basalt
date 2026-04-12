@@ -22,6 +22,7 @@ mod connection;
 mod helpers;
 mod play;
 mod player;
+mod skin;
 mod state;
 
 use std::sync::Arc;
