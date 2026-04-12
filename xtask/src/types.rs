@@ -218,3 +218,191 @@ impl ProtocolType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn to_rust_primitives() {
+        assert_eq!(ProtocolType::I8.to_rust(), ("i8".into(), None));
+        assert_eq!(ProtocolType::I16.to_rust(), ("i16".into(), None));
+        assert_eq!(ProtocolType::I32.to_rust(), ("i32".into(), None));
+        assert_eq!(ProtocolType::I64.to_rust(), ("i64".into(), None));
+        assert_eq!(ProtocolType::U8.to_rust(), ("u8".into(), None));
+        assert_eq!(ProtocolType::U16.to_rust(), ("u16".into(), None));
+        assert_eq!(ProtocolType::U32.to_rust(), ("u32".into(), None));
+        assert_eq!(ProtocolType::U64.to_rust(), ("u64".into(), None));
+        assert_eq!(ProtocolType::F32.to_rust(), ("f32".into(), None));
+        assert_eq!(ProtocolType::F64.to_rust(), ("f64".into(), None));
+        assert_eq!(ProtocolType::Bool.to_rust(), ("bool".into(), None));
+        assert_eq!(ProtocolType::String.to_rust(), ("String".into(), None));
+        assert_eq!(ProtocolType::Uuid.to_rust(), ("Uuid".into(), None));
+        assert_eq!(ProtocolType::Position.to_rust(), ("Position".into(), None));
+        assert_eq!(ProtocolType::Slot.to_rust(), ("Slot".into(), None));
+        assert_eq!(ProtocolType::Vec2f.to_rust(), ("Vec2f".into(), None));
+        assert_eq!(ProtocolType::Vec3f.to_rust(), ("Vec3f".into(), None));
+        assert_eq!(ProtocolType::Vec3f64.to_rust(), ("Vec3f64".into(), None));
+        assert_eq!(ProtocolType::Vec3i16.to_rust(), ("Vec3i16".into(), None));
+    }
+
+    #[test]
+    fn to_rust_nbt() {
+        assert_eq!(
+            ProtocolType::NbtCompound.to_rust(),
+            ("NbtCompound".into(), None)
+        );
+        assert_eq!(
+            ProtocolType::OptionalNbt.to_rust(),
+            ("Option<NbtCompound>".into(), Some("optional".into()))
+        );
+    }
+
+    #[test]
+    fn to_rust_wire_encoded() {
+        assert_eq!(
+            ProtocolType::VarInt.to_rust(),
+            ("i32".into(), Some("varint".into()))
+        );
+        assert_eq!(
+            ProtocolType::VarLong.to_rust(),
+            ("i64".into(), Some("varlong".into()))
+        );
+    }
+
+    #[test]
+    fn to_rust_array() {
+        let pt = ProtocolType::Array {
+            count: CountType::VarInt,
+            inner: Box::new(ProtocolType::I32),
+        };
+        assert_eq!(
+            pt.to_rust(),
+            ("Vec<i32>".into(), Some("length = \"varint\"".into()))
+        );
+    }
+
+    #[test]
+    fn to_rust_nested_array_falls_back() {
+        let pt = ProtocolType::Array {
+            count: CountType::VarInt,
+            inner: Box::new(ProtocolType::Array {
+                count: CountType::VarInt,
+                inner: Box::new(ProtocolType::String),
+            }),
+        };
+        assert_eq!(
+            pt.to_rust(),
+            ("Vec<Vec<u8>>".into(), Some("length = \"varint\"".into()))
+        );
+    }
+
+    #[test]
+    fn to_rust_optional() {
+        let pt = ProtocolType::Optional(Box::new(ProtocolType::String));
+        assert_eq!(
+            pt.to_rust(),
+            ("Option<String>".into(), Some("optional".into()))
+        );
+    }
+
+    #[test]
+    fn to_rust_optional_with_complex_inner_falls_back() {
+        let pt = ProtocolType::Optional(Box::new(ProtocolType::Array {
+            count: CountType::VarInt,
+            inner: Box::new(ProtocolType::I32),
+        }));
+        assert_eq!(
+            pt.to_rust(),
+            ("Option<Vec<u8>>".into(), Some("optional".into()))
+        );
+    }
+
+    #[test]
+    fn to_rust_buffer() {
+        assert_eq!(
+            ProtocolType::Buffer(CountType::VarInt).to_rust(),
+            ("Vec<u8>".into(), Some("length = \"varint\"".into()))
+        );
+        assert_eq!(
+            ProtocolType::Buffer(CountType::None).to_rust(),
+            ("Vec<u8>".into(), None)
+        );
+    }
+
+    #[test]
+    fn to_rust_rest() {
+        assert_eq!(
+            ProtocolType::Rest.to_rust(),
+            ("Vec<u8>".into(), Some("rest".into()))
+        );
+    }
+
+    #[test]
+    fn to_rust_bitfield() {
+        assert_eq!(ProtocolType::Bitfield(8).to_rust(), ("u8".into(), None));
+        assert_eq!(ProtocolType::Bitfield(16).to_rust(), ("u16".into(), None));
+        assert_eq!(ProtocolType::Bitfield(32).to_rust(), ("u32".into(), None));
+        assert_eq!(ProtocolType::Bitfield(64).to_rust(), ("u64".into(), None));
+    }
+
+    #[test]
+    fn to_rust_opaque_and_void() {
+        assert_eq!(ProtocolType::Opaque.to_rust(), ("Vec<u8>".into(), None));
+        assert_eq!(ProtocolType::Void.to_rust(), ("__void__".into(), None));
+    }
+
+    #[test]
+    fn to_rust_inline_struct() {
+        let pt = ProtocolType::InlineStruct {
+            name: "MyStruct".into(),
+            fields: vec![],
+        };
+        assert_eq!(pt.to_rust(), ("MyStruct".into(), None));
+    }
+
+    #[test]
+    fn to_rust_switch_enum() {
+        let pt = ProtocolType::SwitchEnum {
+            name: "MyEnum".into(),
+            variants: vec![],
+        };
+        assert_eq!(pt.to_rust(), ("MyEnum".into(), None));
+    }
+
+    #[test]
+    fn needs_derive_imports_check() {
+        assert!(
+            ProtocolType::InlineStruct {
+                name: "X".into(),
+                fields: vec![]
+            }
+            .needs_derive_imports()
+        );
+        assert!(
+            ProtocolType::SwitchEnum {
+                name: "X".into(),
+                variants: vec![]
+            }
+            .needs_derive_imports()
+        );
+        assert!(!ProtocolType::I32.needs_derive_imports());
+    }
+
+    #[test]
+    fn basalt_import_check() {
+        assert_eq!(ProtocolType::Uuid.basalt_import(), Some("Uuid"));
+        assert_eq!(ProtocolType::Position.basalt_import(), Some("Position"));
+        assert_eq!(
+            ProtocolType::NbtCompound.basalt_import(),
+            Some("NbtCompound")
+        );
+        assert_eq!(
+            ProtocolType::OptionalNbt.basalt_import(),
+            Some("NbtCompound")
+        );
+        assert_eq!(ProtocolType::Slot.basalt_import(), Some("Slot"));
+        assert_eq!(ProtocolType::I32.basalt_import(), None);
+        assert_eq!(ProtocolType::VarInt.basalt_import(), None);
+    }
+}

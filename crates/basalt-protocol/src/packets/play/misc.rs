@@ -22,7 +22,6 @@ impl Default for ServerboundPlayAdvancementTabAction {
         }
     }
 }
-
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x30)]
 pub struct ServerboundPlayAdvancementTab {
@@ -179,10 +178,29 @@ pub struct ServerboundPlayUseItem {
 
 /// Inline data structure used by [`ClientboundPlayAdvancements`].
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayAdvancementsAdvancementmappingValue {
+    #[field(optional)]
+    pub parent_id: Option<String>,
+    #[field(optional)]
+    pub display_data: Option<Vec<u8>>,
+    #[field(length = "varint")]
+    pub requirements: Vec<Vec<u8>>,
+    pub sends_telemtry_data: bool,
+}
+
+/// Inline data structure used by [`ClientboundPlayAdvancements`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayAdvancementsAdvancementmapping {
     pub key: String,
-    #[field(length = "varint")]
-    pub value: Vec<u8>,
+    pub value: ClientboundPlayAdvancementsAdvancementmappingValue,
+}
+
+/// Inline data structure used by [`ClientboundPlayAdvancements`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayAdvancementsProgressmappingValue {
+    pub criterion_identifier: String,
+    #[field(optional)]
+    pub criterion_progress: Option<i64>,
 }
 
 /// Inline data structure used by [`ClientboundPlayAdvancements`].
@@ -190,7 +208,7 @@ pub struct ClientboundPlayAdvancementsAdvancementmapping {
 pub struct ClientboundPlayAdvancementsProgressmapping {
     pub key: String,
     #[field(length = "varint")]
-    pub value: Vec<u8>,
+    pub value: Vec<ClientboundPlayAdvancementsProgressmappingValue>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -227,15 +245,22 @@ pub struct ClientboundPlayDebugSample {
 pub struct ClientboundPlayDeclareRecipesRecipes {
     pub name: String,
     #[field(length = "varint")]
-    pub items: Vec<i32>,
+    pub items: Vec<Vec<u8>>,
+}
+
+/// Inline data structure used by [`ClientboundPlayDeclareRecipes`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayDeclareRecipesStonecutterrecipesSlotdisplay {
+    #[field(varint)]
+    pub r#type: i32,
+    pub data: Vec<u8>,
 }
 
 /// Inline data structure used by [`ClientboundPlayDeclareRecipes`].
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayDeclareRecipesStonecutterrecipes {
     pub input: Vec<u8>,
-    #[field(length = "varint")]
-    pub slot_display: Vec<u8>,
+    pub slot_display: ClientboundPlayDeclareRecipesStonecutterrecipesSlotdisplay,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -273,9 +298,30 @@ pub struct ClientboundPlayPingResponse {
 
 /// Inline data structure used by [`ClientboundPlayRecipeBookAdd`].
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayRecipeBookAddEntriesRecipeRecipedisplay {
+    #[field(varint)]
+    pub r#type: i32,
+    pub data: Vec<u8>,
+}
+
+/// Inline data structure used by [`ClientboundPlayRecipeBookAdd`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayRecipeBookAddEntriesRecipe {
+    #[field(varint)]
+    pub display_id: i32,
+    pub display: ClientboundPlayRecipeBookAddEntriesRecipeRecipedisplay,
+    #[field(varint)]
+    pub group: i32,
+    #[field(varint)]
+    pub category: i32,
+    #[field(optional)]
+    pub crafting_requirements: Option<Vec<u8>>,
+}
+
+/// Inline data structure used by [`ClientboundPlayRecipeBookAdd`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayRecipeBookAddEntries {
-    #[field(length = "varint")]
-    pub recipe: Vec<u8>,
+    pub recipe: ClientboundPlayRecipeBookAddEntriesRecipe,
     pub flags: u8,
 }
 
@@ -291,7 +337,7 @@ pub struct ClientboundPlayRecipeBookAdd {
 #[packet(id = 0x45)]
 pub struct ClientboundPlayRecipeBookRemove {
     #[field(length = "varint")]
-    pub recipe_ids: Vec<i32>,
+    pub recipe_ids: Vec<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -397,7 +443,6 @@ impl Default for ClientboundPlayStopSoundFlags {
         }
     }
 }
-
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x71)]
 pub struct ClientboundPlayStopSound {
@@ -406,10 +451,18 @@ pub struct ClientboundPlayStopSound {
 
 /// Inline data structure used by [`ClientboundPlayTags`].
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayTagsTagsTags {
+    pub tag_name: String,
+    #[field(length = "varint")]
+    pub entries: Vec<Vec<u8>>,
+}
+
+/// Inline data structure used by [`ClientboundPlayTags`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayTagsTags {
     pub tag_type: String,
     #[field(length = "varint")]
-    pub tags: Vec<u8>,
+    pub tags: Vec<ClientboundPlayTagsTagsTags>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

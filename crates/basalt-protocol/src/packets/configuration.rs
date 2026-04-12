@@ -104,10 +104,18 @@ pub struct ClientboundConfigurationResetChat;
 
 /// Inline data structure used by [`ClientboundConfigurationTags`].
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundConfigurationTagsTagsTags {
+    pub tag_name: String,
+    #[field(length = "varint")]
+    pub entries: Vec<Vec<u8>>,
+}
+
+/// Inline data structure used by [`ClientboundConfigurationTags`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundConfigurationTagsTags {
     pub tag_type: String,
     #[field(length = "varint")]
-    pub tags: Vec<u8>,
+    pub tags: Vec<ClientboundConfigurationTagsTagsTags>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

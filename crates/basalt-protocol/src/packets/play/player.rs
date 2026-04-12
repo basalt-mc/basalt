@@ -220,6 +220,14 @@ pub struct ClientboundPlayLogin {
     pub enforces_secure_chat: bool,
 }
 
+/// Inline data structure used by [`ClientboundPlayPlayerChat`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayPlayerChatPreviousmessages {
+    #[field(varint)]
+    pub id: i32,
+    pub signature: Vec<u8>,
+}
+
 /// Switch enum used by [`ClientboundPlayPlayerChat`].
 #[derive(Debug, Clone, PartialEq, Encode, Decode, EncodedSize)]
 pub enum ClientboundPlayPlayerChatFiltertype {
@@ -237,15 +245,6 @@ impl Default for ClientboundPlayPlayerChatFiltertype {
         }
     }
 }
-
-/// Inline data structure used by [`ClientboundPlayPlayerChat`].
-#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
-pub struct ClientboundPlayPlayerChatPreviousmessages {
-    #[field(varint)]
-    pub id: i32,
-    pub signature: Vec<u8>,
-}
-
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x3b)]
 pub struct ClientboundPlayPlayerChat {

@@ -80,9 +80,9 @@ pub struct ServerboundPlaySelectTrade {
 #[packet(id = 0x32)]
 pub struct ServerboundPlaySetBeaconEffect {
     #[field(optional)]
-    pub primary_effect: Option<i32>,
+    pub primary_effect: Option<Vec<u8>>,
     #[field(optional)]
-    pub secondary_effect: Option<i32>,
+    pub secondary_effect: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -235,9 +235,29 @@ pub struct ClientboundPlaySetSlot {
 
 /// Inline data structure used by [`ClientboundPlayTradeList`].
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
-pub struct ClientboundPlayTradeListTrades {
+pub struct ClientboundPlayTradeListTradesInputitem1Slotcomponent {
+    #[field(varint)]
+    pub r#type: i32,
+    pub data: Vec<u8>,
+}
+
+/// Inline data structure used by [`ClientboundPlayTradeList`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayTradeListTradesInputitem1 {
+    #[field(varint)]
+    pub item_id: i32,
+    #[field(varint)]
+    pub item_count: i32,
+    #[field(varint)]
+    pub added_component_count: i32,
     #[field(length = "varint")]
-    pub input_item1: Vec<u8>,
+    pub components: Vec<ClientboundPlayTradeListTradesInputitem1Slotcomponent>,
+}
+
+/// Inline data structure used by [`ClientboundPlayTradeList`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayTradeListTrades {
+    pub input_item1: ClientboundPlayTradeListTradesInputitem1,
     pub output_item: Slot,
     #[field(optional)]
     pub input_item2: Option<Vec<u8>>,
