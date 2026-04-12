@@ -1,15 +1,18 @@
 //! Player state tracking.
 //!
 //! Maintains the server-side state for a connected player: position,
-//! rotation, gamemode, and keep-alive tracking. Updated by the play
-//! loop as packets arrive from the client.
+//! rotation, gamemode, inventory, and keep-alive tracking. Updated by
+//! the play loop as packets arrive from the client.
 
 use std::collections::HashSet;
 use std::time::Instant;
 
-use basalt_types::Uuid;
+use basalt_types::{Slot, Uuid};
 
 use crate::skin::ProfileProperty;
+
+/// Number of hotbar slots in the player's inventory.
+const HOTBAR_SIZE: usize = 9;
 
 /// Server-side state for a connected player.
 ///
@@ -47,6 +50,10 @@ pub(crate) struct PlayerState {
     /// Set of chunk coordinates that have been sent to this player.
     /// Used to avoid resending chunks the client already has.
     pub loaded_chunks: HashSet<(i32, i32)>,
+    /// Currently selected hotbar slot (0-8).
+    pub held_slot: u8,
+    /// The 9 hotbar slots. Updated via `SetCreativeSlot` packets.
+    pub hotbar: [Slot; HOTBAR_SIZE],
 }
 
 impl PlayerState {
@@ -73,6 +80,8 @@ impl PlayerState {
             teleport_confirmed: false,
             loaded: false,
             loaded_chunks: HashSet::new(),
+            held_slot: 0,
+            hotbar: std::array::from_fn(|_| Slot::empty()),
         }
     }
 
@@ -95,6 +104,24 @@ impl PlayerState {
     /// at position 0 (LSB).
     pub fn update_on_ground(&mut self, flags: u8) {
         self.on_ground = flags & 0x01 != 0;
+    }
+
+    /// Returns the item the player is currently holding, if any.
+    ///
+    /// Looks up the held slot index in the hotbar array.
+    pub fn held_item(&self) -> &Slot {
+        &self.hotbar[self.held_slot as usize]
+    }
+
+    /// Sets a hotbar slot from a creative inventory packet.
+    ///
+    /// Creative mode slot indices 36-44 map to hotbar slots 0-8.
+    /// Other slot indices are ignored (they refer to non-hotbar
+    /// inventory slots which we don't track).
+    pub fn set_creative_slot(&mut self, slot_index: i16, item: Slot) {
+        if (36..=44).contains(&slot_index) {
+            self.hotbar[(slot_index - 36) as usize] = item;
+        }
     }
 }
 
@@ -152,5 +179,45 @@ mod tests {
         // Ground bit + other bits
         p.update_on_ground(0xFF);
         assert!(p.on_ground);
+    }
+
+    #[test]
+    fn new_player_has_empty_hotbar() {
+        let p = test_player();
+        assert_eq!(p.held_slot, 0);
+        assert!(p.held_item().is_empty());
+        for slot in &p.hotbar {
+            assert!(slot.is_empty());
+        }
+    }
+
+    #[test]
+    fn held_item_reflects_active_slot() {
+        let mut p = test_player();
+        p.hotbar[2] = Slot::new(1, 64); // stone × 64
+        p.held_slot = 2;
+        assert_eq!(p.held_item().item_id, Some(1));
+        assert_eq!(p.held_item().item_count, 64);
+    }
+
+    #[test]
+    fn set_creative_slot_updates_hotbar() {
+        let mut p = test_player();
+        p.set_creative_slot(36, Slot::new(1, 1)); // hotbar slot 0
+        p.set_creative_slot(44, Slot::new(10, 32)); // hotbar slot 8
+        assert_eq!(p.hotbar[0].item_id, Some(1));
+        assert_eq!(p.hotbar[8].item_id, Some(10));
+    }
+
+    #[test]
+    fn set_creative_slot_ignores_non_hotbar() {
+        let mut p = test_player();
+        p.set_creative_slot(0, Slot::new(1, 1));
+        p.set_creative_slot(35, Slot::new(1, 1));
+        p.set_creative_slot(45, Slot::new(1, 1));
+        // All hotbar slots should still be empty
+        for slot in &p.hotbar {
+            assert!(slot.is_empty());
+        }
     }
 }

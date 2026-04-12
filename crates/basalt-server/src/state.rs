@@ -111,6 +111,17 @@ pub(crate) enum BroadcastMessage {
         /// Whether the player is on the ground.
         on_ground: bool,
     },
+    /// A block was modified in the world.
+    BlockChanged {
+        /// Block X coordinate (absolute world coordinates).
+        x: i32,
+        /// Block Y coordinate (absolute world coordinates).
+        y: i32,
+        /// Block Z coordinate (absolute world coordinates).
+        z: i32,
+        /// The new block state ID.
+        block_state: i32,
+    },
 }
 
 impl ServerState {
