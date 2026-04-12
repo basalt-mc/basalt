@@ -40,21 +40,24 @@ basalt-types → basalt-derive → basalt-protocol → basalt-net → basalt-ser
 crates/basalt-server/
 ├── src/
 │   ├── lib.rs           # Server struct, public API, accept loop
+│   ├── state.rs         # ServerState: player registry, entity IDs, broadcast channels
 │   ├── connection.rs    # Per-player lifecycle: handshake → login → config → play
-│   ├── play.rs          # Play loop, packet dispatch (sync) + action execution (async)
+│   ├── play.rs          # Play loop (3-branch select), packet dispatch, broadcast handling
 │   ├── player.rs        # PlayerState: position, rotation, keep-alive tracking
-│   └── chat.rs          # Chat message echo, command dispatch (/say, /tp, /gamemode, /help)
+│   ├── chat.rs          # Chat formatting, command dispatch (/say, /tp, /gamemode, /help)
+│   └── helpers.rs       # angle_to_byte, RawPayload wrapper
 ├── examples/
 │   └── server.rs        # 14-line launcher: Server::new("0.0.0.0:25565").run().await
 └── tests/
-    └── e2e.rs           # End-to-end tests: status ping, login flow, chat, commands
+    └── e2e.rs           # End-to-end tests: status, login, chat, commands, multi-player
 ```
 
-The play loop separates sync and async concerns:
-- `dispatch_packet()` — pure sync function that updates `PlayerState` and returns a `PacketAction` enum
-- `execute_action()` — async function that sends response packets (chat echo, command feedback)
+### Multi-player architecture
 
-This keeps the state-update logic unit-testable without a TCP connection.
+- `ServerState` holds an `Arc`-shared player registry (`RwLock<HashMap<Uuid, PlayerHandle>>`) and an atomic entity ID counter
+- Each player task creates an `mpsc::channel` — the `Sender` goes in the registry, the `Receiver` is polled in the play loop's third `select!` branch
+- `broadcast()` sends to all players, `broadcast_except()` skips the sender (used for movement)
+- The play loop separates sync and async: `dispatch_packet()` returns a `PacketAction` enum, `execute_action()` sends responses and broadcasts
 
 ## Architectural principles
 
@@ -218,6 +221,7 @@ For non-packet types (inline structs, switch enums). Supports both structs and e
 | `varlong` | Encode as VarLong (1-10 bytes) | `i64` fields |
 | `optional` | Boolean-prefixed optional value | `Option<T>` fields |
 | `length = "varint"` | VarInt length prefix for collections | `Vec<T>` fields |
+| `element = "varint"` | Encode each element as VarInt (combine with `length`) | `Vec<i32>` fields |
 | `rest` | Consume all remaining bytes (must be last field) | `Vec<u8>` fields |
 
 All attributes work on both struct fields and enum variant fields.
