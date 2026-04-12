@@ -142,14 +142,40 @@ fn derive_encode_enum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStrea
                     .iter()
                     .map(|f| f.ident.as_ref().unwrap())
                     .collect();
-                let field_encodes: Vec<_> = field_names
+                let field_encodes = fields
+                    .named
                     .iter()
-                    .map(|name| {
-                        quote! {
-                            basalt_types::Encode::encode(#name, buf)?;
-                        }
+                    .map(|f| {
+                        let fname = f.ident.as_ref().unwrap();
+                        let attr = parse_field_attr(&f.attrs)?;
+                        Ok(if attr.varint {
+                            quote! { basalt_types::Encode::encode(&basalt_types::VarInt(*#fname), buf)?; }
+                        } else if attr.optional {
+                            quote! {
+                                match #fname {
+                                    Some(value) => {
+                                        basalt_types::Encode::encode(&true, buf)?;
+                                        basalt_types::Encode::encode(value, buf)?;
+                                    }
+                                    None => {
+                                        basalt_types::Encode::encode(&false, buf)?;
+                                    }
+                                }
+                            }
+                        } else if attr.length_varint {
+                            quote! {
+                                basalt_types::Encode::encode(&basalt_types::VarInt(#fname.len() as i32), buf)?;
+                                for item in #fname {
+                                    basalt_types::Encode::encode(item, buf)?;
+                                }
+                            }
+                        } else if attr.rest {
+                            quote! { buf.extend_from_slice(#fname); }
+                        } else {
+                            quote! { basalt_types::Encode::encode(#fname, buf)?; }
+                        })
                     })
-                    .collect();
+                    .collect::<Result<Vec<_>>>()?;
                 quote! {
                     #name::#variant_name { #(#field_names),* } => {
                         basalt_types::Encode::encode(&basalt_types::VarInt(#id), buf)?;
