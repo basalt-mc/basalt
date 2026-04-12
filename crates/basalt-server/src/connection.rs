@@ -139,6 +139,12 @@ async fn handle_configuration(
     player_uuid: basalt_types::Uuid,
     state: Arc<ServerState>,
 ) -> crate::error::Result<()> {
+    // Start skin fetch in parallel — runs during registry exchange
+    // and FinishConfiguration handshake so it doesn't block the join.
+    let skin_username = username.to_string();
+    let skin_task =
+        tokio::spawn(async move { crate::skin::fetch_skin_properties(&skin_username).await });
+
     let registries = build_default_registries();
     for reg in &registries {
         conn.write_packet_typed(ClientboundConfigurationRegistryData::PACKET_ID, reg)
@@ -149,10 +155,9 @@ async fn handle_configuration(
     let conn = conn.finish_configuration().await?;
     println!("[{addr}] <- FinishConfiguration → Play");
 
-    // Fetch skin textures from Mojang API (non-blocking, best-effort)
-    let skin_properties = crate::skin::fetch_skin_properties(username).await;
+    // Collect skin result — the fetch ran during the config exchange
+    let skin_properties = skin_task.await.unwrap_or_default();
 
-    // Assign a unique entity ID and create player state
     let entity_id = state.next_entity_id();
     let mut player = PlayerState::new(
         username.to_string(),
