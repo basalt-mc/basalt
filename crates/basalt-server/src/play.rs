@@ -27,7 +27,7 @@ use basalt_protocol::packets::play::world::{
     ClientboundPlaySpawnPosition,
 };
 use basalt_types::{Encode, Position, VarInt, Vec3i16};
-use tokio::sync::mpsc;
+use tokio::sync::broadcast;
 
 use crate::helpers::{RawPayload, angle_to_byte};
 use crate::player::PlayerState;
@@ -39,7 +39,7 @@ pub(crate) async fn run_play_loop(
     addr: SocketAddr,
     player: &mut PlayerState,
     state: &Arc<ServerState>,
-    rx: mpsc::Receiver<BroadcastMessage>,
+    rx: broadcast::Receiver<BroadcastMessage>,
     existing_players: &[PlayerSnapshot],
 ) -> crate::error::Result<()> {
     send_initial_world(&mut conn, addr, player).await?;
@@ -181,7 +181,7 @@ async fn play_loop(
     addr: SocketAddr,
     player: &mut PlayerState,
     state: &Arc<ServerState>,
-    mut rx: mpsc::Receiver<BroadcastMessage>,
+    mut rx: broadcast::Receiver<BroadcastMessage>,
 ) -> crate::error::Result<()> {
     let mut keep_alive = tokio::time::interval(std::time::Duration::from_secs(15));
     keep_alive.tick().await;
@@ -216,7 +216,7 @@ async fn play_loop(
                     }
                 }
             }
-            Some(msg) = rx.recv() => {
+            Ok(msg) = rx.recv() => {
                 handle_broadcast(conn, player, msg).await?;
             }
         }
@@ -338,26 +338,21 @@ async fn execute_action(
         PacketAction::Handled => {}
         PacketAction::Chat { username, message } => {
             let content = crate::chat::build_chat_component(&username, &message).to_nbt();
-            state.broadcast(BroadcastMessage::Chat { content }).await;
+            state.broadcast(BroadcastMessage::Chat { content });
         }
         PacketAction::Command { command } => {
             crate::chat::handle_command(conn, player, &command).await?;
         }
         PacketAction::Moved => {
-            state
-                .broadcast_except(
-                    BroadcastMessage::EntityMoved {
-                        entity_id: player.entity_id,
-                        x: player.x,
-                        y: player.y,
-                        z: player.z,
-                        yaw: player.yaw,
-                        pitch: player.pitch,
-                        on_ground: player.on_ground,
-                    },
-                    &player.uuid,
-                )
-                .await;
+            state.broadcast(BroadcastMessage::EntityMoved {
+                entity_id: player.entity_id,
+                x: player.x,
+                y: player.y,
+                z: player.z,
+                yaw: player.yaw,
+                pitch: player.pitch,
+                on_ground: player.on_ground,
+            });
         }
     }
     Ok(())
@@ -379,6 +374,10 @@ async fn handle_broadcast(
                 .await?;
         }
         BroadcastMessage::PlayerJoined { info } => {
+            // Skip our own join message
+            if info.uuid == player.uuid {
+                return Ok(());
+            }
             send_player_info_add(conn, &info).await?;
             send_spawn_entity(conn, &info).await?;
 

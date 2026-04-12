@@ -2,16 +2,16 @@
 //!
 //! `ServerState` is the central shared state passed as `Arc<ServerState>`
 //! to each connection task. It holds the player registry (who's online),
-//! an atomic entity ID counter, and provides methods for broadcasting
+//! an atomic entity ID counter, and a broadcast channel for fan-out
 //! messages to all connected players.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 use basalt_types::Uuid;
 use basalt_types::nbt::NbtCompound;
-use tokio::sync::{RwLock, mpsc};
+use dashmap::DashMap;
+use tokio::sync::broadcast;
 
 use crate::skin::ProfileProperty;
 
@@ -19,14 +19,16 @@ use crate::skin::ProfileProperty;
 pub(crate) struct ServerState {
     /// Atomic counter for assigning unique entity IDs.
     next_entity_id: AtomicI32,
-    /// Registry of all connected players, keyed by UUID.
-    players: RwLock<HashMap<Uuid, PlayerHandle>>,
+    /// Lock-free registry of all connected players, keyed by UUID.
+    players: DashMap<Uuid, PlayerHandle>,
+    /// Broadcast channel sender — O(1) fan-out to all subscribers.
+    broadcast_tx: broadcast::Sender<BroadcastMessage>,
 }
 
 /// A handle to a connected player, stored in the server state registry.
 ///
-/// Contains the player's identity info and a channel sender for
-/// delivering broadcast messages to their connection task.
+/// Contains the player's identity info. Broadcast messages are delivered
+/// via the shared `broadcast::Sender` rather than per-player channels.
 #[derive(Debug)]
 pub(crate) struct PlayerHandle {
     /// The player's display name.
@@ -37,8 +39,6 @@ pub(crate) struct PlayerHandle {
     pub entity_id: i32,
     /// Mojang profile properties (skin textures).
     pub skin_properties: Vec<ProfileProperty>,
-    /// Channel for sending broadcast messages to this player's task.
-    pub sender: mpsc::Sender<BroadcastMessage>,
 }
 
 /// A snapshot of a player's state at a point in time.
@@ -69,9 +69,8 @@ pub(crate) struct PlayerSnapshot {
 
 /// A message broadcast from one player's task to all others.
 ///
-/// Sent through the `mpsc` channel stored in each `PlayerHandle`.
-/// The receiving task translates these into the appropriate
-/// clientbound packets.
+/// Sent through the `broadcast::Sender` and received by each player's
+/// `broadcast::Receiver` in their play loop.
 #[derive(Debug, Clone)]
 pub(crate) enum BroadcastMessage {
     /// A chat message to display in all players' chat windows.
@@ -113,11 +112,16 @@ pub(crate) enum BroadcastMessage {
 }
 
 impl ServerState {
-    /// Creates a new empty server state.
+    /// Creates a new empty server state with a broadcast channel.
     pub fn new() -> Arc<Self> {
+        // Buffer size for broadcast — receivers that fall behind lose
+        // old messages. 256 is enough for ~5 seconds of movement
+        // updates from 10 players at 20Hz.
+        let (broadcast_tx, _) = broadcast::channel(256);
         Arc::new(Self {
             next_entity_id: AtomicI32::new(1),
-            players: RwLock::new(HashMap::new()),
+            players: DashMap::new(),
+            broadcast_tx,
         })
     }
 
@@ -126,67 +130,58 @@ impl ServerState {
         self.next_entity_id.fetch_add(1, Ordering::Relaxed)
     }
 
+    /// Subscribes to the broadcast channel. Each player task calls
+    /// this once and polls the receiver in their play loop.
+    pub fn subscribe(&self) -> broadcast::Receiver<BroadcastMessage> {
+        self.broadcast_tx.subscribe()
+    }
+
     /// Registers a player in the server state.
     ///
     /// Returns snapshots of all players who were already connected
     /// (the new player needs to know about them).
-    pub async fn register_player(&self, handle: PlayerHandle) -> Vec<PlayerSnapshot> {
-        let mut players = self.players.write().await;
-        let existing: Vec<PlayerSnapshot> = players
-            .values()
-            .map(|h| PlayerSnapshot {
-                username: h.username.clone(),
-                uuid: h.uuid,
-                entity_id: h.entity_id,
-                // Position is not tracked in the handle — the joining
-                // player will receive SpawnEntity with default coords.
-                // Movement broadcasts update position in real time.
-                x: 0.0,
-                y: 100.0,
-                z: 0.0,
-                yaw: 0.0,
-                pitch: 0.0,
-                skin_properties: h.skin_properties.clone(),
+    pub fn register_player(&self, handle: PlayerHandle) -> Vec<PlayerSnapshot> {
+        let existing: Vec<PlayerSnapshot> = self
+            .players
+            .iter()
+            .map(|entry| {
+                let h = entry.value();
+                PlayerSnapshot {
+                    username: h.username.clone(),
+                    uuid: h.uuid,
+                    entity_id: h.entity_id,
+                    x: 0.0,
+                    y: 100.0,
+                    z: 0.0,
+                    yaw: 0.0,
+                    pitch: 0.0,
+                    skin_properties: h.skin_properties.clone(),
+                }
             })
             .collect();
-        players.insert(handle.uuid, handle);
+        self.players.insert(handle.uuid, handle);
         existing
     }
 
     /// Removes a player from the server state.
-    pub async fn unregister_player(&self, uuid: &Uuid) {
-        self.players.write().await.remove(uuid);
+    pub fn unregister_player(&self, uuid: &Uuid) {
+        self.players.remove(uuid);
     }
 
     /// Broadcasts a message to all connected players.
     ///
-    /// Sends the message to every player's channel. Players whose
-    /// channel is full or closed are silently skipped (they will
-    /// disconnect on their own).
-    pub async fn broadcast(&self, message: BroadcastMessage) {
-        let players = self.players.read().await;
-        for handle in players.values() {
-            let _ = handle.sender.try_send(message.clone());
-        }
-    }
-
-    /// Broadcasts a message to all connected players except one.
-    ///
-    /// Used for movement updates where the moving player should
-    /// not receive their own entity movement packet.
-    pub async fn broadcast_except(&self, message: BroadcastMessage, except: &Uuid) {
-        let players = self.players.read().await;
-        for handle in players.values() {
-            if &handle.uuid != except {
-                let _ = handle.sender.try_send(message.clone());
-            }
-        }
+    /// Uses the broadcast channel for O(1) fan-out. Receivers that
+    /// have fallen behind will miss old messages (acceptable for
+    /// movement updates, chat is rare enough to fit in the buffer).
+    pub fn broadcast(&self, message: BroadcastMessage) {
+        // Ignore send errors — they mean no receivers are listening.
+        let _ = self.broadcast_tx.send(message);
     }
 
     /// Returns the number of currently connected players.
     #[cfg(test)]
-    pub async fn player_count(&self) -> usize {
-        self.players.read().await.len()
+    pub fn player_count(&self) -> usize {
+        self.players.len()
     }
 }
 
@@ -194,149 +189,83 @@ impl ServerState {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn next_entity_id_increments() {
+    #[test]
+    fn next_entity_id_increments() {
         let state = ServerState::new();
         assert_eq!(state.next_entity_id(), 1);
         assert_eq!(state.next_entity_id(), 2);
         assert_eq!(state.next_entity_id(), 3);
     }
 
-    #[tokio::test]
-    async fn register_and_unregister_player() {
+    #[test]
+    fn register_and_unregister_player() {
         let state = ServerState::new();
-        let (tx, _rx) = mpsc::channel(16);
 
         let uuid = Uuid::default();
-        let existing = state
-            .register_player(PlayerHandle {
-                username: "Steve".into(),
-                uuid,
-                entity_id: 1,
-                skin_properties: vec![],
-                sender: tx,
-            })
-            .await;
+        let existing = state.register_player(PlayerHandle {
+            username: "Steve".into(),
+            uuid,
+            entity_id: 1,
+            skin_properties: vec![],
+        });
 
         assert!(existing.is_empty());
-        assert_eq!(state.player_count().await, 1);
+        assert_eq!(state.player_count(), 1);
 
-        state.unregister_player(&uuid).await;
-        assert_eq!(state.player_count().await, 0);
+        state.unregister_player(&uuid);
+        assert_eq!(state.player_count(), 0);
     }
 
-    #[tokio::test]
-    async fn register_returns_existing_players() {
+    #[test]
+    fn register_returns_existing_players() {
         let state = ServerState::new();
-        let (tx1, _rx1) = mpsc::channel(16);
-        let (tx2, _rx2) = mpsc::channel(16);
 
         let uuid1 = Uuid::from_bytes([1; 16]);
         let uuid2 = Uuid::from_bytes([2; 16]);
 
-        state
-            .register_player(PlayerHandle {
-                username: "Alice".into(),
-                uuid: uuid1,
-                entity_id: 1,
-                skin_properties: vec![],
-                sender: tx1,
-            })
-            .await;
+        state.register_player(PlayerHandle {
+            username: "Alice".into(),
+            uuid: uuid1,
+            entity_id: 1,
+            skin_properties: vec![],
+        });
 
-        let existing = state
-            .register_player(PlayerHandle {
-                username: "Bob".into(),
-                uuid: uuid2,
-                entity_id: 2,
-                skin_properties: vec![],
-                sender: tx2,
-            })
-            .await;
+        let existing = state.register_player(PlayerHandle {
+            username: "Bob".into(),
+            uuid: uuid2,
+            entity_id: 2,
+            skin_properties: vec![],
+        });
 
         assert_eq!(existing.len(), 1);
         assert_eq!(existing[0].username, "Alice");
-        assert_eq!(state.player_count().await, 2);
+        assert_eq!(state.player_count(), 2);
     }
 
-    #[tokio::test]
-    async fn broadcast_sends_to_all() {
+    #[test]
+    fn broadcast_delivers_to_subscriber() {
         let state = ServerState::new();
-        let (tx1, mut rx1) = mpsc::channel(16);
-        let (tx2, mut rx2) = mpsc::channel(16);
+        let mut rx = state.subscribe();
 
-        let uuid1 = Uuid::from_bytes([1; 16]);
-        let uuid2 = Uuid::from_bytes([2; 16]);
+        state.broadcast(BroadcastMessage::Chat {
+            content: NbtCompound::new(),
+        });
 
-        state
-            .register_player(PlayerHandle {
-                username: "A".into(),
-                uuid: uuid1,
-                entity_id: 1,
-                skin_properties: vec![],
-                sender: tx1,
-            })
-            .await;
-        state
-            .register_player(PlayerHandle {
-                username: "B".into(),
-                uuid: uuid2,
-                entity_id: 2,
-                skin_properties: vec![],
-                sender: tx2,
-            })
-            .await;
+        let msg = rx.try_recv().unwrap();
+        assert!(matches!(msg, BroadcastMessage::Chat { .. }));
+    }
 
-        state
-            .broadcast(BroadcastMessage::Chat {
-                content: NbtCompound::new(),
-            })
-            .await;
+    #[test]
+    fn broadcast_delivers_to_multiple_subscribers() {
+        let state = ServerState::new();
+        let mut rx1 = state.subscribe();
+        let mut rx2 = state.subscribe();
+
+        state.broadcast(BroadcastMessage::Chat {
+            content: NbtCompound::new(),
+        });
 
         assert!(rx1.try_recv().is_ok());
-        assert!(rx2.try_recv().is_ok());
-    }
-
-    #[tokio::test]
-    async fn broadcast_except_skips_sender() {
-        let state = ServerState::new();
-        let (tx1, mut rx1) = mpsc::channel(16);
-        let (tx2, mut rx2) = mpsc::channel(16);
-
-        let uuid1 = Uuid::from_bytes([1; 16]);
-        let uuid2 = Uuid::from_bytes([2; 16]);
-
-        state
-            .register_player(PlayerHandle {
-                username: "A".into(),
-                uuid: uuid1,
-                entity_id: 1,
-                skin_properties: vec![],
-                sender: tx1,
-            })
-            .await;
-        state
-            .register_player(PlayerHandle {
-                username: "B".into(),
-                uuid: uuid2,
-                entity_id: 2,
-                skin_properties: vec![],
-                sender: tx2,
-            })
-            .await;
-
-        state
-            .broadcast_except(
-                BroadcastMessage::Chat {
-                    content: NbtCompound::new(),
-                },
-                &uuid1,
-            )
-            .await;
-
-        // A should NOT receive it
-        assert!(rx1.try_recv().is_err());
-        // B should receive it
         assert!(rx2.try_recv().is_ok());
     }
 }

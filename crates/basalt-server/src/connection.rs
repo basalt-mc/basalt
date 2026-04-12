@@ -17,7 +17,6 @@ use basalt_protocol::packets::status::{
     ClientboundStatusPing, ClientboundStatusServerInfo, ServerboundStatusPacket,
 };
 use basalt_protocol::registry_data::build_default_registries;
-use tokio::sync::mpsc;
 
 use crate::play::run_play_loop;
 use crate::player::PlayerState;
@@ -166,21 +165,20 @@ async fn handle_configuration(
         skin_properties,
     );
 
-    // Create the broadcast channel for this player
-    let (tx, rx) = mpsc::channel::<BroadcastMessage>(64);
+    // Subscribe to broadcast channel before registering so we don't
+    // miss our own join notification (we filter it in the play loop).
+    let broadcast_rx = state.subscribe();
 
     // Register in the server state — get the list of existing players
-    let existing_players = state
-        .register_player(PlayerHandle {
-            username: username.to_string(),
-            uuid: player_uuid,
-            entity_id,
-            skin_properties: player.skin_properties.clone(),
-            sender: tx,
-        })
-        .await;
+    let existing_players = state.register_player(PlayerHandle {
+        username: username.to_string(),
+        uuid: player_uuid,
+        entity_id,
+        skin_properties: player.skin_properties.clone(),
+    });
 
-    // Notify existing players that this player joined
+    // Notify all players (including ourselves) that we joined.
+    // Our play loop will filter out our own join message.
     let snapshot = PlayerSnapshot {
         username: player.username.clone(),
         uuid: player.uuid,
@@ -192,25 +190,26 @@ async fn handle_configuration(
         pitch: player.pitch,
         skin_properties: player.skin_properties.clone(),
     };
-    state
-        .broadcast_except(
-            BroadcastMessage::PlayerJoined { info: snapshot },
-            &player_uuid,
-        )
-        .await;
+    state.broadcast(BroadcastMessage::PlayerJoined { info: snapshot });
 
     // Run the play loop — this blocks until the player disconnects
-    let result = run_play_loop(conn, addr, &mut player, &state, rx, &existing_players).await;
+    let result = run_play_loop(
+        conn,
+        addr,
+        &mut player,
+        &state,
+        broadcast_rx,
+        &existing_players,
+    )
+    .await;
 
     // Unregister and notify others
-    state.unregister_player(&player_uuid).await;
-    state
-        .broadcast(BroadcastMessage::PlayerLeft {
-            uuid: player_uuid,
-            entity_id,
-            username: player.username.clone(),
-        })
-        .await;
+    state.unregister_player(&player_uuid);
+    state.broadcast(BroadcastMessage::PlayerLeft {
+        uuid: player_uuid,
+        entity_id,
+        username: player.username.clone(),
+    });
 
     result
 }
