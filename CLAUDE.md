@@ -56,11 +56,20 @@ Server features are implemented as plugin handlers registered on the event bus. 
 crates/basalt-server/
 ├── src/
 │   ├── lib.rs           # Server struct, public API, accept loop
-│   ├── state.rs         # ServerState: player registry, entity IDs, broadcast channels
+│   ├── state.rs         # ServerState: player registry, entity IDs, broadcast, EventBus
 │   ├── connection.rs    # Per-player lifecycle: handshake → login → config → play
-│   ├── play.rs          # Play loop (3-branch select), packet dispatch, broadcast handling
-│   ├── player.rs        # PlayerState: position, rotation, keep-alive tracking
-│   ├── chat.rs          # Chat formatting, command dispatch (/say, /tp, /gamemode, /help)
+│   ├── play.rs          # Play loop: packet_to_event → dispatch → execute_responses
+│   ├── events.rs        # Concrete event types (BlockBroken, PlayerMoved, Chat, etc.)
+│   ├── context.rs       # EventContext, ResponseQueue, Response enum
+│   ├── handlers/
+│   │   ├── mod.rs       # register_all() — registers all plugin handlers
+│   │   ├── lifecycle.rs # LifecycleHandler: join/leave broadcasts
+│   │   ├── chat.rs      # ChatHandler: commands + chat broadcast
+│   │   ├── movement.rs  # PlayerInputHandler: movement broadcast
+│   │   ├── world.rs     # WorldHandler: chunk streaming on boundary crossing
+│   │   └── block.rs     # BlockInteractionHandler: world mutation + block broadcasts
+│   ├── player.rs        # PlayerState: position, rotation, inventory, keep-alive
+│   ├── chat.rs          # Chat formatting helpers (build_chat_component, send_welcome)
 │   └── helpers.rs       # angle_to_byte, RawPayload wrapper
 ├── examples/
 │   └── server.rs        # 14-line launcher: Server::new("0.0.0.0:25565").run().await
@@ -68,12 +77,30 @@ crates/basalt-server/
     └── e2e.rs           # End-to-end tests: status, login, chat, commands, multi-player
 ```
 
+### Event-driven architecture
+
+- `ServerState` holds the `EventBus` alongside the player registry, broadcast channel, and `World`
+- Packets are converted to typed events via `packet_to_event()`, dispatched through staged handlers, and responses executed asynchronously via `execute_responses()`
+- Handlers are sync (no connection access). They queue async work through `ResponseQueue` using `Response` enum variants (Broadcast, SendBlockAck, StreamChunks, etc.)
+- 5 built-in handler plugins, each with a `register(&mut EventBus)` method:
+
+| Plugin | Events | Stages |
+|--------|--------|--------|
+| `LifecycleHandler` | PlayerJoined, PlayerLeft | Post: broadcast |
+| `ChatHandler` | ChatMessage, Command | Process: execute commands, Post: broadcast chat |
+| `PlayerInputHandler` | PlayerMoved | Post: broadcast movement |
+| `WorldHandler` | PlayerMoved | Process: chunk streaming |
+| `BlockInteractionHandler` | BlockBroken, BlockPlaced | Process: world mutation, Post: ack + broadcast |
+
+- Plugins are registered at startup via `register_all()`. Future: config-driven registration for composable server profiles (auth, lobby, game)
+- Non-event packets (keep-alive, teleport confirm, inventory updates) stay inline in the play loop
+
 ### Multi-player architecture
 
-- `ServerState` holds a `DashMap` player registry (lock-free), an atomic entity ID counter, a `tokio::sync::broadcast` channel, and the `World`
+- `ServerState` holds a `DashMap` player registry (lock-free), an atomic entity ID counter, a `tokio::sync::broadcast` channel, the `World`, and the `EventBus`
 - Each player subscribes to the broadcast channel on join and polls it in the play loop's third `select!` branch
 - `broadcast()` is O(1) fan-out — receivers filter their own messages (join, movement)
-- The play loop separates sync and async: `dispatch_packet()` returns a `PacketAction` enum, `execute_action()` sends responses via `PacketContext`
+- Join/leave lifecycle is dispatched through the event bus; handlers queue broadcast responses
 
 ### basalt-world architecture
 
