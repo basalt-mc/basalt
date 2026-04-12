@@ -236,8 +236,8 @@ async fn e2e_server_handles_teleport_confirm() {
     )
     .await;
 
-    // Read all initial Play packets (Login, SpawnPosition, GameEvent, Chunk, Position)
-    for _ in 0..5 {
+    // Read all initial Play packets (Login, SpawnPosition, GameEvent, Chunk, Position, Welcome)
+    for _ in 0..6 {
         framing::read_raw_packet(&mut client)
             .await
             .unwrap()
@@ -285,4 +285,264 @@ async fn e2e_server_handles_teleport_confirm() {
 
     // Small delay to let the server log the disconnect
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+}
+
+/// Helper: connects a client and fast-tracks through to Play state.
+/// Returns the client stream positioned right after all initial Play
+/// packets have been consumed (Login, SpawnPosition, GameEvent, Chunk,
+/// Position, Welcome message).
+async fn connect_to_play(addr: std::net::SocketAddr) -> TcpStream {
+    let mut client = TcpStream::connect(addr).await.unwrap();
+    client_handshake(&mut client, addr.port(), 2).await;
+
+    use basalt_protocol::packets::login::{
+        ServerboundLoginLoginAcknowledged, ServerboundLoginLoginStart,
+    };
+    send_packet(
+        &mut client,
+        ServerboundLoginLoginStart::PACKET_ID,
+        &ServerboundLoginLoginStart {
+            username: "ChatTester".into(),
+            player_uuid: Uuid::default(),
+        },
+    )
+    .await;
+
+    // LoginSuccess
+    let _: (_, ClientboundLoginSuccess) = recv_packet(&mut client).await;
+
+    // LoginAcknowledged
+    send_packet(
+        &mut client,
+        ServerboundLoginLoginAcknowledged::PACKET_ID,
+        &ServerboundLoginLoginAcknowledged,
+    )
+    .await;
+
+    // Read Config packets until FinishConfiguration
+    loop {
+        let raw = framing::read_raw_packet(&mut client)
+            .await
+            .unwrap()
+            .unwrap();
+        use basalt_protocol::packets::configuration::ClientboundConfigurationFinishConfiguration;
+        if raw.id == ClientboundConfigurationFinishConfiguration::PACKET_ID {
+            break;
+        }
+    }
+
+    // Send FinishConfiguration ack
+    use basalt_protocol::packets::configuration::ServerboundConfigurationFinishConfiguration;
+    send_packet(
+        &mut client,
+        ServerboundConfigurationFinishConfiguration::PACKET_ID,
+        &ServerboundConfigurationFinishConfiguration,
+    )
+    .await;
+
+    // Read initial Play packets (Login, SpawnPosition, GameEvent, Chunk,
+    // Position, Welcome message = 6 packets)
+    for _ in 0..6 {
+        framing::read_raw_packet(&mut client)
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
+    client
+}
+
+// -- Chat tests --
+
+#[tokio::test]
+async fn e2e_server_chat_message_echoed() {
+    let addr = spawn_server().await;
+    let mut client = connect_to_play(addr).await;
+
+    // Send a chat message
+    use basalt_protocol::packets::play::chat::ServerboundPlayChatMessage;
+    send_packet(
+        &mut client,
+        ServerboundPlayChatMessage::PACKET_ID,
+        &ServerboundPlayChatMessage {
+            message: "hello world".into(),
+            timestamp: 0,
+            salt: 0,
+            signature: None,
+            offset: 0,
+            acknowledged: vec![],
+        },
+    )
+    .await;
+
+    // Read the SystemChat response
+    use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
+    let (id, _response): (_, ClientboundPlaySystemChat) = recv_packet(&mut client).await;
+    assert_eq!(id, ClientboundPlaySystemChat::PACKET_ID);
+    // The response contains an NbtCompound with the formatted message
+}
+
+#[tokio::test]
+async fn e2e_server_command_help() {
+    let addr = spawn_server().await;
+    let mut client = connect_to_play(addr).await;
+
+    // Send /help command
+    use basalt_protocol::packets::play::chat::ServerboundPlayChatCommand;
+    send_packet(
+        &mut client,
+        ServerboundPlayChatCommand::PACKET_ID,
+        &ServerboundPlayChatCommand {
+            command: "help".into(),
+        },
+    )
+    .await;
+
+    // Read the SystemChat response with help text
+    use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
+    let (id, _response): (_, ClientboundPlaySystemChat) = recv_packet(&mut client).await;
+    assert_eq!(id, ClientboundPlaySystemChat::PACKET_ID);
+}
+
+#[tokio::test]
+async fn e2e_server_command_unknown() {
+    let addr = spawn_server().await;
+    let mut client = connect_to_play(addr).await;
+
+    // Send unknown command
+    use basalt_protocol::packets::play::chat::ServerboundPlayChatCommand;
+    send_packet(
+        &mut client,
+        ServerboundPlayChatCommand::PACKET_ID,
+        &ServerboundPlayChatCommand {
+            command: "doesnotexist".into(),
+        },
+    )
+    .await;
+
+    // Read error response
+    use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
+    let (id, _response): (_, ClientboundPlaySystemChat) = recv_packet(&mut client).await;
+    assert_eq!(id, ClientboundPlaySystemChat::PACKET_ID);
+}
+
+#[tokio::test]
+async fn e2e_server_command_say() {
+    let addr = spawn_server().await;
+    let mut client = connect_to_play(addr).await;
+
+    use basalt_protocol::packets::play::chat::{
+        ClientboundPlaySystemChat, ServerboundPlayChatCommand,
+    };
+    send_packet(
+        &mut client,
+        ServerboundPlayChatCommand::PACKET_ID,
+        &ServerboundPlayChatCommand {
+            command: "say hello everyone".into(),
+        },
+    )
+    .await;
+
+    let (id, _): (_, ClientboundPlaySystemChat) = recv_packet(&mut client).await;
+    assert_eq!(id, ClientboundPlaySystemChat::PACKET_ID);
+}
+
+#[tokio::test]
+async fn e2e_server_command_tp() {
+    let addr = spawn_server().await;
+    let mut client = connect_to_play(addr).await;
+
+    use basalt_protocol::packets::play::chat::{
+        ClientboundPlaySystemChat, ServerboundPlayChatCommand,
+    };
+
+    // Valid tp
+    send_packet(
+        &mut client,
+        ServerboundPlayChatCommand::PACKET_ID,
+        &ServerboundPlayChatCommand {
+            command: "tp 10 200 -30".into(),
+        },
+    )
+    .await;
+
+    // Read PlayerPosition packet (teleport) + SystemChat feedback
+    use basalt_protocol::packets::play::player::ClientboundPlayPosition;
+    let (id, pos): (_, ClientboundPlayPosition) = recv_packet(&mut client).await;
+    assert_eq!(id, ClientboundPlayPosition::PACKET_ID);
+    assert_eq!(pos.x, 10.0);
+    assert_eq!(pos.y, 200.0);
+    assert_eq!(pos.z, -30.0);
+
+    let (id, _): (_, ClientboundPlaySystemChat) = recv_packet(&mut client).await;
+    assert_eq!(id, ClientboundPlaySystemChat::PACKET_ID);
+
+    // Invalid tp (wrong args)
+    send_packet(
+        &mut client,
+        ServerboundPlayChatCommand::PACKET_ID,
+        &ServerboundPlayChatCommand {
+            command: "tp 10".into(),
+        },
+    )
+    .await;
+
+    let (id, _): (_, ClientboundPlaySystemChat) = recv_packet(&mut client).await;
+    assert_eq!(id, ClientboundPlaySystemChat::PACKET_ID);
+
+    // Invalid tp (bad number)
+    send_packet(
+        &mut client,
+        ServerboundPlayChatCommand::PACKET_ID,
+        &ServerboundPlayChatCommand {
+            command: "tp abc 0 0".into(),
+        },
+    )
+    .await;
+
+    let (id, _): (_, ClientboundPlaySystemChat) = recv_packet(&mut client).await;
+    assert_eq!(id, ClientboundPlaySystemChat::PACKET_ID);
+}
+
+#[tokio::test]
+async fn e2e_server_command_gamemode() {
+    let addr = spawn_server().await;
+    let mut client = connect_to_play(addr).await;
+
+    use basalt_protocol::packets::play::chat::{
+        ClientboundPlaySystemChat, ServerboundPlayChatCommand,
+    };
+
+    // Valid gamemode
+    send_packet(
+        &mut client,
+        ServerboundPlayChatCommand::PACKET_ID,
+        &ServerboundPlayChatCommand {
+            command: "gamemode survival".into(),
+        },
+    )
+    .await;
+
+    // Read GameStateChange + SystemChat feedback
+    use basalt_protocol::packets::play::player::ClientboundPlayGameStateChange;
+    let (id, event): (_, ClientboundPlayGameStateChange) = recv_packet(&mut client).await;
+    assert_eq!(id, ClientboundPlayGameStateChange::PACKET_ID);
+    assert_eq!(event.reason, 3); // change game mode
+    assert_eq!(event.game_mode, 0.0); // survival
+
+    let (id, _): (_, ClientboundPlaySystemChat) = recv_packet(&mut client).await;
+    assert_eq!(id, ClientboundPlaySystemChat::PACKET_ID);
+
+    // Invalid gamemode
+    send_packet(
+        &mut client,
+        ServerboundPlayChatCommand::PACKET_ID,
+        &ServerboundPlayChatCommand {
+            command: "gamemode invalid".into(),
+        },
+    )
+    .await;
+
+    let (id, _): (_, ClientboundPlaySystemChat) = recv_packet(&mut client).await;
+    assert_eq!(id, ClientboundPlaySystemChat::PACKET_ID);
 }

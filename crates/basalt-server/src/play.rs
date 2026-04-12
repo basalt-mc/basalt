@@ -34,6 +34,7 @@ pub(crate) async fn run_play_loop(
     player: &mut PlayerState,
 ) -> basalt_net::Result<()> {
     send_initial_world(&mut conn, addr, player).await?;
+    crate::chat::send_welcome(&mut conn, &player.username).await?;
 
     println!(
         "[{addr}] {} joined the void world! Starting play loop.",
@@ -156,7 +157,10 @@ async fn play_loop(
             }
             result = conn.read_packet() => {
                 match result {
-                    Ok(packet) => dispatch_packet(addr, player, packet),
+                    Ok(packet) => {
+                        let action = dispatch_packet(addr, player, packet);
+                        execute_action(conn, player, action).await?;
+                    }
                     Err(e) => {
                         println!("[{addr}] {} disconnected: {e}", player.username);
                         break;
@@ -169,16 +173,30 @@ async fn play_loop(
     Ok(())
 }
 
-/// Dispatches a single serverbound Play packet to the appropriate handler.
+/// Result of dispatching a packet synchronously.
 ///
-/// This is a pure function that updates `PlayerState` without any IO.
-/// Packets that require sending a response (chat, commands) will return
-/// an action in a future iteration; for now they are logged.
+/// Most packets only update `PlayerState` and return `Handled`. Packets
+/// that need async IO (chat, commands) return an action that the caller
+/// executes with the connection.
+pub(crate) enum PacketAction {
+    /// Packet was fully handled (state updated, logged).
+    Handled,
+    /// A chat message that needs to be echoed back.
+    Chat { username: String, message: String },
+    /// A command that needs to be executed.
+    Command { command: String },
+}
+
+/// Dispatches a single serverbound Play packet synchronously.
+///
+/// Updates `PlayerState` for movement, keep-alive, teleport confirm,
+/// and player loaded packets. Returns a `PacketAction` for packets
+/// that require async IO (chat and commands).
 pub(crate) fn dispatch_packet(
     addr: SocketAddr,
     player: &mut PlayerState,
     packet: ServerboundPlayPacket,
-) {
+) -> PacketAction {
     match packet {
         // -- Keep-alive --
         ServerboundPlayPacket::KeepAlive(ka) => {
@@ -195,6 +213,7 @@ pub(crate) fn dispatch_packet(
                     player.username, player.last_keep_alive_id, ka.keep_alive_id
                 );
             }
+            PacketAction::Handled
         }
 
         // -- Teleport confirm --
@@ -204,41 +223,56 @@ pub(crate) fn dispatch_packet(
                 player.username, tc.teleport_id
             );
             player.teleport_confirmed = true;
+            PacketAction::Handled
         }
 
         // -- Player loaded --
         ServerboundPlayPacket::PlayerLoaded(_) => {
             println!("[{addr}] {} finished loading", player.username);
             player.loaded = true;
+            PacketAction::Handled
         }
 
         // -- Movement --
         ServerboundPlayPacket::Position(p) => {
             player.update_position(p.x, p.y, p.z);
             player.update_on_ground(p.flags);
+            PacketAction::Handled
         }
         ServerboundPlayPacket::PositionLook(p) => {
             player.update_position(p.x, p.y, p.z);
             player.update_look(p.yaw, p.pitch);
             player.update_on_ground(p.flags);
+            PacketAction::Handled
         }
         ServerboundPlayPacket::Look(p) => {
             player.update_look(p.yaw, p.pitch);
             player.update_on_ground(p.flags);
+            PacketAction::Handled
         }
         ServerboundPlayPacket::Flying(p) => {
             player.update_on_ground(p.flags);
+            PacketAction::Handled
         }
 
-        // -- Chat (logged for now, handled in #52) --
+        // -- Chat --
         ServerboundPlayPacket::ChatMessage(msg) => {
             println!("[{addr}] <{}> {}", player.username, msg.message);
+            PacketAction::Chat {
+                username: player.username.clone(),
+                message: msg.message,
+            }
         }
+
+        // -- Commands --
         ServerboundPlayPacket::ChatCommand(cmd) => {
             println!(
                 "[{addr}] {} issued command: /{}",
                 player.username, cmd.command
             );
+            PacketAction::Command {
+                command: cmd.command,
+            }
         }
 
         // -- Client settings / plugin channels (acknowledged silently) --
@@ -248,9 +282,7 @@ pub(crate) fn dispatch_packet(
         | ServerboundPlayPacket::ChunkBatchReceived(_)
         | ServerboundPlayPacket::Pong(_)
         | ServerboundPlayPacket::MessageAcknowledgement(_)
-        | ServerboundPlayPacket::ConfigurationAcknowledged(_) => {
-            // Expected protocol traffic — handle silently
-        }
+        | ServerboundPlayPacket::ConfigurationAcknowledged(_) => PacketAction::Handled,
 
         // -- Everything else --
         other => {
@@ -259,8 +291,27 @@ pub(crate) fn dispatch_packet(
                 player.username,
                 std::mem::discriminant(&other)
             );
+            PacketAction::Handled
         }
     }
+}
+
+/// Executes the async part of a packet action (chat echo, command dispatch).
+async fn execute_action(
+    conn: &mut Connection<Play>,
+    player: &mut PlayerState,
+    action: PacketAction,
+) -> basalt_net::Result<()> {
+    match action {
+        PacketAction::Handled => {}
+        PacketAction::Chat { username, message } => {
+            crate::chat::handle_chat_message(conn, &username, &message).await?;
+        }
+        PacketAction::Command { command } => {
+            crate::chat::handle_command(conn, player, &command).await?;
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

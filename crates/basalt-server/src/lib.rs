@@ -17,6 +17,7 @@
 //! }
 //! ```
 
+mod chat;
 mod connection;
 mod play;
 mod player;
