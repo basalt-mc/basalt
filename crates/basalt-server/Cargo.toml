@@ -8,6 +8,7 @@ repository.workspace = true
 [dependencies]
 basalt-types = { workspace = true }
 basalt-protocol = { workspace = true }
+basalt-events = { workspace = true }
 basalt-net = { workspace = true }
 basalt-world = { workspace = true }
 tokio = { workspace = true }

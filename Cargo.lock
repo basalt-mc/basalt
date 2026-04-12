@@ -98,6 +98,7 @@ dependencies = [
 name = "basalt-server"
 version = "0.1.0"
 dependencies = [
+ "basalt-events",
  "basalt-net",
  "basalt-protocol",
  "basalt-types",

@@ -19,8 +19,10 @@
 
 mod chat;
 mod connection;
+pub(crate) mod context;
 pub mod error;
-mod handler;
+pub(crate) mod events;
+mod handlers;
 mod helpers;
 mod play;
 mod player;
