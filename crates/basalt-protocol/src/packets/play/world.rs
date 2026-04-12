@@ -123,6 +123,14 @@ pub struct ClientboundPlayChunkBiomes {
     pub biomes: Vec<ClientboundPlayChunkBiomesBiomes>,
 }
 
+/// Inline data structure used by [`ClientboundPlayExplosion`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayExplosionParticle {
+    #[field(varint)]
+    pub r#type: i32,
+    pub data: Vec<u8>,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x21)]
 pub struct ClientboundPlayExplosion {
@@ -131,7 +139,8 @@ pub struct ClientboundPlayExplosion {
     pub z: f64,
     #[field(optional)]
     pub player_knockback: Option<Vec3f64>,
-    pub explosion_particle: Vec<u8>,
+    pub explosion_particle: ClientboundPlayExplosionParticle,
+    #[field(rest)]
     pub sound: Vec<u8>,
 }
 
@@ -168,6 +177,17 @@ pub struct ClientboundPlayMap {
     pub data: Vec<u8>,
 }
 
+/// Inline data structure used by [`ClientboundPlayMapChunk`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayMapChunkChunkblockentity {
+    pub anon_0: u8,
+    pub y: i16,
+    #[field(varint)]
+    pub r#type: i32,
+    #[field(optional)]
+    pub nbt_data: Option<NbtCompound>,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x28)]
 pub struct ClientboundPlayMapChunk {
@@ -177,7 +197,7 @@ pub struct ClientboundPlayMapChunk {
     #[field(length = "varint")]
     pub chunk_data: Vec<u8>,
     #[field(length = "varint")]
-    pub block_entities: Vec<Vec<u8>>,
+    pub block_entities: Vec<ClientboundPlayMapChunkChunkblockentity>,
     #[field(length = "varint")]
     pub sky_light_mask: Vec<i64>,
     #[field(length = "varint")]
@@ -195,7 +215,7 @@ pub struct ClientboundPlayMapChunk {
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x4e)]
 pub struct ClientboundPlayMultiBlockChange {
-    pub chunk_coordinates: Vec<u8>,
+    pub chunk_coordinates: u64,
     #[field(length = "varint")]
     pub records: Vec<i32>,
 }
@@ -323,6 +343,14 @@ pub struct ClientboundPlayWorldEvent {
     pub global: bool,
 }
 
+/// Inline data structure used by [`ClientboundPlayWorldParticles`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayWorldParticlesParticle {
+    #[field(varint)]
+    pub r#type: i32,
+    pub data: Vec<u8>,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x2a)]
 pub struct ClientboundPlayWorldParticles {
@@ -336,5 +364,5 @@ pub struct ClientboundPlayWorldParticles {
     pub offset_z: f32,
     pub velocity_offset: f32,
     pub amount: i32,
-    pub particle: Vec<u8>,
+    pub particle: ClientboundPlayWorldParticlesParticle,
 }

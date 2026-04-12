@@ -220,6 +220,32 @@ pub struct ClientboundPlayLogin {
     pub enforces_secure_chat: bool,
 }
 
+/// Switch enum used by [`ClientboundPlayPlayerChat`].
+#[derive(Debug, Clone, PartialEq, Encode, Decode, EncodedSize)]
+pub enum ClientboundPlayPlayerChatFiltertype {
+    #[variant(id = 2)]
+    Variant2 {
+        #[field(length = "varint")]
+        filter_type_mask: Vec<i64>,
+    },
+}
+
+impl Default for ClientboundPlayPlayerChatFiltertype {
+    fn default() -> Self {
+        Self::Variant2 {
+            filter_type_mask: Default::default(),
+        }
+    }
+}
+
+/// Inline data structure used by [`ClientboundPlayPlayerChat`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayPlayerChatPreviousmessages {
+    #[field(varint)]
+    pub id: i32,
+    pub signature: Vec<u8>,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x3b)]
 pub struct ClientboundPlayPlayerChat {
@@ -231,12 +257,11 @@ pub struct ClientboundPlayPlayerChat {
     pub plain_message: String,
     pub timestamp: i64,
     pub salt: i64,
-    pub previous_messages: Vec<u8>,
+    #[field(length = "varint")]
+    pub previous_messages: Vec<ClientboundPlayPlayerChatPreviousmessages>,
     #[field(optional)]
     pub unsigned_chat_content: Option<NbtCompound>,
-    #[field(varint)]
-    pub filter_type: i32,
-    pub filter_type_mask: Vec<u8>,
+    pub filter_type: ClientboundPlayPlayerChatFiltertype,
     pub r#type: Vec<u8>,
     pub network_name: NbtCompound,
     #[field(optional)]

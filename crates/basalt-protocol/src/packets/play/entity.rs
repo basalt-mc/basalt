@@ -35,17 +35,38 @@ pub struct ServerboundPlayQueryEntityNbt {
     pub entity_id: i32,
 }
 
+/// Switch enum used by [`ServerboundPlayUseEntity`].
+#[derive(Debug, Clone, PartialEq, Encode, Decode, EncodedSize)]
+pub enum ServerboundPlayUseEntityMouse {
+    #[variant(id = 0)]
+    Variant0 {
+        #[field(varint)]
+        hand: i32,
+    },
+    #[variant(id = 2)]
+    Variant2 {
+        x: f32,
+        y: f32,
+        z: f32,
+        #[field(varint)]
+        hand: i32,
+    },
+}
+
+impl Default for ServerboundPlayUseEntityMouse {
+    fn default() -> Self {
+        Self::Variant0 {
+            hand: Default::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x18)]
 pub struct ServerboundPlayUseEntity {
     #[field(varint)]
     pub target: i32,
-    #[field(varint)]
-    pub mouse: i32,
-    pub x: Vec<u8>,
-    pub y: Vec<u8>,
-    pub z: Vec<u8>,
-    pub hand: Vec<u8>,
+    pub mouse: ServerboundPlayUseEntityMouse,
     pub sneaking: bool,
 }
 
@@ -127,6 +148,7 @@ pub struct ClientboundPlayEntityEffect {
 pub struct ClientboundPlayEntityEquipment {
     #[field(varint)]
     pub entity_id: i32,
+    #[field(rest)]
     pub equipments: Vec<u8>,
 }
 
@@ -153,6 +175,7 @@ pub struct ClientboundPlayEntityLook {
 pub struct ClientboundPlayEntityMetadata {
     #[field(varint)]
     pub entity_id: i32,
+    #[field(rest)]
     pub metadata: Vec<u8>,
 }
 
