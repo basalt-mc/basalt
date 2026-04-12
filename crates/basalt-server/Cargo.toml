@@ -9,6 +9,7 @@ repository.workspace = true
 basalt-types = { workspace = true }
 basalt-protocol = { workspace = true }
 basalt-net = { workspace = true }
+basalt-world = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 dashmap = { workspace = true }

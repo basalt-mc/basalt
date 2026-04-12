@@ -18,7 +18,6 @@
 //! ```
 
 mod chat;
-mod chunk;
 mod connection;
 pub mod error;
 mod handler;

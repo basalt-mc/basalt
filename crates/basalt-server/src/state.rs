@@ -23,6 +23,8 @@ pub(crate) struct ServerState {
     players: DashMap<Uuid, PlayerHandle>,
     /// Broadcast channel sender — O(1) fan-out to all subscribers.
     broadcast_tx: broadcast::Sender<BroadcastMessage>,
+    /// The world — chunk cache and terrain generator.
+    pub world: basalt_world::World,
 }
 
 /// A handle to a connected player, stored in the server state registry.
@@ -122,6 +124,7 @@ impl ServerState {
             next_entity_id: AtomicI32::new(1),
             players: DashMap::new(),
             broadcast_tx,
+            world: basalt_world::World::new(),
         })
     }
 
@@ -151,7 +154,7 @@ impl ServerState {
                     uuid: h.uuid,
                     entity_id: h.entity_id,
                     x: 0.0,
-                    y: 100.0,
+                    y: basalt_world::FlatWorldGenerator::SPAWN_Y as f64,
                     z: 0.0,
                     yaw: 0.0,
                     pitch: 0.0,
