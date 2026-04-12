@@ -9,8 +9,18 @@ repository.workspace = true
 basalt-types = { workspace = true }
 basalt-protocol = { workspace = true }
 basalt-events = { workspace = true }
+basalt-api = { workspace = true }
 basalt-net = { workspace = true }
 basalt-world = { workspace = true }
+
+# Built-in plugins
+basalt-plugin-chat = { path = "../../plugins/chat" }
+basalt-plugin-block = { path = "../../plugins/block" }
+basalt-plugin-world = { path = "../../plugins/world" }
+basalt-plugin-storage = { path = "../../plugins/storage" }
+basalt-plugin-lifecycle = { path = "../../plugins/lifecycle" }
+basalt-plugin-movement = { path = "../../plugins/movement" }
+
 tokio = { workspace = true }
 thiserror = { workspace = true }
 dashmap = { workspace = true }
@@ -20,4 +30,3 @@ serde_json = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-tempfile = "3"

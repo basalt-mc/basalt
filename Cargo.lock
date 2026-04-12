@@ -93,6 +93,62 @@ dependencies = [
 ]
 
 [[package]]
+name = "basalt-plugin-block"
+version = "0.1.0"
+dependencies = [
+ "basalt-api",
+ "basalt-types",
+ "basalt-world",
+]
+
+[[package]]
+name = "basalt-plugin-chat"
+version = "0.1.0"
+dependencies = [
+ "basalt-api",
+ "basalt-types",
+ "basalt-world",
+]
+
+[[package]]
+name = "basalt-plugin-lifecycle"
+version = "0.1.0"
+dependencies = [
+ "basalt-api",
+ "basalt-types",
+ "basalt-world",
+]
+
+[[package]]
+name = "basalt-plugin-movement"
+version = "0.1.0"
+dependencies = [
+ "basalt-api",
+ "basalt-types",
+ "basalt-world",
+]
+
+[[package]]
+name = "basalt-plugin-storage"
+version = "0.1.0"
+dependencies = [
+ "basalt-api",
+ "basalt-plugin-block",
+ "basalt-types",
+ "basalt-world",
+ "tempfile",
+]
+
+[[package]]
+name = "basalt-plugin-world"
+version = "0.1.0"
+dependencies = [
+ "basalt-api",
+ "basalt-types",
+ "basalt-world",
+]
+
+[[package]]
 name = "basalt-protocol"
 version = "0.1.0"
 dependencies = [
@@ -107,8 +163,15 @@ dependencies = [
 name = "basalt-server"
 version = "0.1.0"
 dependencies = [
+ "basalt-api",
  "basalt-events",
  "basalt-net",
+ "basalt-plugin-block",
+ "basalt-plugin-chat",
+ "basalt-plugin-lifecycle",
+ "basalt-plugin-movement",
+ "basalt-plugin-storage",
+ "basalt-plugin-world",
  "basalt-protocol",
  "basalt-types",
  "basalt-world",
@@ -116,7 +179,6 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "tempfile",
  "thiserror",
  "tokio",
 ]

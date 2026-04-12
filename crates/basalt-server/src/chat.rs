@@ -37,14 +37,3 @@ pub(crate) async fn send_welcome(
         .bold(true);
     send_system_message(conn, &msg, false).await
 }
-
-/// Builds a formatted chat text component for `<username> message`.
-///
-/// Returns the `TextComponent` without sending it — the caller
-/// broadcasts it to all players via `ServerState::broadcast`.
-pub(crate) fn build_chat_component(username: &str, message: &str) -> TextComponent {
-    TextComponent::text("<")
-        .append(TextComponent::text(username).color(TextColor::Named(NamedColor::Aqua)))
-        .append(TextComponent::text("> "))
-        .append(TextComponent::text(message))
-}

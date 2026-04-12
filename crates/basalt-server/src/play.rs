@@ -29,15 +29,15 @@ use basalt_protocol::packets::play::world::{
 use basalt_types::{Encode, Position, VarInt, Vec3i16};
 use tokio::sync::broadcast;
 
-use basalt_events::Event;
-
-use crate::context::{EventContext, Response};
-use crate::events::{
+use basalt_api::context::{Response, ServerContext};
+use basalt_api::events::{
     BlockBrokenEvent, BlockPlacedEvent, ChatMessageEvent, CommandEvent, PlayerMovedEvent,
 };
+use basalt_api::{BroadcastMessage, Event, PlayerSnapshot};
+
 use crate::helpers::{RawPayload, angle_to_byte};
 use crate::player::PlayerState;
-use crate::state::{BroadcastMessage, PlayerSnapshot, ServerState};
+use crate::state::ServerState;
 
 /// Sends the initial world data to the client and enters the play loop.
 pub(crate) async fn run_play_loop(
@@ -199,9 +199,18 @@ async fn play_loop(
                 match result {
                     Ok(packet) => {
                         if let Some(mut event) = packet_to_event(addr, player, packet) {
-                            let ctx = EventContext::new(Arc::clone(state));
+                            // Safety: Arc<ServerState> lives for the entire server.
+                            // The world reference is valid for the duration of dispatch.
+                            let world: &basalt_world::World = &state.world;
+                            let world: &'static basalt_world::World = unsafe { &*(world as *const _) };
+                            let ctx = ServerContext::new(
+                                world,
+                                player.uuid,
+                                player.entity_id,
+                                player.username.clone(),
+                            );
                             state.event_bus.dispatch_dyn(&mut *event, &ctx);
-                            execute_responses(conn, state, player, &ctx.responses.drain()).await?;
+                            execute_responses(conn, state, player, &ctx.drain_responses()).await?;
                         }
                     }
                     Err(basalt_net::Error::Protocol(
