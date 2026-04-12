@@ -123,7 +123,6 @@ impl Default for ClientboundPlayBossBarAction {
         }
     }
 }
-
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x0a)]
 pub struct ClientboundPlayBossBar {
@@ -151,7 +150,7 @@ pub struct ClientboundPlayClearTitles {
 pub struct ClientboundPlayDeclareCommandsCommandNode {
     pub flags: u8,
     #[field(length = "varint")]
-    pub children: Vec<i32>,
+    pub children: Vec<Vec<u8>>,
     pub redirect_node: Vec<u8>,
     pub extra_node_data: Vec<u8>,
 }
@@ -182,7 +181,6 @@ impl Default for ClientboundPlayHideMessageId {
         }
     }
 }
-
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x1c)]
 pub struct ClientboundPlayHideMessage {
@@ -231,7 +229,7 @@ pub enum ClientboundPlayScoreboardObjectiveAction {
         #[field(varint)]
         r#type: i32,
         #[field(optional)]
-        number_format: Option<i32>,
+        number_format: Option<Vec<u8>>,
         styling: Vec<u8>,
     },
     #[variant(id = 2)]
@@ -240,7 +238,7 @@ pub enum ClientboundPlayScoreboardObjectiveAction {
         #[field(varint)]
         r#type: i32,
         #[field(optional)]
-        number_format: Option<i32>,
+        number_format: Option<Vec<u8>>,
         styling: Vec<u8>,
     },
 }
@@ -255,7 +253,6 @@ impl Default for ClientboundPlayScoreboardObjectiveAction {
         }
     }
 }
-
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x64)]
 pub struct ClientboundPlayScoreboardObjective {
@@ -279,7 +276,6 @@ impl Default for ClientboundPlayScoreboardScoreNumberFormat {
         }
     }
 }
-
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x68)]
 pub struct ClientboundPlayScoreboardScore {
@@ -393,7 +389,6 @@ impl Default for ClientboundPlayTeamsMode {
         }
     }
 }
-
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x67)]
 pub struct ClientboundPlayTeams {

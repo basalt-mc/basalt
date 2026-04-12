@@ -60,7 +60,6 @@ impl Default for ServerboundPlayUseEntityMouse {
         }
     }
 }
-
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x18)]
 pub struct ServerboundPlayUseEntity {
@@ -126,7 +125,7 @@ pub struct ClientboundPlayDamageEvent {
 #[packet(id = 0x47)]
 pub struct ClientboundPlayEntityDestroy {
     #[field(length = "varint")]
-    pub entity_ids: Vec<i32>,
+    pub entity_ids: Vec<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -227,12 +226,20 @@ pub struct ClientboundPlayEntityTeleport {
 
 /// Inline data structure used by [`ClientboundPlayEntityUpdateAttributes`].
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayEntityUpdateAttributesPropertiesModifiers {
+    pub uuid: String,
+    pub amount: f64,
+    pub operation: i8,
+}
+
+/// Inline data structure used by [`ClientboundPlayEntityUpdateAttributes`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayEntityUpdateAttributesProperties {
     #[field(varint)]
     pub key: i32,
     pub value: f64,
     #[field(length = "varint")]
-    pub modifiers: Vec<u8>,
+    pub modifiers: Vec<ClientboundPlayEntityUpdateAttributesPropertiesModifiers>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -305,7 +312,7 @@ pub struct ClientboundPlaySetPassengers {
     #[field(varint)]
     pub entity_id: i32,
     #[field(length = "varint")]
-    pub passengers: Vec<i32>,
+    pub passengers: Vec<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

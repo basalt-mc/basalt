@@ -161,6 +161,18 @@ pub struct ClientboundPlayInitializeWorldBorder {
     pub warning_time: i32,
 }
 
+/// Inline data structure used by [`ClientboundPlayMap`].
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
+pub struct ClientboundPlayMapIcons {
+    #[field(varint)]
+    pub r#type: i32,
+    pub x: i8,
+    pub z: i8,
+    pub direction: u8,
+    #[field(optional)]
+    pub display_name: Option<NbtCompound>,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x2d)]
 pub struct ClientboundPlayMap {
@@ -217,7 +229,7 @@ pub struct ClientboundPlayMapChunk {
 pub struct ClientboundPlayMultiBlockChange {
     pub chunk_coordinates: u64,
     #[field(length = "varint")]
-    pub records: Vec<i32>,
+    pub records: Vec<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
