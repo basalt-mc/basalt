@@ -20,6 +20,7 @@
 mod chat;
 mod chunk;
 mod connection;
+pub mod error;
 mod helpers;
 mod play;
 mod player;

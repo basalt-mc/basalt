@@ -48,7 +48,7 @@ pub(crate) async fn handle_connection(
     stream: tokio::net::TcpStream,
     addr: SocketAddr,
     state: Arc<ServerState>,
-) -> basalt_net::Result<()> {
+) -> crate::error::Result<()> {
     let conn = Connection::<Handshake>::accept(stream);
 
     match conn.read_handshake().await? {
@@ -73,7 +73,7 @@ pub(crate) async fn handle_connection(
 async fn handle_status(
     mut conn: Connection<basalt_net::connection::Status>,
     addr: SocketAddr,
-) -> basalt_net::Result<()> {
+) -> crate::error::Result<()> {
     let packet = conn.read_packet().await?;
     if let ServerboundStatusPacket::PingStart(_) = packet {
         println!("[{addr}] <- StatusRequest");
@@ -103,7 +103,7 @@ async fn handle_login(
     mut conn: Connection<basalt_net::connection::Login>,
     addr: SocketAddr,
     state: Arc<ServerState>,
-) -> basalt_net::Result<()> {
+) -> crate::error::Result<()> {
     let (username, player_uuid) = match conn.read_packet().await? {
         ServerboundLoginPacket::LoginStart(login) => {
             println!(
@@ -138,7 +138,7 @@ async fn handle_configuration(
     username: &str,
     player_uuid: basalt_types::Uuid,
     state: Arc<ServerState>,
-) -> basalt_net::Result<()> {
+) -> crate::error::Result<()> {
     let registries = build_default_registries();
     for reg in &registries {
         conn.write_packet_typed(ClientboundConfigurationRegistryData::PACKET_ID, reg)
