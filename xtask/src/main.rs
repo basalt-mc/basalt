@@ -7,8 +7,8 @@
 
 mod codegen;
 mod helpers;
-mod parser;
 mod play;
+mod registry;
 mod types;
 
 use std::fs;
