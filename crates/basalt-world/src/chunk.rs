@@ -8,6 +8,20 @@ use basalt_types::nbt::{NbtCompound, NbtTag};
 use basalt_types::{Encode, VarInt};
 
 use crate::block;
+
+/// Builds a BitSet where the first `count` bits are set.
+///
+/// The Minecraft sky light mask is a BitSet encoded as a VarInt length
+/// followed by an array of i64 values. Each bit indicates whether the
+/// corresponding section has light data.
+fn build_full_light_mask(count: usize) -> Vec<i64> {
+    let num_longs = count.div_ceil(64);
+    let mut longs = vec![0i64; num_longs];
+    for i in 0..count {
+        longs[i / 64] |= 1i64 << (i % 64);
+    }
+    longs
+}
 use crate::palette::PalettedContainer;
 
 /// Number of chunk sections in a standard overworld chunk.
@@ -64,17 +78,26 @@ impl ChunkColumn {
         let chunk_data = self.encode_sections();
         let heightmaps = self.compute_heightmaps();
 
+        // Sky light: all sections get full sunlight (level 15).
+        // The light system has 26 entries (24 sections + 1 below + 1 above).
+        // Each entry is a 2048-byte array (4 bits per block, 16×16×16 / 2).
+        let light_sections = SECTIONS_PER_CHUNK + 2;
+        // BitSet marking which sections have sky light data: all of them
+        let sky_light_mask = build_full_light_mask(light_sections);
+        // Full sunlight = all nibbles set to 15 (0xFF bytes)
+        let sky_light: Vec<Vec<u8>> = (0..light_sections).map(|_| vec![0xFF; 2048]).collect();
+
         ClientboundPlayMapChunk {
             x: self.x,
             z: self.z,
             heightmaps,
             chunk_data,
             block_entities: vec![],
-            sky_light_mask: vec![],
+            sky_light_mask,
             block_light_mask: vec![],
             empty_sky_light_mask: vec![],
             empty_block_light_mask: vec![],
-            sky_light: vec![],
+            sky_light,
             block_light: vec![],
         }
     }

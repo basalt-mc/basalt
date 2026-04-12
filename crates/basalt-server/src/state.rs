@@ -124,7 +124,7 @@ impl ServerState {
             next_entity_id: AtomicI32::new(1),
             players: DashMap::new(),
             broadcast_tx,
-            world: basalt_world::World::new(),
+            world: basalt_world::World::new(42),
         })
     }
 
@@ -154,7 +154,7 @@ impl ServerState {
                     uuid: h.uuid,
                     entity_id: h.entity_id,
                     x: 0.0,
-                    y: basalt_world::FlatWorldGenerator::SPAWN_Y as f64,
+                    y: basalt_world::NoiseTerrainGenerator::SPAWN_Y as f64,
                     z: 0.0,
                     yaw: 0.0,
                     pitch: 0.0,

@@ -43,8 +43,12 @@ enum Generator {
 /// Thread-safe: the chunk cache is behind a `Mutex` so multiple player
 /// tasks can request chunks concurrently.
 pub struct World {
-    /// In-memory chunk cache, keyed by (chunk_x, chunk_z).
-    chunks: Mutex<HashMap<(i32, i32), ChunkColumn>>,
+    /// Cached encoded packets, keyed by (chunk_x, chunk_z).
+    /// We cache the final packet instead of ChunkColumn to avoid
+    /// re-encoding on every access (palette encoding + heightmap
+    /// computation is expensive).
+    packets:
+        Mutex<HashMap<(i32, i32), basalt_protocol::packets::play::world::ClientboundPlayMapChunk>>,
     /// The terrain generator used for new chunks.
     generator: Generator,
     /// The Y coordinate where players spawn.
@@ -59,7 +63,7 @@ impl World {
     /// they are requested.
     pub fn new(seed: u32) -> Self {
         Self {
-            chunks: Mutex::new(HashMap::new()),
+            packets: Mutex::new(HashMap::new()),
             generator: Generator::Noise(Box::new(NoiseTerrainGenerator::new(seed))),
             spawn_y: NoiseTerrainGenerator::SPAWN_Y,
         }
@@ -68,7 +72,7 @@ impl World {
     /// Creates a new flat world (superflat).
     pub fn flat() -> Self {
         Self {
-            chunks: Mutex::new(HashMap::new()),
+            packets: Mutex::new(HashMap::new()),
             generator: Generator::Flat(FlatWorldGenerator),
             spawn_y: FlatWorldGenerator::SPAWN_Y,
         }
@@ -89,26 +93,28 @@ impl World {
         cx: i32,
         cz: i32,
     ) -> basalt_protocol::packets::play::world::ClientboundPlayMapChunk {
-        let mut cache = self.chunks.lock().unwrap();
-        let chunk = cache.entry((cx, cz)).or_insert_with(|| {
-            let mut col = ChunkColumn::new(cx, cz);
-            match &self.generator {
-                Generator::Flat(g) => g.generate(&mut col),
-                Generator::Noise(g) => g.generate(&mut col),
-            }
-            col
-        });
-        chunk.to_packet()
+        let mut cache = self.packets.lock().unwrap();
+        cache
+            .entry((cx, cz))
+            .or_insert_with(|| {
+                let mut col = ChunkColumn::new(cx, cz);
+                match &self.generator {
+                    Generator::Flat(g) => g.generate(&mut col),
+                    Generator::Noise(g) => g.generate(&mut col),
+                }
+                col.to_packet()
+            })
+            .clone()
     }
 
     /// Returns true if the chunk at (cx, cz) has been generated.
     pub fn is_chunk_loaded(&self, cx: i32, cz: i32) -> bool {
-        self.chunks.lock().unwrap().contains_key(&(cx, cz))
+        self.packets.lock().unwrap().contains_key(&(cx, cz))
     }
 
     /// Returns the number of chunks currently cached.
     pub fn chunk_count(&self) -> usize {
-        self.chunks.lock().unwrap().len()
+        self.packets.lock().unwrap().len()
     }
 }
 

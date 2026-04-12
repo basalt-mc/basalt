@@ -23,7 +23,7 @@ use basalt_protocol::packets::play::player::{
 };
 use basalt_protocol::packets::play::world::{
     ClientboundPlayChunkBatchFinished, ClientboundPlayChunkBatchStart, ClientboundPlayMapChunk,
-    ClientboundPlaySpawnPosition, ClientboundPlayUnloadChunk,
+    ClientboundPlaySpawnPosition, ClientboundPlayUnloadChunk, ClientboundPlayUpdateViewPosition,
 };
 use basalt_types::{Encode, Position, VarInt, Vec3i16};
 use tokio::sync::broadcast;
@@ -82,7 +82,7 @@ const VIEW_RADIUS: i32 = 5;
 async fn send_initial_world(
     conn: &mut Connection<Play>,
     addr: SocketAddr,
-    player: &PlayerState,
+    player: &mut PlayerState,
     state: &Arc<ServerState>,
 ) -> crate::error::Result<()> {
     let login = ClientboundPlayLogin {
@@ -130,10 +130,17 @@ async fn send_initial_world(
         .await?;
     println!("[{addr}] -> GameEvent (start waiting for chunks)");
 
-    // Send chunks around spawn using the world generator/cache
+    // Tell the client where to center its chunk rendering
     let spawn_cx = (player.x as i32) >> 4;
     let spawn_cz = (player.z as i32) >> 4;
-    let chunk_count = send_chunks_around(conn, state, spawn_cx, spawn_cz, VIEW_RADIUS).await?;
+    let view_pos = ClientboundPlayUpdateViewPosition {
+        chunk_x: spawn_cx,
+        chunk_z: spawn_cz,
+    };
+    conn.write_packet_typed(ClientboundPlayUpdateViewPosition::PACKET_ID, &view_pos)
+        .await?;
+    let chunk_count =
+        send_chunks_around(conn, state, player, spawn_cx, spawn_cz, VIEW_RADIUS).await?;
     println!("[{addr}] -> ChunkData ({chunk_count} chunks, radius {VIEW_RADIUS})");
 
     let position = ClientboundPlayPosition {
@@ -346,7 +353,7 @@ async fn execute_action(
             let new_cx = (player.x as i32) >> 4;
             let new_cz = (player.z as i32) >> 4;
             if new_cx != old_cx || new_cz != old_cz {
-                stream_chunks(ctx.conn, ctx.state, old_cx, old_cz, new_cx, new_cz).await?;
+                stream_chunks(ctx.conn, ctx.state, player, new_cx, new_cz).await?;
             }
 
             ctx.state.broadcast(BroadcastMessage::EntityMoved {
@@ -549,6 +556,7 @@ async fn send_spawn_entity(
 async fn send_chunks_around(
     conn: &mut Connection<Play>,
     state: &Arc<ServerState>,
+    player: &mut PlayerState,
     cx: i32,
     cz: i32,
     radius: i32,
@@ -562,10 +570,14 @@ async fn send_chunks_around(
     let mut count = 0;
     for dx in -radius..=radius {
         for dz in -radius..=radius {
-            let packet = state.world.get_chunk_packet(cx + dx, cz + dz);
-            conn.write_packet_typed(ClientboundPlayMapChunk::PACKET_ID, &packet)
-                .await?;
-            count += 1;
+            let key = (cx + dx, cz + dz);
+            if player.loaded_chunks.insert(key) {
+                // Not previously sent — send it
+                let packet = state.world.get_chunk_packet(key.0, key.1);
+                conn.write_packet_typed(ClientboundPlayMapChunk::PACKET_ID, &packet)
+                    .await?;
+                count += 1;
+            }
         }
     }
 
@@ -586,40 +598,36 @@ async fn send_chunks_around(
 async fn stream_chunks(
     conn: &mut Connection<Play>,
     state: &Arc<ServerState>,
-    old_cx: i32,
-    old_cz: i32,
+    player: &mut PlayerState,
     new_cx: i32,
     new_cz: i32,
 ) -> crate::error::Result<()> {
+    // Update the client's view center so it knows which chunks to render
+    let view_pos = ClientboundPlayUpdateViewPosition {
+        chunk_x: new_cx,
+        chunk_z: new_cz,
+    };
+    conn.write_packet_typed(ClientboundPlayUpdateViewPosition::PACKET_ID, &view_pos)
+        .await?;
+
     let r = VIEW_RADIUS;
 
-    // Collect chunks to load (in new view but not in old view)
-    let mut to_load = Vec::new();
+    // Collect chunks that should be in view
+    let mut in_view = std::collections::HashSet::new();
     for dx in -r..=r {
         for dz in -r..=r {
-            let cx = new_cx + dx;
-            let cz = new_cz + dz;
-            let was_in_old = (cx - old_cx).abs() <= r && (cz - old_cz).abs() <= r;
-            if !was_in_old {
-                to_load.push((cx, cz));
-            }
+            in_view.insert((new_cx + dx, new_cz + dz));
         }
     }
 
-    // Collect chunks to unload (in old view but not in new view)
-    let mut to_unload = Vec::new();
-    for dx in -r..=r {
-        for dz in -r..=r {
-            let cx = old_cx + dx;
-            let cz = old_cz + dz;
-            let is_in_new = (cx - new_cx).abs() <= r && (cz - new_cz).abs() <= r;
-            if !is_in_new {
-                to_unload.push((cx, cz));
-            }
-        }
-    }
+    // Unload chunks no longer in view
+    let to_unload: Vec<(i32, i32)> = player
+        .loaded_chunks
+        .iter()
+        .filter(|key| !in_view.contains(key))
+        .copied()
+        .collect();
 
-    // Unload old chunks
     for (cx, cz) in &to_unload {
         let packet = ClientboundPlayUnloadChunk {
             chunk_x: *cx,
@@ -627,9 +635,17 @@ async fn stream_chunks(
         };
         conn.write_packet_typed(ClientboundPlayUnloadChunk::PACKET_ID, &packet)
             .await?;
+        player.loaded_chunks.remove(&(*cx, *cz));
     }
 
-    // Load new chunks
+    // Load new chunks — only those not already sent to this player
+    let mut to_load = Vec::new();
+    for &key in &in_view {
+        if player.loaded_chunks.insert(key) {
+            to_load.push(key);
+        }
+    }
+
     if !to_load.is_empty() {
         conn.write_packet_typed(
             ClientboundPlayChunkBatchStart::PACKET_ID,
