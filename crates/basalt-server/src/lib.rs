@@ -18,6 +18,7 @@
 //! ```
 
 mod chat;
+mod chunk;
 mod connection;
 mod helpers;
 mod play;
