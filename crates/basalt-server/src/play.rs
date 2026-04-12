@@ -41,7 +41,7 @@ pub(crate) async fn run_play_loop(
     state: &Arc<ServerState>,
     rx: mpsc::Receiver<BroadcastMessage>,
     existing_players: &[PlayerSnapshot],
-) -> basalt_net::Result<()> {
+) -> crate::error::Result<()> {
     send_initial_world(&mut conn, addr, player).await?;
 
     // Send the player's own PlayerInfo so they appear in their own Tab list
@@ -79,7 +79,7 @@ async fn send_initial_world(
     conn: &mut Connection<Play>,
     addr: SocketAddr,
     player: &PlayerState,
-) -> basalt_net::Result<()> {
+) -> crate::error::Result<()> {
     let login = ClientboundPlayLogin {
         entity_id: player.entity_id,
         is_hardcore: false,
@@ -182,7 +182,7 @@ async fn play_loop(
     player: &mut PlayerState,
     state: &Arc<ServerState>,
     mut rx: mpsc::Receiver<BroadcastMessage>,
-) -> basalt_net::Result<()> {
+) -> crate::error::Result<()> {
     let mut keep_alive = tokio::time::interval(std::time::Duration::from_secs(15));
     keep_alive.tick().await;
 
@@ -333,7 +333,7 @@ async fn execute_action(
     player: &mut PlayerState,
     state: &Arc<ServerState>,
     action: PacketAction,
-) -> basalt_net::Result<()> {
+) -> crate::error::Result<()> {
     match action {
         PacketAction::Handled => {}
         PacketAction::Chat { username, message } => {
@@ -368,7 +368,7 @@ async fn handle_broadcast(
     conn: &mut Connection<Play>,
     player: &PlayerState,
     msg: BroadcastMessage,
-) -> basalt_net::Result<()> {
+) -> crate::error::Result<()> {
     match msg {
         BroadcastMessage::Chat { content } => {
             let packet = ClientboundPlaySystemChat {
@@ -467,7 +467,7 @@ async fn handle_broadcast(
 async fn send_player_info_add(
     conn: &mut Connection<Play>,
     info: &PlayerSnapshot,
-) -> basalt_net::Result<()> {
+) -> crate::error::Result<()> {
     let mut buf = Vec::new();
 
     // Action bitmask: bit 0 (add_player) | bit 2 (gamemode) | bit 3 (listed)
@@ -509,7 +509,8 @@ async fn send_player_info_add(
     // Use a RawPayload wrapper since write_packet is private
     // and write_packet_typed requires Encode + EncodedSize.
     conn.write_packet_typed(ClientboundPlayPlayerInfo::PACKET_ID, &RawPayload(buf))
-        .await
+        .await?;
+    Ok(())
 }
 
 /// Sends a SpawnEntity packet for a player entity.
@@ -518,7 +519,7 @@ async fn send_player_info_add(
 async fn send_spawn_entity(
     conn: &mut Connection<Play>,
     info: &PlayerSnapshot,
-) -> basalt_net::Result<()> {
+) -> crate::error::Result<()> {
     let packet = ClientboundPlaySpawnEntity {
         entity_id: info.entity_id,
         object_uuid: info.uuid,
@@ -533,7 +534,8 @@ async fn send_spawn_entity(
         velocity: Vec3i16 { x: 0, y: 0, z: 0 },
     };
     conn.write_packet_typed(ClientboundPlaySpawnEntity::PACKET_ID, &packet)
-        .await
+        .await?;
+    Ok(())
 }
 
 #[cfg(test)]

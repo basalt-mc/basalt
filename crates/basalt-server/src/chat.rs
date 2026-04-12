@@ -22,20 +22,21 @@ pub(crate) async fn send_system_message(
     conn: &mut Connection<Play>,
     component: &TextComponent,
     is_action_bar: bool,
-) -> basalt_net::Result<()> {
+) -> crate::error::Result<()> {
     let packet = ClientboundPlaySystemChat {
         content: component.to_nbt(),
         is_action_bar,
     };
     conn.write_packet_typed(ClientboundPlaySystemChat::PACKET_ID, &packet)
-        .await
+        .await?;
+    Ok(())
 }
 
 /// Sends a welcome message when a player joins the server.
 pub(crate) async fn send_welcome(
     conn: &mut Connection<Play>,
     username: &str,
-) -> basalt_net::Result<()> {
+) -> crate::error::Result<()> {
     let msg = TextComponent::text(format!("Welcome to Basalt, {username}!"))
         .color(TextColor::Named(NamedColor::Gold))
         .bold(true);
@@ -61,7 +62,7 @@ pub(crate) async fn handle_command(
     conn: &mut Connection<Play>,
     player: &mut PlayerState,
     command: &str,
-) -> basalt_net::Result<()> {
+) -> crate::error::Result<()> {
     let parts: Vec<&str> = command.splitn(2, ' ').collect();
     let cmd = parts[0];
     let args = parts.get(1).unwrap_or(&"");
@@ -80,7 +81,7 @@ pub(crate) async fn handle_command(
 }
 
 /// `/say <message>` — broadcasts a server message.
-async fn cmd_say(conn: &mut Connection<Play>, message: &str) -> basalt_net::Result<()> {
+async fn cmd_say(conn: &mut Connection<Play>, message: &str) -> crate::error::Result<()> {
     let msg = TextComponent::text("[Server] ")
         .color(TextColor::Named(NamedColor::LightPurple))
         .bold(true)
@@ -93,7 +94,7 @@ async fn cmd_tp(
     conn: &mut Connection<Play>,
     player: &mut PlayerState,
     args: &str,
-) -> basalt_net::Result<()> {
+) -> crate::error::Result<()> {
     let coords: Vec<&str> = args.split_whitespace().collect();
     if coords.len() != 3 {
         let msg =
@@ -152,7 +153,7 @@ async fn cmd_tp(
 /// `/gamemode <mode>` — changes the player's gamemode.
 ///
 /// Accepted modes: survival (0), creative (1), adventure (2), spectator (3).
-async fn cmd_gamemode(conn: &mut Connection<Play>, args: &str) -> basalt_net::Result<()> {
+async fn cmd_gamemode(conn: &mut Connection<Play>, args: &str) -> crate::error::Result<()> {
     let mode: f32 = match args.trim() {
         "survival" | "0" => 0.0,
         "creative" | "1" => 1.0,
@@ -186,7 +187,7 @@ async fn cmd_gamemode(conn: &mut Connection<Play>, args: &str) -> basalt_net::Re
 }
 
 /// `/help` — shows available commands.
-async fn cmd_help(conn: &mut Connection<Play>) -> basalt_net::Result<()> {
+async fn cmd_help(conn: &mut Connection<Play>) -> crate::error::Result<()> {
     let msg = TextComponent::text("Available commands:")
         .color(TextColor::Named(NamedColor::Gold))
         .append(

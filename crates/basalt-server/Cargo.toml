@@ -10,6 +10,7 @@ basalt-types = { workspace = true }
 basalt-protocol = { workspace = true }
 basalt-net = { workspace = true }
 tokio = { workspace = true }
+thiserror = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
