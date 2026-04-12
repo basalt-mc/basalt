@@ -22,6 +22,7 @@ use basalt_protocol::packets::play::player::{
     ClientboundPlayPlayerInfo, ClientboundPlayPlayerRemove, ClientboundPlayPosition,
 };
 use basalt_protocol::packets::play::world::{
+    ClientboundPlayAcknowledgePlayerDigging, ClientboundPlayBlockChange,
     ClientboundPlayChunkBatchFinished, ClientboundPlayChunkBatchStart, ClientboundPlayMapChunk,
     ClientboundPlaySpawnPosition, ClientboundPlayUnloadChunk, ClientboundPlayUpdateViewPosition,
 };
@@ -235,6 +236,30 @@ pub(crate) enum PacketAction {
         /// Previous chunk Z before the movement.
         old_cz: i32,
     },
+    /// A block was broken (set to air).
+    BlockBroken {
+        /// The block position.
+        x: i32,
+        /// The block position.
+        y: i32,
+        /// The block position.
+        z: i32,
+        /// Sequence number for client acknowledgement.
+        sequence: i32,
+    },
+    /// A block was placed.
+    BlockPlaced {
+        /// The position where the block was placed.
+        x: i32,
+        /// The position where the block was placed.
+        y: i32,
+        /// The position where the block was placed.
+        z: i32,
+        /// The block state ID that was placed.
+        block_state: u16,
+        /// Sequence number for client acknowledgement.
+        sequence: i32,
+    },
 }
 
 /// Dispatches a single serverbound Play packet synchronously.
@@ -315,13 +340,70 @@ pub(crate) fn dispatch_packet(
                 command: cmd.command,
             }
         }
+        ServerboundPlayPacket::BlockDig(dig) => {
+            let pos = dig.location;
+            // Status 0 = started digging. In creative mode this is an instant break.
+            if dig.status == 0 {
+                println!(
+                    "[{addr}] {} broke block at ({}, {}, {})",
+                    player.username, pos.x, pos.y, pos.z
+                );
+                PacketAction::BlockBroken {
+                    x: pos.x,
+                    y: pos.y,
+                    z: pos.z,
+                    sequence: dig.sequence,
+                }
+            } else {
+                PacketAction::Handled
+            }
+        }
+        ServerboundPlayPacket::BlockPlace(place) => {
+            let target = place.location;
+            // Compute placement position from the face that was clicked
+            let (dx, dy, dz) = face_offset(place.direction);
+            let (px, py, pz) = (target.x + dx, target.y + dy, target.z + dz);
+
+            // Determine what block to place from the held item
+            let item = player.held_item();
+            if let Some(item_id) = item.item_id
+                && let Some(block_state) = basalt_world::block::item_to_default_block_state(item_id)
+            {
+                println!(
+                    "[{addr}] {} placed block at ({px}, {py}, {pz}) state={block_state}",
+                    player.username
+                );
+                PacketAction::BlockPlaced {
+                    x: px,
+                    y: py,
+                    z: pz,
+                    block_state,
+                    sequence: place.sequence,
+                }
+            } else {
+                PacketAction::Handled
+            }
+        }
+        ServerboundPlayPacket::HeldItemSlot(slot) => {
+            let idx = slot.slot_id as u8;
+            if idx < 9 {
+                player.held_slot = idx;
+            }
+            PacketAction::Handled
+        }
+        ServerboundPlayPacket::SetCreativeSlot(creative) => {
+            player.set_creative_slot(creative.slot, creative.item);
+            PacketAction::Handled
+        }
         ServerboundPlayPacket::CustomPayload(_)
         | ServerboundPlayPacket::PlayerInput(_)
         | ServerboundPlayPacket::TickEnd(_)
         | ServerboundPlayPacket::ChunkBatchReceived(_)
         | ServerboundPlayPacket::Pong(_)
         | ServerboundPlayPacket::MessageAcknowledgement(_)
-        | ServerboundPlayPacket::ConfigurationAcknowledged(_) => PacketAction::Handled,
+        | ServerboundPlayPacket::ConfigurationAcknowledged(_)
+        | ServerboundPlayPacket::UseItem(_)
+        | ServerboundPlayPacket::ArmAnimation(_) => PacketAction::Handled,
         other => {
             println!(
                 "[{addr}] {} sent unhandled packet: {:?}",
@@ -364,6 +446,32 @@ async fn execute_action(
                 yaw: player.yaw,
                 pitch: player.pitch,
                 on_ground: player.on_ground,
+            });
+        }
+        PacketAction::BlockBroken { x, y, z, sequence } => {
+            ctx.state.world.set_block(x, y, z, basalt_world::block::AIR);
+            send_block_ack(ctx.conn, sequence).await?;
+            ctx.state.broadcast(BroadcastMessage::BlockChanged {
+                x,
+                y,
+                z,
+                block_state: basalt_world::block::AIR as i32,
+            });
+        }
+        PacketAction::BlockPlaced {
+            x,
+            y,
+            z,
+            block_state,
+            sequence,
+        } => {
+            ctx.state.world.set_block(x, y, z, block_state);
+            send_block_ack(ctx.conn, sequence).await?;
+            ctx.state.broadcast(BroadcastMessage::BlockChanged {
+                x,
+                y,
+                z,
+                block_state: block_state as i32,
             });
         }
     }
@@ -465,6 +573,19 @@ async fn handle_broadcast(
             conn.write_packet_typed(ClientboundPlayEntityHeadRotation::PACKET_ID, &head)
                 .await?;
         }
+        BroadcastMessage::BlockChanged {
+            x,
+            y,
+            z,
+            block_state,
+        } => {
+            let packet = ClientboundPlayBlockChange {
+                location: Position::new(x, y, z),
+                r#type: block_state,
+            };
+            conn.write_packet_typed(ClientboundPlayBlockChange::PACKET_ID, &packet)
+                .await?;
+        }
     }
     Ok(())
 }
@@ -545,6 +666,36 @@ async fn send_spawn_entity(
         velocity: Vec3i16 { x: 0, y: 0, z: 0 },
     };
     conn.write_packet_typed(ClientboundPlaySpawnEntity::PACKET_ID, &packet)
+        .await?;
+    Ok(())
+}
+
+/// Returns the (dx, dy, dz) offset for a block face direction.
+///
+/// Block faces in the Minecraft protocol:
+/// 0 = bottom (-Y), 1 = top (+Y), 2 = north (-Z),
+/// 3 = south (+Z), 4 = west (-X), 5 = east (+X).
+fn face_offset(direction: i32) -> (i32, i32, i32) {
+    match direction {
+        0 => (0, -1, 0),
+        1 => (0, 1, 0),
+        2 => (0, 0, -1),
+        3 => (0, 0, 1),
+        4 => (-1, 0, 0),
+        5 => (1, 0, 0),
+        _ => (0, 0, 0),
+    }
+}
+
+/// Sends a block action acknowledgement to the client.
+///
+/// The client waits for this before applying block predictions.
+/// The sequence ID matches the one sent in the dig/place packet.
+async fn send_block_ack(conn: &mut Connection<Play>, sequence: i32) -> crate::error::Result<()> {
+    let ack = ClientboundPlayAcknowledgePlayerDigging {
+        sequence_id: sequence,
+    };
+    conn.write_packet_typed(ClientboundPlayAcknowledgePlayerDigging::PACKET_ID, &ack)
         .await?;
     Ok(())
 }
@@ -859,11 +1010,182 @@ mod tests {
         let action = dispatch_packet(
             test_addr(),
             &mut player,
-            ServerboundPlayPacket::ArmAnimation(
-                basalt_protocol::packets::play::entity::ServerboundPlayArmAnimation { hand: 0 },
+            ServerboundPlayPacket::CustomPayload(
+                basalt_protocol::packets::play::misc::ServerboundPlayCustomPayload {
+                    channel: "brand".into(),
+                    data: vec![],
+                },
             ),
         );
 
         assert!(matches!(action, PacketAction::Handled));
+    }
+
+    #[test]
+    fn dispatch_block_dig_status_0_returns_block_broken() {
+        let mut player = test_player();
+
+        let action = dispatch_packet(
+            test_addr(),
+            &mut player,
+            ServerboundPlayPacket::BlockDig(
+                basalt_protocol::packets::play::world::ServerboundPlayBlockDig {
+                    status: 0,
+                    location: Position::new(10, 64, -5),
+                    face: 1,
+                    sequence: 42,
+                },
+            ),
+        );
+
+        match action {
+            PacketAction::BlockBroken { x, y, z, sequence } => {
+                assert_eq!(x, 10);
+                assert_eq!(y, 64);
+                assert_eq!(z, -5);
+                assert_eq!(sequence, 42);
+            }
+            _ => panic!("expected BlockBroken"),
+        }
+    }
+
+    #[test]
+    fn dispatch_block_dig_other_status_returns_handled() {
+        let mut player = test_player();
+
+        // Status 1 = cancelled digging, should be ignored
+        let action = dispatch_packet(
+            test_addr(),
+            &mut player,
+            ServerboundPlayPacket::BlockDig(
+                basalt_protocol::packets::play::world::ServerboundPlayBlockDig {
+                    status: 1,
+                    location: Position::new(0, 0, 0),
+                    face: 0,
+                    sequence: 1,
+                },
+            ),
+        );
+
+        assert!(matches!(action, PacketAction::Handled));
+    }
+
+    #[test]
+    fn dispatch_block_place_with_valid_item() {
+        let mut player = test_player();
+        // Give the player stone in hotbar slot 0
+        player.hotbar[0] = basalt_types::Slot::new(1, 64);
+        player.held_slot = 0;
+
+        let action = dispatch_packet(
+            test_addr(),
+            &mut player,
+            ServerboundPlayPacket::BlockPlace(
+                basalt_protocol::packets::play::world::ServerboundPlayBlockPlace {
+                    hand: 0,
+                    location: Position::new(5, 63, 5),
+                    direction: 1, // top face → place at y+1
+                    cursor_x: 0.5,
+                    cursor_y: 1.0,
+                    cursor_z: 0.5,
+                    inside_block: false,
+                    world_border_hit: false,
+                    sequence: 7,
+                },
+            ),
+        );
+
+        match action {
+            PacketAction::BlockPlaced {
+                x,
+                y,
+                z,
+                block_state,
+                sequence,
+            } => {
+                assert_eq!(x, 5);
+                assert_eq!(y, 64); // 63 + 1 (top face)
+                assert_eq!(z, 5);
+                assert_eq!(block_state, 1); // stone
+                assert_eq!(sequence, 7);
+            }
+            _ => panic!("expected BlockPlaced"),
+        }
+    }
+
+    #[test]
+    fn dispatch_block_place_empty_hand_returns_handled() {
+        let mut player = test_player();
+        // Empty hand — no block to place
+
+        let action = dispatch_packet(
+            test_addr(),
+            &mut player,
+            ServerboundPlayPacket::BlockPlace(
+                basalt_protocol::packets::play::world::ServerboundPlayBlockPlace {
+                    hand: 0,
+                    location: Position::new(0, 64, 0),
+                    direction: 1,
+                    cursor_x: 0.5,
+                    cursor_y: 1.0,
+                    cursor_z: 0.5,
+                    inside_block: false,
+                    world_border_hit: false,
+                    sequence: 1,
+                },
+            ),
+        );
+
+        assert!(matches!(action, PacketAction::Handled));
+    }
+
+    #[test]
+    fn dispatch_held_item_slot_updates_player() {
+        let mut player = test_player();
+        assert_eq!(player.held_slot, 0);
+
+        let action = dispatch_packet(
+            test_addr(),
+            &mut player,
+            ServerboundPlayPacket::HeldItemSlot(
+                basalt_protocol::packets::play::inventory::ServerboundPlayHeldItemSlot {
+                    slot_id: 4,
+                },
+            ),
+        );
+
+        assert_eq!(player.held_slot, 4);
+        assert!(matches!(action, PacketAction::Handled));
+    }
+
+    #[test]
+    fn dispatch_set_creative_slot_updates_hotbar() {
+        let mut player = test_player();
+
+        let action = dispatch_packet(
+            test_addr(),
+            &mut player,
+            ServerboundPlayPacket::SetCreativeSlot(
+                basalt_protocol::packets::play::inventory::ServerboundPlaySetCreativeSlot {
+                    slot: 36,
+                    item: basalt_types::Slot::new(1, 64),
+                },
+            ),
+        );
+
+        assert_eq!(player.hotbar[0].item_id, Some(1));
+        assert_eq!(player.hotbar[0].item_count, 64);
+        assert!(matches!(action, PacketAction::Handled));
+    }
+
+    #[test]
+    fn face_offset_all_directions() {
+        assert_eq!(face_offset(0), (0, -1, 0)); // bottom
+        assert_eq!(face_offset(1), (0, 1, 0)); // top
+        assert_eq!(face_offset(2), (0, 0, -1)); // north
+        assert_eq!(face_offset(3), (0, 0, 1)); // south
+        assert_eq!(face_offset(4), (-1, 0, 0)); // west
+        assert_eq!(face_offset(5), (1, 0, 0)); // east
+        assert_eq!(face_offset(99), (0, 0, 0)); // invalid
     }
 }
