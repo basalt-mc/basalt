@@ -9,12 +9,14 @@ mod block;
 mod chat;
 mod lifecycle;
 mod movement;
+mod storage;
 mod world;
 
 pub use block::BlockInteractionHandler;
 pub use chat::ChatHandler;
 pub use lifecycle::LifecycleHandler;
 pub use movement::PlayerInputHandler;
+pub use storage::StorageHandler;
 pub use world::WorldHandler;
 
 use basalt_events::EventBus;
@@ -30,4 +32,5 @@ pub fn register_all(bus: &mut EventBus) {
     PlayerInputHandler::register(bus);
     WorldHandler::register(bus);
     BlockInteractionHandler::register(bus);
+    StorageHandler::register(bus);
 }

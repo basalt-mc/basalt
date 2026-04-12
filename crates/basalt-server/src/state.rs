@@ -145,6 +145,24 @@ impl ServerState {
         })
     }
 
+    /// Creates a server state with a custom world instance.
+    ///
+    /// Used in tests to provide a world with specific configuration
+    /// (e.g., disk persistence for storage handler tests).
+    #[cfg(test)]
+    pub fn new_with_world(world: basalt_world::World) -> Arc<Self> {
+        let (broadcast_tx, _) = broadcast::channel(256);
+        let mut event_bus = EventBus::new();
+        crate::handlers::register_all(&mut event_bus);
+        Arc::new(Self {
+            next_entity_id: AtomicI32::new(1),
+            players: DashMap::new(),
+            broadcast_tx,
+            world,
+            event_bus,
+        })
+    }
+
     /// Allocates a unique entity ID for a new player.
     pub fn next_entity_id(&self) -> i32 {
         self.next_entity_id.fetch_add(1, Ordering::Relaxed)
