@@ -8,3 +8,4 @@ repository.workspace = true
 [dependencies]
 basalt-types = { workspace = true }
 basalt-protocol = { workspace = true }
+noise = { workspace = true }

@@ -18,3 +18,16 @@ pub const GRASS_BLOCK: u16 = 8;
 
 /// Bedrock — indestructible bottom layer.
 pub const BEDROCK: u16 = 85;
+
+/// Water — still water (default state, level 0).
+pub const WATER: u16 = 86;
+
+/// Sand — beach and desert block.
+pub const SAND: u16 = 118;
+
+/// Gravel — underwater floor block.
+pub const GRAVEL: u16 = 124;
+
+/// Snow block — covers high-altitude terrain.
+/// Snow block — covers high-altitude terrain tops.
+pub const SNOW_BLOCK: u16 = 5950;
