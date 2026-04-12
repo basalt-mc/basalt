@@ -176,6 +176,28 @@ const net = [
   'net/pipeline',
 ];
 
+const server = [
+  // Cross-module changes within basalt-server.
+  // Example: "feat(server): add player tracking"
+  'server',
+
+  // Per-player connection lifecycle: handshake → login → config → play.
+  // Example: "refactor(server/connection): extract configuration handler"
+  'server/connection',
+
+  // Player state tracking: position, gamemode, keep-alive.
+  // Example: "feat(server/player): add gamemode switching"
+  'server/player',
+
+  // Play loop and packet dispatch.
+  // Example: "feat(server/play): handle movement packets"
+  'server/play',
+
+  // Chat message handling and command dispatch.
+  // Example: "feat(server/chat): add /tp command"
+  'server/chat',
+];
+
 const keywords = [
   // Root workspace configuration: Cargo.toml workspace settings, workspace-wide
   // dependency versions, cross-crate build configuration.
@@ -236,7 +258,7 @@ const keywords = [
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...keywords]],
+    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...keywords]],
     'scope-empty': [2, 'never'],
   },
 };
