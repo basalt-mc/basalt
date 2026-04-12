@@ -4,6 +4,7 @@ mod byte_array;
 pub mod error;
 mod identifier;
 pub mod nbt;
+mod opaque;
 mod position;
 mod primitives;
 mod slot;
@@ -19,6 +20,7 @@ pub use bit_set::BitSet;
 pub use error::{Error, Result};
 pub use identifier::Identifier;
 pub use nbt::{NbtCompound, NbtList, NbtTag};
+pub use opaque::OpaqueBytes;
 pub use position::{BlockPosition, ChunkPosition, Position};
 pub use slot::Slot;
 pub use text::{
