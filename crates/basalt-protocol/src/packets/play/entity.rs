@@ -124,8 +124,8 @@ pub struct ClientboundPlayDamageEvent {
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x47)]
 pub struct ClientboundPlayEntityDestroy {
-    #[field(length = "varint")]
-    pub entity_ids: Vec<Vec<u8>>,
+    #[field(length = "varint", element = "varint")]
+    pub entity_ids: Vec<i32>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -311,8 +311,8 @@ pub struct ClientboundPlayRemoveEntityEffect {
 pub struct ClientboundPlaySetPassengers {
     #[field(varint)]
     pub entity_id: i32,
-    #[field(length = "varint")]
-    pub passengers: Vec<Vec<u8>>,
+    #[field(length = "varint", element = "varint")]
+    pub passengers: Vec<i32>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

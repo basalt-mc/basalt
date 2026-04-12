@@ -149,10 +149,10 @@ pub struct ClientboundPlayClearTitles {
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayDeclareCommandsCommandNode {
     pub flags: u8,
-    #[field(length = "varint")]
-    pub children: Vec<Vec<u8>>,
-    pub redirect_node: Vec<u8>,
-    pub extra_node_data: Vec<u8>,
+    #[field(length = "varint", element = "varint")]
+    pub children: Vec<i32>,
+    #[field(rest)]
+    pub remaining: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

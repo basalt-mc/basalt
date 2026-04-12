@@ -228,8 +228,8 @@ pub struct ClientboundPlayMapChunk {
 #[packet(id = 0x4e)]
 pub struct ClientboundPlayMultiBlockChange {
     pub chunk_coordinates: u64,
-    #[field(length = "varint")]
-    pub records: Vec<Vec<u8>>,
+    #[field(length = "varint", element = "varint")]
+    pub records: Vec<i32>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
