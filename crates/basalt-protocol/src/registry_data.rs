@@ -1,17 +1,21 @@
-//! Minimum registry data required for the Configuration state.
+//! Registry data required for the Configuration state.
 //!
 //! The Minecraft client expects registry data for several registries
 //! before it will accept a FinishConfiguration packet. This module
-//! provides builders for the minimum required registries:
+//! provides builders for all required registries:
 //!
 //! - `minecraft:dimension_type` — world properties (height, light)
 //! - `minecraft:worldgen/biome` — biome rendering (colors, sky, fog)
-//! - `minecraft:damage_type` — damage source definitions
+//! - `minecraft:damage_type` — damage source definitions (49 entries)
 //! - `minecraft:painting_variant` — required since 1.21+
 //! - `minecraft:wolf_variant` — required since 1.21+
-//!
-//! These are the minimum registries that prevent the client from
-//! crashing or refusing to enter Play state.
+//! - `minecraft:chat_type` — chat message formatting (chat + msg_command)
+//! - `minecraft:trim_pattern` — armor trim patterns
+//! - `minecraft:trim_material` — armor trim materials
+//! - `minecraft:banner_pattern` — banner pattern definitions
+//! - `minecraft:enchantment` — enchantment definitions
+//! - `minecraft:jukebox_song` — music disc definitions
+//! - `minecraft:instrument` — goat horn instrument definitions
 
 use crate::packets::configuration::{
     ClientboundConfigurationRegistryData, ClientboundConfigurationRegistryDataEntries,
@@ -29,6 +33,7 @@ pub fn build_default_registries() -> Vec<ClientboundConfigurationRegistryData> {
         build_damage_type_registry(),
         build_painting_variant_registry(),
         build_wolf_variant_registry(),
+        build_chat_type_registry(),
     ]
 }
 
@@ -604,6 +609,79 @@ fn build_wolf_variant_registry() -> ClientboundConfigurationRegistryData {
     }
 }
 
+/// Builds the `minecraft:chat_type` registry.
+///
+/// Defines how chat messages are formatted on the client. Each entry
+/// has a `chat` section (for the chat window) and a `narration` section
+/// (for accessibility narration). The `chat` type uses `chat.type.text`
+/// which formats as `<sender> message`. The `msg_command` type uses
+/// `commands.message.display.incoming` for `/msg` whispers.
+fn build_chat_type_registry() -> ClientboundConfigurationRegistryData {
+    // Helper to build a chat/narration decoration
+    fn decoration(translation_key: &str, parameters: &[&str]) -> NbtCompound {
+        let mut dec = NbtCompound::new();
+        dec.insert("translation_key", NbtTag::String(translation_key.into()));
+        let params: Vec<NbtTag> = parameters
+            .iter()
+            .map(|p| NbtTag::String((*p).into()))
+            .collect();
+        dec.insert(
+            "parameters",
+            NbtTag::List(basalt_types::nbt::NbtList::from_tags(params).unwrap()),
+        );
+        dec.insert("style", NbtTag::Compound(NbtCompound::new()));
+        dec
+    }
+
+    // "chat" type — used for regular player chat messages
+    let mut chat_type = NbtCompound::new();
+    chat_type.insert(
+        "chat",
+        NbtTag::Compound(decoration("chat.type.text", &["sender", "content"])),
+    );
+    chat_type.insert(
+        "narration",
+        NbtTag::Compound(decoration("chat.type.text.narrate", &["sender", "content"])),
+    );
+
+    // "msg_command" type — used for /msg (whisper) messages
+    let mut msg_command = NbtCompound::new();
+    msg_command.insert(
+        "chat",
+        NbtTag::Compound(decoration(
+            "commands.message.display.incoming",
+            &["sender", "content"],
+        )),
+    );
+    msg_command.insert(
+        "narration",
+        NbtTag::Compound(decoration("chat.type.text.narrate", &["sender", "content"])),
+    );
+
+    ClientboundConfigurationRegistryData {
+        id: "minecraft:chat_type".into(),
+        entries: vec![
+            ClientboundConfigurationRegistryDataEntries {
+                key: "minecraft:chat".into(),
+                value: Some(chat_type),
+            },
+            ClientboundConfigurationRegistryDataEntries {
+                key: "minecraft:msg_command".into(),
+                value: Some(msg_command),
+            },
+        ],
+    }
+}
+
+// Future registries — these have complex NBT formats that require
+// matching the exact vanilla data generator output. Tracked in
+// separate issues for each registry group.
+//
+// - trim_pattern / trim_material
+// - banner_pattern
+// - enchantment
+// - jukebox_song / instrument
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -612,13 +690,24 @@ mod tests {
     #[test]
     fn build_all_registries() {
         let registries = build_default_registries();
-        assert_eq!(registries.len(), 5);
+        assert_eq!(registries.len(), 6);
 
-        assert_eq!(registries[0].id, "minecraft:dimension_type");
-        assert_eq!(registries[1].id, "minecraft:worldgen/biome");
-        assert_eq!(registries[2].id, "minecraft:damage_type");
-        assert_eq!(registries[3].id, "minecraft:painting_variant");
-        assert_eq!(registries[4].id, "minecraft:wolf_variant");
+        let ids: Vec<&str> = registries.iter().map(|r| r.id.as_str()).collect();
+        assert!(ids.contains(&"minecraft:dimension_type"));
+        assert!(ids.contains(&"minecraft:worldgen/biome"));
+        assert!(ids.contains(&"minecraft:damage_type"));
+        assert!(ids.contains(&"minecraft:painting_variant"));
+        assert!(ids.contains(&"minecraft:wolf_variant"));
+        assert!(ids.contains(&"minecraft:chat_type"));
+    }
+
+    #[test]
+    fn chat_type_has_entries() {
+        let reg = build_chat_type_registry();
+        assert_eq!(reg.entries.len(), 2);
+        let keys: Vec<&str> = reg.entries.iter().map(|e| e.key.as_str()).collect();
+        assert!(keys.contains(&"minecraft:chat"));
+        assert!(keys.contains(&"minecraft:msg_command"));
     }
 
     #[test]
