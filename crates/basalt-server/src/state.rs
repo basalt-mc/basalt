@@ -13,6 +13,8 @@ use basalt_types::Uuid;
 use basalt_types::nbt::NbtCompound;
 use tokio::sync::{RwLock, mpsc};
 
+use crate::skin::ProfileProperty;
+
 /// Shared server state, held behind `Arc` and passed to every connection task.
 pub(crate) struct ServerState {
     /// Atomic counter for assigning unique entity IDs.
@@ -33,6 +35,8 @@ pub(crate) struct PlayerHandle {
     pub uuid: Uuid,
     /// The player's unique entity ID.
     pub entity_id: i32,
+    /// Mojang profile properties (skin textures).
+    pub skin_properties: Vec<ProfileProperty>,
     /// Channel for sending broadcast messages to this player's task.
     pub sender: mpsc::Sender<BroadcastMessage>,
 }
@@ -59,6 +63,8 @@ pub(crate) struct PlayerSnapshot {
     pub yaw: f32,
     /// Current pitch (vertical look angle, degrees).
     pub pitch: f32,
+    /// Mojang profile properties (skin textures).
+    pub skin_properties: Vec<ProfileProperty>,
 }
 
 /// A message broadcast from one player's task to all others.
@@ -140,6 +146,7 @@ impl ServerState {
                 z: 0.0,
                 yaw: 0.0,
                 pitch: 0.0,
+                skin_properties: h.skin_properties.clone(),
             })
             .collect();
         players.insert(handle.uuid, handle);
@@ -206,6 +213,7 @@ mod tests {
                 username: "Steve".into(),
                 uuid,
                 entity_id: 1,
+                skin_properties: vec![],
                 sender: tx,
             })
             .await;
@@ -231,6 +239,7 @@ mod tests {
                 username: "Alice".into(),
                 uuid: uuid1,
                 entity_id: 1,
+                skin_properties: vec![],
                 sender: tx1,
             })
             .await;
@@ -240,6 +249,7 @@ mod tests {
                 username: "Bob".into(),
                 uuid: uuid2,
                 entity_id: 2,
+                skin_properties: vec![],
                 sender: tx2,
             })
             .await;
@@ -263,6 +273,7 @@ mod tests {
                 username: "A".into(),
                 uuid: uuid1,
                 entity_id: 1,
+                skin_properties: vec![],
                 sender: tx1,
             })
             .await;
@@ -271,6 +282,7 @@ mod tests {
                 username: "B".into(),
                 uuid: uuid2,
                 entity_id: 2,
+                skin_properties: vec![],
                 sender: tx2,
             })
             .await;
@@ -299,6 +311,7 @@ mod tests {
                 username: "A".into(),
                 uuid: uuid1,
                 entity_id: 1,
+                skin_properties: vec![],
                 sender: tx1,
             })
             .await;
@@ -307,6 +320,7 @@ mod tests {
                 username: "B".into(),
                 uuid: uuid2,
                 entity_id: 2,
+                skin_properties: vec![],
                 sender: tx2,
             })
             .await;

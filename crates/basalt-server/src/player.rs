@@ -8,6 +8,8 @@ use std::time::Instant;
 
 use basalt_types::Uuid;
 
+use crate::skin::ProfileProperty;
+
 /// Server-side state for a connected player.
 ///
 /// Created when the player enters the Play state and updated
@@ -16,11 +18,11 @@ pub(crate) struct PlayerState {
     /// The player's display name.
     pub username: String,
     /// The player's UUID (offline-mode generated or Mojang-assigned).
-    /// Used by multi-player support (#53) for PlayerInfo and entity tracking.
-    #[allow(dead_code)]
     pub uuid: Uuid,
     /// The player's entity ID in the world.
     pub entity_id: i32,
+    /// Mojang profile properties (skin textures).
+    pub skin_properties: Vec<ProfileProperty>,
     /// Current X coordinate in the world.
     pub x: f64,
     /// Current Y coordinate in the world.
@@ -45,11 +47,17 @@ pub(crate) struct PlayerState {
 
 impl PlayerState {
     /// Creates a new player state with default spawn position.
-    pub fn new(username: String, uuid: Uuid, entity_id: i32) -> Self {
+    pub fn new(
+        username: String,
+        uuid: Uuid,
+        entity_id: i32,
+        skin_properties: Vec<ProfileProperty>,
+    ) -> Self {
         Self {
             username,
             uuid,
             entity_id,
+            skin_properties,
             x: 0.0,
             y: 100.0,
             z: 0.0,
@@ -90,7 +98,7 @@ mod tests {
     use super::*;
 
     fn test_player() -> PlayerState {
-        PlayerState::new("Steve".into(), Uuid::default(), 1)
+        PlayerState::new("Steve".into(), Uuid::default(), 1, vec![])
     }
 
     #[test]

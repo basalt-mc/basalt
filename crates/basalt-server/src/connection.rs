@@ -149,9 +149,17 @@ async fn handle_configuration(
     let conn = conn.finish_configuration().await?;
     println!("[{addr}] <- FinishConfiguration → Play");
 
+    // Fetch skin textures from Mojang API (non-blocking, best-effort)
+    let skin_properties = crate::skin::fetch_skin_properties(username).await;
+
     // Assign a unique entity ID and create player state
     let entity_id = state.next_entity_id();
-    let mut player = PlayerState::new(username.to_string(), player_uuid, entity_id);
+    let mut player = PlayerState::new(
+        username.to_string(),
+        player_uuid,
+        entity_id,
+        skin_properties,
+    );
 
     // Create the broadcast channel for this player
     let (tx, rx) = mpsc::channel::<BroadcastMessage>(64);
@@ -162,6 +170,7 @@ async fn handle_configuration(
             username: username.to_string(),
             uuid: player_uuid,
             entity_id,
+            skin_properties: player.skin_properties.clone(),
             sender: tx,
         })
         .await;
@@ -176,6 +185,7 @@ async fn handle_configuration(
         z: player.z,
         yaw: player.yaw,
         pitch: player.pitch,
+        skin_properties: player.skin_properties.clone(),
     };
     state
         .broadcast_except(
