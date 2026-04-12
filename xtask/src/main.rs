@@ -66,6 +66,7 @@ fn run_codegen() {
         .unwrap_or_else(|e| panic!("Failed to read {}: {e}", protocol_path.display()));
 
     let protocol: Value = serde_json::from_str(&protocol_json).expect("Failed to parse JSON");
+    let global_types = &protocol["types"];
 
     for &(json_key, module_name) in STATES {
         let state_data = &protocol[json_key];
@@ -75,9 +76,9 @@ fn run_codegen() {
         }
 
         if module_name == "play" {
-            generate_play_split(state_data, &workspace_root, PACKETS_DIR);
+            generate_play_split(state_data, &workspace_root, PACKETS_DIR, global_types);
         } else {
-            let code = generate_state_module(state_data, module_name);
+            let code = generate_state_module(state_data, module_name, global_types);
             let output_path = workspace_root
                 .join(PACKETS_DIR)
                 .join(format!("{module_name}.rs"));
