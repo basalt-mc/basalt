@@ -129,14 +129,33 @@ fn derive_encoded_size_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
                     .iter()
                     .map(|f| f.ident.as_ref().unwrap())
                     .collect();
-                let field_sizes: Vec<_> = field_names
+                let field_sizes = fields
+                    .named
                     .iter()
-                    .map(|name| {
-                        quote! {
-                            basalt_types::EncodedSize::encoded_size(#name)
-                        }
+                    .map(|f| {
+                        let fname = f.ident.as_ref().unwrap();
+                        let attr = parse_field_attr(&f.attrs)?;
+                        Ok(if attr.varint {
+                            quote! { basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(*#fname)) }
+                        } else if attr.optional {
+                            quote! {
+                                1 + match #fname {
+                                    Some(value) => basalt_types::EncodedSize::encoded_size(value),
+                                    None => 0,
+                                }
+                            }
+                        } else if attr.length_varint {
+                            quote! {
+                                basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(#fname.len() as i32))
+                                + #fname.iter().map(|item| basalt_types::EncodedSize::encoded_size(item)).sum::<usize>()
+                            }
+                        } else if attr.rest {
+                            quote! { #fname.len() }
+                        } else {
+                            quote! { basalt_types::EncodedSize::encoded_size(#fname) }
+                        })
                     })
-                    .collect();
+                    .collect::<Result<Vec<_>>>()?;
                 quote! {
                     #name::#variant_name { #(#field_names),* } => {
                         basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(#id))

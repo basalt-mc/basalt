@@ -139,16 +139,58 @@ fn derive_decode_enum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStrea
                     .iter()
                     .map(|f| f.ident.as_ref().unwrap())
                     .collect();
-                let field_types: Vec<_> = fields.named.iter().map(|f| &f.ty).collect();
-                let field_decodes: Vec<_> = field_names
+                let field_decodes = fields
+                    .named
                     .iter()
-                    .zip(field_types.iter())
-                    .map(|(name, ty)| {
-                        quote! {
-                            let #name: #ty = basalt_types::Decode::decode(buf)?;
-                        }
+                    .map(|f| {
+                        let fname = f.ident.as_ref().unwrap();
+                        let fty = &f.ty;
+                        let attr = parse_field_attr(&f.attrs)?;
+                        Ok(if attr.varint {
+                            quote! {
+                                let #fname = {
+                                    let var: basalt_types::VarInt = basalt_types::Decode::decode(buf)?;
+                                    var.0
+                                };
+                            }
+                        } else if attr.optional {
+                            quote! {
+                                let #fname = {
+                                    let present: bool = basalt_types::Decode::decode(buf)?;
+                                    if present {
+                                        Some(basalt_types::Decode::decode(buf)?)
+                                    } else {
+                                        None
+                                    }
+                                };
+                            }
+                        } else if attr.length_varint {
+                            quote! {
+                                let #fname = {
+                                    let len: basalt_types::VarInt = basalt_types::Decode::decode(buf)?;
+                                    let len = len.0 as usize;
+                                    let mut items = Vec::with_capacity(len);
+                                    for _ in 0..len {
+                                        items.push(basalt_types::Decode::decode(buf)?);
+                                    }
+                                    items
+                                };
+                            }
+                        } else if attr.rest {
+                            quote! {
+                                let #fname = {
+                                    let rest = buf.to_vec();
+                                    *buf = &buf[buf.len()..];
+                                    rest
+                                };
+                            }
+                        } else {
+                            quote! {
+                                let #fname: #fty = basalt_types::Decode::decode(buf)?;
+                            }
+                        })
                     })
-                    .collect();
+                    .collect::<Result<Vec<_>>>()?;
                 quote! {
                     #id => {
                         #(#field_decodes)*
