@@ -16,13 +16,23 @@
 pub mod block;
 mod chunk;
 mod generator;
+mod noise_gen;
 mod palette;
 
 pub use chunk::ChunkColumn;
 pub use generator::FlatWorldGenerator;
+pub use noise_gen::NoiseTerrainGenerator;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
+
+/// How terrain is generated for new chunks.
+enum Generator {
+    /// Superflat world: bedrock + dirt + grass.
+    Flat(FlatWorldGenerator),
+    /// Noise-based terrain with hills, water, beaches.
+    Noise(Box<NoiseTerrainGenerator>),
+}
 
 /// A Minecraft world with lazy chunk generation and in-memory caching.
 ///
@@ -36,24 +46,37 @@ pub struct World {
     /// In-memory chunk cache, keyed by (chunk_x, chunk_z).
     chunks: Mutex<HashMap<(i32, i32), ChunkColumn>>,
     /// The terrain generator used for new chunks.
-    generator: FlatWorldGenerator,
+    generator: Generator,
+    /// The Y coordinate where players spawn.
+    spawn_y: i32,
 }
 
 impl World {
-    /// Creates a new world with the flat world generator.
+    /// Creates a new world with noise-based terrain generation.
     ///
-    /// No chunks are generated until they are requested via
-    /// `get_or_generate_chunk`.
-    pub fn new() -> Self {
+    /// The seed determines the terrain shape — same seed produces
+    /// the same world every time. No chunks are generated until
+    /// they are requested.
+    pub fn new(seed: u32) -> Self {
         Self {
             chunks: Mutex::new(HashMap::new()),
-            generator: FlatWorldGenerator,
+            generator: Generator::Noise(Box::new(NoiseTerrainGenerator::new(seed))),
+            spawn_y: NoiseTerrainGenerator::SPAWN_Y,
+        }
+    }
+
+    /// Creates a new flat world (superflat).
+    pub fn flat() -> Self {
+        Self {
+            chunks: Mutex::new(HashMap::new()),
+            generator: Generator::Flat(FlatWorldGenerator),
+            spawn_y: FlatWorldGenerator::SPAWN_Y,
         }
     }
 
     /// The Y coordinate where players should spawn.
     pub fn spawn_y(&self) -> f64 {
-        FlatWorldGenerator::SPAWN_Y as f64
+        self.spawn_y as f64
     }
 
     /// Returns a protocol packet for the chunk at (cx, cz).
@@ -69,7 +92,10 @@ impl World {
         let mut cache = self.chunks.lock().unwrap();
         let chunk = cache.entry((cx, cz)).or_insert_with(|| {
             let mut col = ChunkColumn::new(cx, cz);
-            self.generator.generate(&mut col);
+            match &self.generator {
+                Generator::Flat(g) => g.generate(&mut col),
+                Generator::Noise(g) => g.generate(&mut col),
+            }
             col
         });
         chunk.to_packet()
@@ -88,7 +114,7 @@ impl World {
 
 impl Default for World {
     fn default() -> Self {
-        Self::new()
+        Self::new(0)
     }
 }
 
@@ -98,7 +124,7 @@ mod tests {
 
     #[test]
     fn world_generates_on_first_access() {
-        let world = World::new();
+        let world = World::new(42);
         assert!(!world.is_chunk_loaded(0, 0));
 
         let packet = world.get_chunk_packet(0, 0);
@@ -109,7 +135,7 @@ mod tests {
 
     #[test]
     fn world_caches_chunks() {
-        let world = World::new();
+        let world = World::new(42);
         world.get_chunk_packet(0, 0);
         world.get_chunk_packet(0, 0); // should not regenerate
         assert_eq!(world.chunk_count(), 1);
@@ -117,7 +143,7 @@ mod tests {
 
     #[test]
     fn world_generates_different_coords() {
-        let world = World::new();
+        let world = World::new(42);
         world.get_chunk_packet(0, 0);
         world.get_chunk_packet(1, 0);
         world.get_chunk_packet(0, 1);
@@ -126,7 +152,7 @@ mod tests {
 
     #[test]
     fn spawn_y_is_above_ground() {
-        let world = World::new();
-        assert_eq!(world.spawn_y(), -60.0);
+        let world = World::new(42);
+        assert_eq!(world.spawn_y(), NoiseTerrainGenerator::SPAWN_Y as f64);
     }
 }
