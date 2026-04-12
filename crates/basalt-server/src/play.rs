@@ -29,6 +29,7 @@ use basalt_protocol::packets::play::world::{
 use basalt_types::{Encode, Position, VarInt, Vec3i16};
 use tokio::sync::broadcast;
 
+use crate::handler::PacketContext;
 use crate::helpers::{RawPayload, angle_to_byte};
 use crate::player::PlayerState;
 use crate::state::{BroadcastMessage, PlayerSnapshot, ServerState};
@@ -200,7 +201,8 @@ async fn play_loop(
                 match result {
                     Ok(packet) => {
                         let action = dispatch_packet(addr, player, packet);
-                        execute_action(conn, player, state, action).await?;
+                        let mut ctx = PacketContext { conn, state, addr };
+                        execute_action(&mut ctx, player, action).await?;
                     }
                     Err(basalt_net::Error::Protocol(
                         basalt_protocol::Error::UnknownPacket { id, .. }
@@ -327,24 +329,23 @@ pub(crate) fn dispatch_packet(
     }
 }
 
-/// Executes the async part of a packet action.
+/// Executes the async part of a packet action using the packet context.
 async fn execute_action(
-    conn: &mut Connection<Play>,
+    ctx: &mut PacketContext<'_>,
     player: &mut PlayerState,
-    state: &Arc<ServerState>,
     action: PacketAction,
 ) -> crate::error::Result<()> {
     match action {
         PacketAction::Handled => {}
         PacketAction::Chat { username, message } => {
             let content = crate::chat::build_chat_component(&username, &message).to_nbt();
-            state.broadcast(BroadcastMessage::Chat { content });
+            ctx.state.broadcast(BroadcastMessage::Chat { content });
         }
         PacketAction::Command { command } => {
-            crate::chat::handle_command(conn, player, &command).await?;
+            crate::chat::handle_command(ctx.conn, player, &command).await?;
         }
         PacketAction::Moved => {
-            state.broadcast(BroadcastMessage::EntityMoved {
+            ctx.state.broadcast(BroadcastMessage::EntityMoved {
                 entity_id: player.entity_id,
                 x: player.x,
                 y: player.y,
