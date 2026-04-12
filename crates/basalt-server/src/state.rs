@@ -8,6 +8,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
+use basalt_events::EventBus;
 use basalt_types::Uuid;
 use basalt_types::nbt::NbtCompound;
 use dashmap::DashMap;
@@ -25,6 +26,8 @@ pub(crate) struct ServerState {
     broadcast_tx: broadcast::Sender<BroadcastMessage>,
     /// The world — chunk cache and terrain generator.
     pub world: basalt_world::World,
+    /// Event bus with registered plugin handlers.
+    pub event_bus: EventBus,
 }
 
 /// A handle to a connected player, stored in the server state registry.
@@ -131,11 +134,14 @@ impl ServerState {
         // old messages. 256 is enough for ~5 seconds of movement
         // updates from 10 players at 20Hz.
         let (broadcast_tx, _) = broadcast::channel(256);
+        let mut event_bus = EventBus::new();
+        crate::handlers::register_all(&mut event_bus);
         Arc::new(Self {
             next_entity_id: AtomicI32::new(1),
             players: DashMap::new(),
             broadcast_tx,
             world: basalt_world::World::new(42, "world"),
+            event_bus,
         })
     }
 

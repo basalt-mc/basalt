@@ -29,7 +29,12 @@ use basalt_protocol::packets::play::world::{
 use basalt_types::{Encode, Position, VarInt, Vec3i16};
 use tokio::sync::broadcast;
 
-use crate::handler::PacketContext;
+use basalt_events::Event;
+
+use crate::context::{EventContext, Response};
+use crate::events::{
+    BlockBrokenEvent, BlockPlacedEvent, ChatMessageEvent, CommandEvent, PlayerMovedEvent,
+};
 use crate::helpers::{RawPayload, angle_to_byte};
 use crate::player::PlayerState;
 use crate::state::{BroadcastMessage, PlayerSnapshot, ServerState};
@@ -193,9 +198,11 @@ async fn play_loop(
             result = conn.read_packet() => {
                 match result {
                     Ok(packet) => {
-                        let action = dispatch_packet(addr, player, packet);
-                        let mut ctx = PacketContext { conn, state, addr };
-                        execute_action(&mut ctx, player, action).await?;
+                        if let Some(mut event) = packet_to_event(addr, player, packet) {
+                            let ctx = EventContext::new(Arc::clone(state));
+                            state.event_bus.dispatch_dyn(&mut *event, &ctx);
+                            execute_responses(conn, state, player, &ctx.responses.drain()).await?;
+                        }
                     }
                     Err(basalt_net::Error::Protocol(
                         basalt_protocol::Error::UnknownPacket { id, .. }
@@ -220,54 +227,17 @@ async fn play_loop(
     Ok(())
 }
 
-/// Result of dispatching a packet synchronously.
-pub(crate) enum PacketAction {
-    /// Packet was fully handled (state updated, logged).
-    Handled,
-    /// A chat message that needs to be broadcast.
-    Chat { username: String, message: String },
-    /// A command that needs to be executed.
-    Command { command: String },
-    /// The player moved — broadcast to other players.
-    /// Contains the previous chunk coordinates for streaming detection.
-    Moved {
-        /// Previous chunk X before the movement.
-        old_cx: i32,
-        /// Previous chunk Z before the movement.
-        old_cz: i32,
-    },
-    /// A block was broken (set to air).
-    BlockBroken {
-        /// The block position.
-        x: i32,
-        /// The block position.
-        y: i32,
-        /// The block position.
-        z: i32,
-        /// Sequence number for client acknowledgement.
-        sequence: i32,
-    },
-    /// A block was placed.
-    BlockPlaced {
-        /// The position where the block was placed.
-        x: i32,
-        /// The position where the block was placed.
-        y: i32,
-        /// The position where the block was placed.
-        z: i32,
-        /// The block state ID that was placed.
-        block_state: u16,
-        /// Sequence number for client acknowledgement.
-        sequence: i32,
-    },
-}
-
-/// Dispatches a single serverbound Play packet synchronously.
-pub(crate) fn dispatch_packet(
+/// Converts a serverbound packet into a game event, if applicable.
+///
+/// Updates player state synchronously (position, look, inventory),
+/// then constructs a boxed event for dispatch through the event bus.
+/// Returns `None` for packets that are fully handled inline
+/// (keep-alive, teleport confirm, inventory updates, etc.).
+fn packet_to_event(
     addr: SocketAddr,
     player: &mut PlayerState,
     packet: ServerboundPlayPacket,
-) -> PacketAction {
+) -> Option<Box<dyn Event>> {
     match packet {
         ServerboundPlayPacket::KeepAlive(ka) => {
             if ka.keep_alive_id == player.last_keep_alive_id {
@@ -283,7 +253,7 @@ pub(crate) fn dispatch_packet(
                     player.username, player.last_keep_alive_id, ka.keep_alive_id
                 );
             }
-            PacketAction::Handled
+            None
         }
         ServerboundPlayPacket::TeleportConfirm(tc) => {
             println!(
@@ -291,19 +261,29 @@ pub(crate) fn dispatch_packet(
                 player.username, tc.teleport_id
             );
             player.teleport_confirmed = true;
-            PacketAction::Handled
+            None
         }
         ServerboundPlayPacket::PlayerLoaded(_) => {
             println!("[{addr}] {} finished loading", player.username);
             player.loaded = true;
-            PacketAction::Handled
+            None
         }
         ServerboundPlayPacket::Position(p) => {
             let old_cx = (player.x as i32) >> 4;
             let old_cz = (player.z as i32) >> 4;
             player.update_position(p.x, p.y, p.z);
             player.update_on_ground(p.flags);
-            PacketAction::Moved { old_cx, old_cz }
+            Some(Box::new(PlayerMovedEvent {
+                entity_id: player.entity_id,
+                x: player.x,
+                y: player.y,
+                z: player.z,
+                yaw: player.yaw,
+                pitch: player.pitch,
+                on_ground: player.on_ground,
+                old_cx,
+                old_cz,
+            }))
         }
         ServerboundPlayPacket::PositionLook(p) => {
             let old_cx = (player.x as i32) >> 4;
@@ -311,60 +291,82 @@ pub(crate) fn dispatch_packet(
             player.update_position(p.x, p.y, p.z);
             player.update_look(p.yaw, p.pitch);
             player.update_on_ground(p.flags);
-            PacketAction::Moved { old_cx, old_cz }
+            Some(Box::new(PlayerMovedEvent {
+                entity_id: player.entity_id,
+                x: player.x,
+                y: player.y,
+                z: player.z,
+                yaw: player.yaw,
+                pitch: player.pitch,
+                on_ground: player.on_ground,
+                old_cx,
+                old_cz,
+            }))
         }
         ServerboundPlayPacket::Look(p) => {
             let old_cx = (player.x as i32) >> 4;
             let old_cz = (player.z as i32) >> 4;
             player.update_look(p.yaw, p.pitch);
             player.update_on_ground(p.flags);
-            PacketAction::Moved { old_cx, old_cz }
+            Some(Box::new(PlayerMovedEvent {
+                entity_id: player.entity_id,
+                x: player.x,
+                y: player.y,
+                z: player.z,
+                yaw: player.yaw,
+                pitch: player.pitch,
+                on_ground: player.on_ground,
+                old_cx,
+                old_cz,
+            }))
         }
         ServerboundPlayPacket::Flying(p) => {
             player.update_on_ground(p.flags);
-            PacketAction::Handled
+            None
         }
         ServerboundPlayPacket::ChatMessage(msg) => {
             println!("[{addr}] <{}> {}", player.username, msg.message);
-            PacketAction::Chat {
+            Some(Box::new(ChatMessageEvent {
                 username: player.username.clone(),
                 message: msg.message,
-            }
+                cancelled: false,
+            }))
         }
         ServerboundPlayPacket::ChatCommand(cmd) => {
             println!(
                 "[{addr}] {} issued command: /{}",
                 player.username, cmd.command
             );
-            PacketAction::Command {
+            Some(Box::new(CommandEvent {
                 command: cmd.command,
-            }
+                player_uuid: player.uuid,
+                cancelled: false,
+            }))
         }
         ServerboundPlayPacket::BlockDig(dig) => {
             let pos = dig.location;
-            // Status 0 = started digging. In creative mode this is an instant break.
             if dig.status == 0 {
                 println!(
                     "[{addr}] {} broke block at ({}, {}, {})",
                     player.username, pos.x, pos.y, pos.z
                 );
-                PacketAction::BlockBroken {
+                Some(Box::new(BlockBrokenEvent {
                     x: pos.x,
                     y: pos.y,
                     z: pos.z,
                     sequence: dig.sequence,
-                }
+                    player_uuid: player.uuid,
+                    cancelled: false,
+                }))
             } else {
-                PacketAction::Handled
+                None
             }
         }
         ServerboundPlayPacket::BlockPlace(place) => {
             let target = place.location;
-            // Compute placement position from the face that was clicked
             let (dx, dy, dz) = face_offset(place.direction);
             let (px, py, pz) = (target.x + dx, target.y + dy, target.z + dz);
 
-            // Determine what block to place from the held item
             let item = player.held_item();
             if let Some(item_id) = item.item_id
                 && let Some(block_state) = basalt_world::block::item_to_default_block_state(item_id)
@@ -373,15 +375,17 @@ pub(crate) fn dispatch_packet(
                     "[{addr}] {} placed block at ({px}, {py}, {pz}) state={block_state}",
                     player.username
                 );
-                PacketAction::BlockPlaced {
+                Some(Box::new(BlockPlacedEvent {
                     x: px,
                     y: py,
                     z: pz,
                     block_state,
                     sequence: place.sequence,
-                }
+                    player_uuid: player.uuid,
+                    cancelled: false,
+                }))
             } else {
-                PacketAction::Handled
+                None
             }
         }
         ServerboundPlayPacket::HeldItemSlot(slot) => {
@@ -389,11 +393,11 @@ pub(crate) fn dispatch_packet(
             if idx < 9 {
                 player.held_slot = idx;
             }
-            PacketAction::Handled
+            None
         }
         ServerboundPlayPacket::SetCreativeSlot(creative) => {
             player.set_creative_slot(creative.slot, creative.item);
-            PacketAction::Handled
+            None
         }
         ServerboundPlayPacket::CustomPayload(_)
         | ServerboundPlayPacket::PlayerInput(_)
@@ -403,76 +407,83 @@ pub(crate) fn dispatch_packet(
         | ServerboundPlayPacket::MessageAcknowledgement(_)
         | ServerboundPlayPacket::ConfigurationAcknowledged(_)
         | ServerboundPlayPacket::UseItem(_)
-        | ServerboundPlayPacket::ArmAnimation(_) => PacketAction::Handled,
+        | ServerboundPlayPacket::ArmAnimation(_) => None,
         other => {
             println!(
                 "[{addr}] {} sent unhandled packet: {:?}",
                 player.username,
                 std::mem::discriminant(&other)
             );
-            PacketAction::Handled
+            None
         }
     }
 }
 
-/// Executes the async part of a packet action using the packet context.
-async fn execute_action(
-    ctx: &mut PacketContext<'_>,
+/// Executes queued responses from event handlers.
+///
+/// This is the async boundary — handlers are sync, but responses
+/// produce async packet writes and chunk streaming.
+async fn execute_responses(
+    conn: &mut Connection<Play>,
+    state: &Arc<ServerState>,
     player: &mut PlayerState,
-    action: PacketAction,
+    responses: &[Response],
 ) -> crate::error::Result<()> {
-    match action {
-        PacketAction::Handled => {}
-        PacketAction::Chat { username, message } => {
-            let content = crate::chat::build_chat_component(&username, &message).to_nbt();
-            ctx.state.broadcast(BroadcastMessage::Chat { content });
-        }
-        PacketAction::Command { command } => {
-            crate::chat::handle_command(ctx.conn, player, &command).await?;
-        }
-        PacketAction::Moved { old_cx, old_cz } => {
-            // Check if the player crossed a chunk boundary
-            let new_cx = (player.x as i32) >> 4;
-            let new_cz = (player.z as i32) >> 4;
-            if new_cx != old_cx || new_cz != old_cz {
-                stream_chunks(ctx.conn, ctx.state, player, new_cx, new_cz).await?;
+    for response in responses {
+        match response {
+            Response::Broadcast(msg) => {
+                state.broadcast(msg.clone());
             }
-
-            ctx.state.broadcast(BroadcastMessage::EntityMoved {
-                entity_id: player.entity_id,
-                x: player.x,
-                y: player.y,
-                z: player.z,
-                yaw: player.yaw,
-                pitch: player.pitch,
-                on_ground: player.on_ground,
-            });
-        }
-        PacketAction::BlockBroken { x, y, z, sequence } => {
-            ctx.state.world.set_block(x, y, z, basalt_world::block::AIR);
-            send_block_ack(ctx.conn, sequence).await?;
-            ctx.state.broadcast(BroadcastMessage::BlockChanged {
+            Response::SendBlockAck { sequence } => {
+                send_block_ack(conn, *sequence).await?;
+            }
+            Response::SendSystemChat {
+                content,
+                action_bar,
+            } => {
+                let packet = ClientboundPlaySystemChat {
+                    content: content.clone(),
+                    is_action_bar: *action_bar,
+                };
+                conn.write_packet_typed(ClientboundPlaySystemChat::PACKET_ID, &packet)
+                    .await?;
+            }
+            Response::SendPosition {
+                teleport_id,
                 x,
                 y,
                 z,
-                block_state: basalt_world::block::AIR as i32,
-            });
-        }
-        PacketAction::BlockPlaced {
-            x,
-            y,
-            z,
-            block_state,
-            sequence,
-        } => {
-            ctx.state.world.set_block(x, y, z, block_state);
-            send_block_ack(ctx.conn, sequence).await?;
-            ctx.state.broadcast(BroadcastMessage::BlockChanged {
-                x,
-                y,
-                z,
-                block_state: block_state as i32,
-            });
+                yaw,
+                pitch,
+            } => {
+                player.update_position(*x, *y, *z);
+                player.teleport_confirmed = false;
+                let packet = ClientboundPlayPosition {
+                    teleport_id: *teleport_id,
+                    x: *x,
+                    y: *y,
+                    z: *z,
+                    dx: 0.0,
+                    dy: 0.0,
+                    dz: 0.0,
+                    yaw: *yaw,
+                    pitch: *pitch,
+                    flags: 0,
+                };
+                conn.write_packet_typed(ClientboundPlayPosition::PACKET_ID, &packet)
+                    .await?;
+            }
+            Response::StreamChunks { new_cx, new_cz } => {
+                stream_chunks(conn, state, player, *new_cx, *new_cz).await?;
+            }
+            Response::SendGameStateChange { reason, value } => {
+                let packet = ClientboundPlayGameStateChange {
+                    reason: *reason,
+                    game_mode: *value,
+                };
+                conn.write_packet_typed(ClientboundPlayGameStateChange::PACKET_ID, &packet)
+                    .await?;
+            }
         }
     }
     Ok(())
@@ -841,11 +852,11 @@ mod tests {
     }
 
     #[test]
-    fn dispatch_teleport_confirm() {
+    fn teleport_confirm_returns_none() {
         let mut player = test_player();
         assert!(!player.teleport_confirmed);
 
-        let action = dispatch_packet(
+        let event = packet_to_event(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::TeleportConfirm(ServerboundPlayTeleportConfirm {
@@ -854,15 +865,15 @@ mod tests {
         );
 
         assert!(player.teleport_confirmed);
-        assert!(matches!(action, PacketAction::Handled));
+        assert!(event.is_none());
     }
 
     #[test]
-    fn dispatch_player_loaded() {
+    fn player_loaded_returns_none() {
         let mut player = test_player();
         assert!(!player.loaded);
 
-        let action = dispatch_packet(
+        let event = packet_to_event(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::PlayerLoaded(
@@ -871,28 +882,28 @@ mod tests {
         );
 
         assert!(player.loaded);
-        assert!(matches!(action, PacketAction::Handled));
+        assert!(event.is_none());
     }
 
     #[test]
-    fn dispatch_keep_alive_matching() {
+    fn keep_alive_returns_none() {
         let mut player = test_player();
         player.last_keep_alive_id = 42;
 
-        let action = dispatch_packet(
+        let event = packet_to_event(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::KeepAlive(ServerboundPlayKeepAlive { keep_alive_id: 42 }),
         );
 
-        assert!(matches!(action, PacketAction::Handled));
+        assert!(event.is_none());
     }
 
     #[test]
-    fn dispatch_position_returns_moved() {
+    fn position_returns_moved_event() {
         let mut player = test_player();
 
-        let action = dispatch_packet(
+        let event = packet_to_event(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::Position(ServerboundPlayPosition {
@@ -907,14 +918,16 @@ mod tests {
         assert_eq!(player.y, 64.0);
         assert_eq!(player.z, -30.2);
         assert!(player.on_ground);
-        assert!(matches!(action, PacketAction::Moved { .. }));
+        let event = event.unwrap();
+        let moved = event.as_any().downcast_ref::<PlayerMovedEvent>().unwrap();
+        assert_eq!(moved.x, 10.5);
     }
 
     #[test]
-    fn dispatch_position_look_returns_moved() {
+    fn position_look_returns_moved_event() {
         let mut player = test_player();
 
-        let action = dispatch_packet(
+        let event = packet_to_event(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::PositionLook(ServerboundPlayPositionLook {
@@ -929,14 +942,14 @@ mod tests {
 
         assert_eq!(player.x, 5.0);
         assert_eq!(player.yaw, 90.0);
-        assert!(matches!(action, PacketAction::Moved { .. }));
+        assert!(event.unwrap().as_any().is::<PlayerMovedEvent>());
     }
 
     #[test]
-    fn dispatch_look_returns_moved() {
+    fn look_returns_moved_event() {
         let mut player = test_player();
 
-        let action = dispatch_packet(
+        let event = packet_to_event(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::Look(ServerboundPlayLook {
@@ -947,28 +960,28 @@ mod tests {
         );
 
         assert_eq!(player.yaw, 180.0);
-        assert!(matches!(action, PacketAction::Moved { .. }));
+        assert!(event.unwrap().as_any().is::<PlayerMovedEvent>());
     }
 
     #[test]
-    fn dispatch_flying_returns_handled() {
+    fn flying_returns_none() {
         let mut player = test_player();
 
-        let action = dispatch_packet(
+        let event = packet_to_event(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::Flying(ServerboundPlayFlying { flags: 0x01 }),
         );
 
         assert!(player.on_ground);
-        assert!(matches!(action, PacketAction::Handled));
+        assert!(event.is_none());
     }
 
     #[test]
-    fn dispatch_chat_returns_action() {
+    fn chat_returns_event() {
         let mut player = test_player();
 
-        let action = dispatch_packet(
+        let event = packet_to_event(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::ChatMessage(
@@ -983,14 +996,14 @@ mod tests {
             ),
         );
 
-        assert!(matches!(action, PacketAction::Chat { .. }));
+        assert!(event.unwrap().as_any().is::<ChatMessageEvent>());
     }
 
     #[test]
-    fn dispatch_command_returns_action() {
+    fn command_returns_event() {
         let mut player = test_player();
 
-        let action = dispatch_packet(
+        let event = packet_to_event(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::ChatCommand(
@@ -1000,14 +1013,14 @@ mod tests {
             ),
         );
 
-        assert!(matches!(action, PacketAction::Command { .. }));
+        assert!(event.unwrap().as_any().is::<CommandEvent>());
     }
 
     #[test]
-    fn dispatch_unhandled_does_not_panic() {
+    fn unhandled_returns_none() {
         let mut player = test_player();
 
-        let action = dispatch_packet(
+        let event = packet_to_event(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::CustomPayload(
@@ -1018,14 +1031,14 @@ mod tests {
             ),
         );
 
-        assert!(matches!(action, PacketAction::Handled));
+        assert!(event.is_none());
     }
 
     #[test]
-    fn dispatch_block_dig_status_0_returns_block_broken() {
+    fn block_dig_status_0_returns_event() {
         let mut player = test_player();
 
-        let action = dispatch_packet(
+        let event = packet_to_event(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::BlockDig(
@@ -1038,23 +1051,19 @@ mod tests {
             ),
         );
 
-        match action {
-            PacketAction::BlockBroken { x, y, z, sequence } => {
-                assert_eq!(x, 10);
-                assert_eq!(y, 64);
-                assert_eq!(z, -5);
-                assert_eq!(sequence, 42);
-            }
-            _ => panic!("expected BlockBroken"),
-        }
+        let event = event.unwrap();
+        let broken = event.as_any().downcast_ref::<BlockBrokenEvent>().unwrap();
+        assert_eq!(broken.x, 10);
+        assert_eq!(broken.y, 64);
+        assert_eq!(broken.z, -5);
+        assert_eq!(broken.sequence, 42);
     }
 
     #[test]
-    fn dispatch_block_dig_other_status_returns_handled() {
+    fn block_dig_other_status_returns_none() {
         let mut player = test_player();
 
-        // Status 1 = cancelled digging, should be ignored
-        let action = dispatch_packet(
+        let event = packet_to_event(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::BlockDig(
@@ -1067,24 +1076,23 @@ mod tests {
             ),
         );
 
-        assert!(matches!(action, PacketAction::Handled));
+        assert!(event.is_none());
     }
 
     #[test]
-    fn dispatch_block_place_with_valid_item() {
+    fn block_place_with_valid_item() {
         let mut player = test_player();
-        // Give the player stone in hotbar slot 0
         player.hotbar[0] = basalt_types::Slot::new(1, 64);
         player.held_slot = 0;
 
-        let action = dispatch_packet(
+        let event = packet_to_event(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::BlockPlace(
                 basalt_protocol::packets::play::world::ServerboundPlayBlockPlace {
                     hand: 0,
                     location: Position::new(5, 63, 5),
-                    direction: 1, // top face → place at y+1
+                    direction: 1,
                     cursor_x: 0.5,
                     cursor_y: 1.0,
                     cursor_z: 0.5,
@@ -1095,30 +1103,20 @@ mod tests {
             ),
         );
 
-        match action {
-            PacketAction::BlockPlaced {
-                x,
-                y,
-                z,
-                block_state,
-                sequence,
-            } => {
-                assert_eq!(x, 5);
-                assert_eq!(y, 64); // 63 + 1 (top face)
-                assert_eq!(z, 5);
-                assert_eq!(block_state, 1); // stone
-                assert_eq!(sequence, 7);
-            }
-            _ => panic!("expected BlockPlaced"),
-        }
+        let event = event.unwrap();
+        let placed = event.as_any().downcast_ref::<BlockPlacedEvent>().unwrap();
+        assert_eq!(placed.x, 5);
+        assert_eq!(placed.y, 64);
+        assert_eq!(placed.z, 5);
+        assert_eq!(placed.block_state, 1);
+        assert_eq!(placed.sequence, 7);
     }
 
     #[test]
-    fn dispatch_block_place_empty_hand_returns_handled() {
+    fn block_place_empty_hand_returns_none() {
         let mut player = test_player();
-        // Empty hand — no block to place
 
-        let action = dispatch_packet(
+        let event = packet_to_event(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::BlockPlace(
@@ -1136,15 +1134,15 @@ mod tests {
             ),
         );
 
-        assert!(matches!(action, PacketAction::Handled));
+        assert!(event.is_none());
     }
 
     #[test]
-    fn dispatch_held_item_slot_updates_player() {
+    fn held_item_slot_updates_player() {
         let mut player = test_player();
         assert_eq!(player.held_slot, 0);
 
-        let action = dispatch_packet(
+        let event = packet_to_event(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::HeldItemSlot(
@@ -1155,14 +1153,14 @@ mod tests {
         );
 
         assert_eq!(player.held_slot, 4);
-        assert!(matches!(action, PacketAction::Handled));
+        assert!(event.is_none());
     }
 
     #[test]
-    fn dispatch_set_creative_slot_updates_hotbar() {
+    fn set_creative_slot_updates_hotbar() {
         let mut player = test_player();
 
-        let action = dispatch_packet(
+        let event = packet_to_event(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::SetCreativeSlot(
@@ -1175,7 +1173,7 @@ mod tests {
 
         assert_eq!(player.hotbar[0].item_id, Some(1));
         assert_eq!(player.hotbar[0].item_count, 64);
-        assert!(matches!(action, PacketAction::Handled));
+        assert!(event.is_none());
     }
 
     #[test]
