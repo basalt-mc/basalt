@@ -186,8 +186,8 @@ impl World {
     ///
     /// Loads the chunk if it isn't already in memory. Invalidates the
     /// packet cache for the affected chunk so the next `get_chunk_packet`
-    /// call re-encodes it. Persists the modified chunk to disk if
-    /// storage is configured.
+    /// call re-encodes it. Does NOT persist to disk — call
+    /// `persist_chunk()` separately (the `StorageHandler` does this).
     pub fn set_block(&self, x: i32, y: i32, z: i32, state: u16) {
         let cx = x >> 4;
         let cz = z >> 4;
@@ -205,10 +205,19 @@ impl World {
 
         // Invalidate cached packet
         store.packets.remove(&(cx, cz));
+    }
 
-        // Persist to disk
-        if let Some(s) = &self.storage {
-            let data = format::serialize_chunk(&store.chunks[&(cx, cz)]);
+    /// Persists a chunk to disk via the storage backend.
+    ///
+    /// Serializes the chunk at (cx, cz) and writes it to the BSR
+    /// region file. No-op if storage is not configured or the chunk
+    /// is not loaded. Called by the `StorageHandler` after block changes.
+    pub fn persist_chunk(&self, cx: i32, cz: i32) {
+        let store = self.store.lock().unwrap();
+        if let Some(s) = &self.storage
+            && let Some(chunk) = store.chunks.get(&(cx, cz))
+        {
+            let data = format::serialize_chunk(chunk);
             let _ = s.save_raw(cx, cz, &data);
         }
     }
@@ -344,13 +353,26 @@ mod tests {
     }
 
     #[test]
-    fn set_block_persists_to_disk() {
+    fn persist_chunk_writes_to_disk() {
         let dir = tempfile::tempdir().unwrap();
         let world = World::new(42, dir.path());
         world.set_block(0, 100, 0, block::STONE);
+        world.persist_chunk(0, 0);
 
         // Load from fresh world — should read from disk
         let world2 = World::new(42, dir.path());
         assert_eq!(world2.get_block(0, 100, 0), block::STONE);
+    }
+
+    #[test]
+    fn set_block_without_persist_is_memory_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let world = World::new(42, dir.path());
+        world.set_block(0, 100, 0, block::STONE);
+        // No persist_chunk call
+
+        // Fresh world should NOT see the change
+        let world2 = World::new(42, dir.path());
+        assert_ne!(world2.get_block(0, 100, 0), block::STONE);
     }
 }
