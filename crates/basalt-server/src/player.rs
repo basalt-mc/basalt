@@ -59,7 +59,7 @@ impl PlayerState {
             entity_id,
             skin_properties,
             x: 0.0,
-            y: basalt_world::FlatWorldGenerator::SPAWN_Y as f64,
+            y: basalt_world::NoiseTerrainGenerator::SPAWN_Y as f64,
             z: 0.0,
             yaw: 0.0,
             pitch: 0.0,
@@ -105,7 +105,7 @@ mod tests {
     fn new_player_has_default_spawn() {
         let p = test_player();
         assert_eq!(p.x, 0.0);
-        assert_eq!(p.y, basalt_world::FlatWorldGenerator::SPAWN_Y as f64);
+        assert_eq!(p.y, basalt_world::NoiseTerrainGenerator::SPAWN_Y as f64);
         assert_eq!(p.z, 0.0);
         assert_eq!(p.yaw, 0.0);
         assert_eq!(p.pitch, 0.0);
