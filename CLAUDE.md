@@ -25,7 +25,8 @@ basalt-types → basalt-derive → basalt-protocol → basalt-net → basalt-ser
 | `basalt-derive` | Proc macros for `Encode`/`Decode`/`EncodedSize` | `syn`, `quote`, `proc-macro2` |
 | `basalt-protocol` | Packet definitions, version-aware registry, registry data | `basalt-types`, `basalt-derive` |
 | `basalt-net` | Async networking, encryption, compression, connection typestate, middleware pipeline | `basalt-protocol`, `tokio`, `aes`, `cfb8`, `flate2` |
-| `basalt-world` | World generation, chunk storage, paletted containers, block state registry | `basalt-types`, `basalt-protocol` |
+| `basalt-world` | World generation, chunk storage, paletted containers, block state registry | `basalt-types`, `basalt-protocol`, `basalt-storage` |
+| `basalt-storage` | BSR region file format with LZ4 compression for chunk persistence | `lz4_flex` |
 | `basalt-server` | Minecraft server: connection lifecycle, play loop, chat, commands, chunk streaming | `basalt-net`, `basalt-world`, `tokio`, `dashmap`, `reqwest` |
 | `xtask` | Code generation from minecraft-data JSON → Rust packet structs | `serde_json` |
 
@@ -120,6 +121,7 @@ basalt/
 │   ├── basalt-protocol/
 │   ├── basalt-net/
 │   ├── basalt-world/          # World generation, chunk cache, paletted containers
+│   ├── basalt-storage/        # BSR region format, LZ4 compression, disk persistence
 │   └── basalt-server/         # Minecraft server: connection lifecycle, play loop, chat, commands
 ├── minecraft-data/           # Git submodule — PrismarineJS/minecraft-data
 ├── xtask/                    # Codegen tool

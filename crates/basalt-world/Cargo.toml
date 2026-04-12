@@ -8,4 +8,8 @@ repository.workspace = true
 [dependencies]
 basalt-types = { workspace = true }
 basalt-protocol = { workspace = true }
+basalt-storage = { workspace = true }
 noise = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

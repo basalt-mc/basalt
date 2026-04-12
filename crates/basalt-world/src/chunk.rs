@@ -25,7 +25,7 @@ fn build_full_light_mask(count: usize) -> Vec<i64> {
 use crate::palette::PalettedContainer;
 
 /// Number of chunk sections in a standard overworld chunk.
-const SECTIONS_PER_CHUNK: usize = 24;
+pub const SECTIONS_PER_CHUNK: usize = 24;
 
 /// The Y coordinate of the bottom of the world.
 const WORLD_BOTTOM_Y: i32 = -64;
@@ -37,7 +37,8 @@ pub struct ChunkColumn {
     /// Chunk Z coordinate.
     pub z: i32,
     /// The 24 sections from bottom (y=-64) to top (y=319).
-    sections: [PalettedContainer; SECTIONS_PER_CHUNK],
+    /// Boxed to avoid 192KB stack allocation (24 × 8KB per section).
+    pub sections: Box<[PalettedContainer; SECTIONS_PER_CHUNK]>,
 }
 
 impl ChunkColumn {
@@ -46,7 +47,9 @@ impl ChunkColumn {
         Self {
             x,
             z,
-            sections: std::array::from_fn(|_| PalettedContainer::filled(block::AIR)),
+            sections: Box::new(std::array::from_fn(|_| {
+                PalettedContainer::filled(block::AIR)
+            })),
         }
     }
 
@@ -105,7 +108,7 @@ impl ChunkColumn {
     /// Encodes all 24 sections into the wire format.
     fn encode_sections(&self) -> Vec<u8> {
         let mut buf = Vec::new();
-        for section in &self.sections {
+        for section in self.sections.iter() {
             // Block count
             section.non_air_count().encode(&mut buf).unwrap();
             // Block states paletted container
