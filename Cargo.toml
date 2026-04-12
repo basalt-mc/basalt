@@ -15,6 +15,7 @@ basalt-protocol = { path = "crates/basalt-protocol" }
 basalt-net = { path = "crates/basalt-net" }
 basalt-server = { path = "crates/basalt-server" }
 basalt-world = { path = "crates/basalt-world" }
+basalt-events = { path = "crates/basalt-events" }
 basalt-storage = { path = "crates/basalt-storage" }
 
 # Error handling
