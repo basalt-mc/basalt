@@ -9,7 +9,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::chunk::build_empty_chunk;
 use basalt_net::connection::{Connection, Play};
 use basalt_protocol::packets::play::ServerboundPlayPacket;
 use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
@@ -24,7 +23,7 @@ use basalt_protocol::packets::play::player::{
 };
 use basalt_protocol::packets::play::world::{
     ClientboundPlayChunkBatchFinished, ClientboundPlayChunkBatchStart, ClientboundPlayMapChunk,
-    ClientboundPlaySpawnPosition,
+    ClientboundPlaySpawnPosition, ClientboundPlayUnloadChunk,
 };
 use basalt_types::{Encode, Position, VarInt, Vec3i16};
 use tokio::sync::broadcast;
@@ -43,7 +42,7 @@ pub(crate) async fn run_play_loop(
     rx: broadcast::Receiver<BroadcastMessage>,
     existing_players: &[PlayerSnapshot],
 ) -> crate::error::Result<()> {
-    send_initial_world(&mut conn, addr, player).await?;
+    send_initial_world(&mut conn, addr, player, state).await?;
 
     // Send the player's own PlayerInfo so they appear in their own Tab list
     let self_snapshot = PlayerSnapshot {
@@ -75,11 +74,16 @@ pub(crate) async fn run_play_loop(
     play_loop(&mut conn, addr, player, state, rx).await
 }
 
+/// View distance radius in chunks. Determines how many chunks are
+/// sent around the player. Total chunks = (2*RADIUS+1)^2.
+const VIEW_RADIUS: i32 = 5;
+
 /// Sends the initial world data that the client needs to enter the game.
 async fn send_initial_world(
     conn: &mut Connection<Play>,
     addr: SocketAddr,
     player: &PlayerState,
+    state: &Arc<ServerState>,
 ) -> crate::error::Result<()> {
     let login = ClientboundPlayLogin {
         entity_id: player.entity_id,
@@ -109,8 +113,9 @@ async fn send_initial_world(
         .await?;
     println!("[{addr}] -> Login (Play)");
 
+    let spawn_y = state.world.spawn_y() as i32;
     let spawn = ClientboundPlaySpawnPosition {
-        location: Position::new(0, 100, 0),
+        location: Position::new(0, spawn_y, 0),
         angle: 0.0,
     };
     conn.write_packet_typed(ClientboundPlaySpawnPosition::PACKET_ID, &spawn)
@@ -125,31 +130,11 @@ async fn send_initial_world(
         .await?;
     println!("[{addr}] -> GameEvent (start waiting for chunks)");
 
-    // Send a grid of empty chunks around spawn so the player can
-    // walk around without falling into the void. The view_distance
-    // in the Login packet is 10, so we send a 7x7 grid (enough to
-    // fill the immediate view without sending hundreds of chunks).
-    let radius = 3;
-    let batch_start = ClientboundPlayChunkBatchStart;
-    conn.write_packet_typed(ClientboundPlayChunkBatchStart::PACKET_ID, &batch_start)
-        .await?;
-
-    let mut chunk_count = 0;
-    for cx in -radius..=radius {
-        for cz in -radius..=radius {
-            let chunk = build_empty_chunk(cx, cz);
-            conn.write_packet_typed(ClientboundPlayMapChunk::PACKET_ID, &chunk)
-                .await?;
-            chunk_count += 1;
-        }
-    }
-
-    let batch_finish = ClientboundPlayChunkBatchFinished {
-        batch_size: chunk_count,
-    };
-    conn.write_packet_typed(ClientboundPlayChunkBatchFinished::PACKET_ID, &batch_finish)
-        .await?;
-    println!("[{addr}] -> ChunkData ({chunk_count} chunks, radius {radius})");
+    // Send chunks around spawn using the world generator/cache
+    let spawn_cx = (player.x as i32) >> 4;
+    let spawn_cz = (player.z as i32) >> 4;
+    let chunk_count = send_chunks_around(conn, state, spawn_cx, spawn_cz, VIEW_RADIUS).await?;
+    println!("[{addr}] -> ChunkData ({chunk_count} chunks, radius {VIEW_RADIUS})");
 
     let position = ClientboundPlayPosition {
         teleport_id: 1,
@@ -236,7 +221,13 @@ pub(crate) enum PacketAction {
     /// A command that needs to be executed.
     Command { command: String },
     /// The player moved — broadcast to other players.
-    Moved,
+    /// Contains the previous chunk coordinates for streaming detection.
+    Moved {
+        /// Previous chunk X before the movement.
+        old_cx: i32,
+        /// Previous chunk Z before the movement.
+        old_cz: i32,
+    },
 }
 
 /// Dispatches a single serverbound Play packet synchronously.
@@ -276,20 +267,26 @@ pub(crate) fn dispatch_packet(
             PacketAction::Handled
         }
         ServerboundPlayPacket::Position(p) => {
+            let old_cx = (player.x as i32) >> 4;
+            let old_cz = (player.z as i32) >> 4;
             player.update_position(p.x, p.y, p.z);
             player.update_on_ground(p.flags);
-            PacketAction::Moved
+            PacketAction::Moved { old_cx, old_cz }
         }
         ServerboundPlayPacket::PositionLook(p) => {
+            let old_cx = (player.x as i32) >> 4;
+            let old_cz = (player.z as i32) >> 4;
             player.update_position(p.x, p.y, p.z);
             player.update_look(p.yaw, p.pitch);
             player.update_on_ground(p.flags);
-            PacketAction::Moved
+            PacketAction::Moved { old_cx, old_cz }
         }
         ServerboundPlayPacket::Look(p) => {
+            let old_cx = (player.x as i32) >> 4;
+            let old_cz = (player.z as i32) >> 4;
             player.update_look(p.yaw, p.pitch);
             player.update_on_ground(p.flags);
-            PacketAction::Moved
+            PacketAction::Moved { old_cx, old_cz }
         }
         ServerboundPlayPacket::Flying(p) => {
             player.update_on_ground(p.flags);
@@ -344,7 +341,14 @@ async fn execute_action(
         PacketAction::Command { command } => {
             crate::chat::handle_command(ctx.conn, player, &command).await?;
         }
-        PacketAction::Moved => {
+        PacketAction::Moved { old_cx, old_cz } => {
+            // Check if the player crossed a chunk boundary
+            let new_cx = (player.x as i32) >> 4;
+            let new_cz = (player.z as i32) >> 4;
+            if new_cx != old_cx || new_cz != old_cz {
+                stream_chunks(ctx.conn, ctx.state, old_cx, old_cz, new_cx, new_cz).await?;
+            }
+
             ctx.state.broadcast(BroadcastMessage::EntityMoved {
                 entity_id: player.entity_id,
                 x: player.x,
@@ -538,6 +542,119 @@ async fn send_spawn_entity(
     Ok(())
 }
 
+/// Sends a batch of chunks in a radius around (cx, cz).
+///
+/// Returns the number of chunks sent. Each chunk is generated
+/// by the world if not already cached.
+async fn send_chunks_around(
+    conn: &mut Connection<Play>,
+    state: &Arc<ServerState>,
+    cx: i32,
+    cz: i32,
+    radius: i32,
+) -> crate::error::Result<i32> {
+    conn.write_packet_typed(
+        ClientboundPlayChunkBatchStart::PACKET_ID,
+        &ClientboundPlayChunkBatchStart,
+    )
+    .await?;
+
+    let mut count = 0;
+    for dx in -radius..=radius {
+        for dz in -radius..=radius {
+            let packet = state.world.get_chunk_packet(cx + dx, cz + dz);
+            conn.write_packet_typed(ClientboundPlayMapChunk::PACKET_ID, &packet)
+                .await?;
+            count += 1;
+        }
+    }
+
+    conn.write_packet_typed(
+        ClientboundPlayChunkBatchFinished::PACKET_ID,
+        &ClientboundPlayChunkBatchFinished { batch_size: count },
+    )
+    .await?;
+
+    Ok(count)
+}
+
+/// Streams chunks when the player crosses a chunk boundary.
+///
+/// Sends new chunks that entered the view distance and unloads
+/// chunks that left it. Only the difference is sent, not the
+/// entire view.
+async fn stream_chunks(
+    conn: &mut Connection<Play>,
+    state: &Arc<ServerState>,
+    old_cx: i32,
+    old_cz: i32,
+    new_cx: i32,
+    new_cz: i32,
+) -> crate::error::Result<()> {
+    let r = VIEW_RADIUS;
+
+    // Collect chunks to load (in new view but not in old view)
+    let mut to_load = Vec::new();
+    for dx in -r..=r {
+        for dz in -r..=r {
+            let cx = new_cx + dx;
+            let cz = new_cz + dz;
+            let was_in_old = (cx - old_cx).abs() <= r && (cz - old_cz).abs() <= r;
+            if !was_in_old {
+                to_load.push((cx, cz));
+            }
+        }
+    }
+
+    // Collect chunks to unload (in old view but not in new view)
+    let mut to_unload = Vec::new();
+    for dx in -r..=r {
+        for dz in -r..=r {
+            let cx = old_cx + dx;
+            let cz = old_cz + dz;
+            let is_in_new = (cx - new_cx).abs() <= r && (cz - new_cz).abs() <= r;
+            if !is_in_new {
+                to_unload.push((cx, cz));
+            }
+        }
+    }
+
+    // Unload old chunks
+    for (cx, cz) in &to_unload {
+        let packet = ClientboundPlayUnloadChunk {
+            chunk_x: *cx,
+            chunk_z: *cz,
+        };
+        conn.write_packet_typed(ClientboundPlayUnloadChunk::PACKET_ID, &packet)
+            .await?;
+    }
+
+    // Load new chunks
+    if !to_load.is_empty() {
+        conn.write_packet_typed(
+            ClientboundPlayChunkBatchStart::PACKET_ID,
+            &ClientboundPlayChunkBatchStart,
+        )
+        .await?;
+
+        for (cx, cz) in &to_load {
+            let packet = state.world.get_chunk_packet(*cx, *cz);
+            conn.write_packet_typed(ClientboundPlayMapChunk::PACKET_ID, &packet)
+                .await?;
+        }
+
+        conn.write_packet_typed(
+            ClientboundPlayChunkBatchFinished::PACKET_ID,
+            &ClientboundPlayChunkBatchFinished {
+                batch_size: to_load.len() as i32,
+            },
+        )
+        .await?;
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -623,7 +740,7 @@ mod tests {
         assert_eq!(player.y, 64.0);
         assert_eq!(player.z, -30.2);
         assert!(player.on_ground);
-        assert!(matches!(action, PacketAction::Moved));
+        assert!(matches!(action, PacketAction::Moved { .. }));
     }
 
     #[test]
@@ -645,7 +762,7 @@ mod tests {
 
         assert_eq!(player.x, 5.0);
         assert_eq!(player.yaw, 90.0);
-        assert!(matches!(action, PacketAction::Moved));
+        assert!(matches!(action, PacketAction::Moved { .. }));
     }
 
     #[test]
@@ -663,7 +780,7 @@ mod tests {
         );
 
         assert_eq!(player.yaw, 180.0);
-        assert!(matches!(action, PacketAction::Moved));
+        assert!(matches!(action, PacketAction::Moved { .. }));
     }
 
     #[test]
