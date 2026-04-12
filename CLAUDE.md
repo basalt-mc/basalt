@@ -11,21 +11,22 @@
 
 ## Architecture
 
-Five crates in a Cargo workspace under `crates/`, plus an `xtask` codegen tool:
+Six crates in a Cargo workspace under `crates/`, plus an `xtask` codegen tool:
 
 ```
 basalt-types → basalt-derive → basalt-protocol → basalt-net → basalt-server
-                                      ↑
-                                   xtask (codegen)
+                                      ↑                            ↑
+                                   xtask (codegen)           basalt-world
 ```
 
 | Crate | Purpose | Key dependencies |
 |-------|---------|-----------------|
 | `basalt-types` | Primitive Minecraft types, `Encode`/`Decode`/`EncodedSize` traits | `thiserror` |
 | `basalt-derive` | Proc macros for `Encode`/`Decode`/`EncodedSize` | `syn`, `quote`, `proc-macro2` |
-| `basalt-protocol` | Packet definitions, version-aware registry, registry data, chunk builder | `basalt-types`, `basalt-derive` |
+| `basalt-protocol` | Packet definitions, version-aware registry, registry data | `basalt-types`, `basalt-derive` |
 | `basalt-net` | Async networking, encryption, compression, connection typestate, middleware pipeline | `basalt-protocol`, `tokio`, `aes`, `cfb8`, `flate2` |
-| `basalt-server` | Minecraft server: connection lifecycle, play loop, chat, commands, player state | `basalt-net`, `basalt-protocol`, `basalt-types`, `tokio` |
+| `basalt-world` | World generation, chunk storage, paletted containers, block state registry | `basalt-types`, `basalt-protocol` |
+| `basalt-server` | Minecraft server: connection lifecycle, play loop, chat, commands, chunk streaming | `basalt-net`, `basalt-world`, `tokio`, `dashmap`, `reqwest` |
 | `xtask` | Code generation from minecraft-data JSON → Rust packet structs | `serde_json` |
 
 - `basalt-types` and `basalt-derive` have no interdependency.
@@ -54,10 +55,26 @@ crates/basalt-server/
 
 ### Multi-player architecture
 
-- `ServerState` holds an `Arc`-shared player registry (`RwLock<HashMap<Uuid, PlayerHandle>>`) and an atomic entity ID counter
-- Each player task creates an `mpsc::channel` — the `Sender` goes in the registry, the `Receiver` is polled in the play loop's third `select!` branch
-- `broadcast()` sends to all players, `broadcast_except()` skips the sender (used for movement)
-- The play loop separates sync and async: `dispatch_packet()` returns a `PacketAction` enum, `execute_action()` sends responses and broadcasts
+- `ServerState` holds a `DashMap` player registry (lock-free), an atomic entity ID counter, a `tokio::sync::broadcast` channel, and the `World`
+- Each player subscribes to the broadcast channel on join and polls it in the play loop's third `select!` branch
+- `broadcast()` is O(1) fan-out — receivers filter their own messages (join, movement)
+- The play loop separates sync and async: `dispatch_packet()` returns a `PacketAction` enum, `execute_action()` sends responses via `PacketContext`
+
+### basalt-world architecture
+
+```
+crates/basalt-world/
+├── src/
+│   ├── lib.rs           # World: chunk cache (HashMap behind Mutex) + generator
+│   ├── chunk.rs         # ChunkColumn: 24 sections, set/get block, to_packet()
+│   ├── palette.rs       # PalettedContainer: single-value + indirect palette encoding
+│   ├── generator.rs     # FlatWorldGenerator: bedrock/dirt/grass layers
+│   └── block.rs         # Block state IDs (AIR, STONE, DIRT, GRASS_BLOCK, BEDROCK)
+```
+
+- `World::get_chunk_packet(cx, cz)` generates on first access, caches in memory
+- `PalettedContainer` handles single-value optimization and indirect palettes with proper bits-per-entry
+- Chunk streaming: server tracks player chunk position, sends new chunks on boundary crossing, unloads old ones via `UnloadChunk`
 
 ## Architectural principles
 
@@ -102,7 +119,8 @@ basalt/
 │   ├── basalt-derive/
 │   ├── basalt-protocol/
 │   ├── basalt-net/
-│   └── basalt-server/        # Minecraft server: connection lifecycle, play loop, chat, commands
+│   ├── basalt-world/          # World generation, chunk cache, paletted containers
+│   └── basalt-server/         # Minecraft server: connection lifecycle, play loop, chat, commands
 ├── minecraft-data/           # Git submodule — PrismarineJS/minecraft-data
 ├── xtask/                    # Codegen tool
 │   └── src/
