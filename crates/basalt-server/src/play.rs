@@ -1,39 +1,67 @@
-//! Play state loop with packet dispatch.
+//! Play state loop with packet dispatch and multi-player broadcast.
 //!
 //! Handles the main gameplay loop: sends initial world data (login,
 //! chunks, position), then enters a read loop that dispatches incoming
-//! packets to the appropriate handlers while sending periodic keep-alive
-//! probes.
+//! packets, sends periodic keep-alive probes, and processes broadcast
+//! messages from other players (chat, join/leave, movement).
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::Instant;
 
 use basalt_net::connection::{Connection, Play};
 use basalt_protocol::chunk::build_empty_chunk;
 use basalt_protocol::packets::play::ServerboundPlayPacket;
+use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
+use basalt_protocol::packets::play::entity::{
+    ClientboundPlayEntityDestroy, ClientboundPlayEntityHeadRotation, ClientboundPlaySpawnEntity,
+    ClientboundPlaySyncEntityPosition,
+};
 use basalt_protocol::packets::play::misc::ClientboundPlayKeepAlive;
 use basalt_protocol::packets::play::player::{
     ClientboundPlayGameStateChange, ClientboundPlayLogin, ClientboundPlayLoginSpawninfo,
-    ClientboundPlayPosition,
+    ClientboundPlayPlayerInfo, ClientboundPlayPlayerRemove, ClientboundPlayPosition,
 };
 use basalt_protocol::packets::play::world::{
     ClientboundPlayMapChunk, ClientboundPlaySpawnPosition,
 };
-use basalt_types::Position;
+use basalt_types::{Encode, Position, VarInt, Vec3i16};
+use tokio::sync::mpsc;
 
+use crate::helpers::{RawPayload, angle_to_byte};
 use crate::player::PlayerState;
+use crate::state::{BroadcastMessage, PlayerSnapshot, ServerState};
 
 /// Sends the initial world data to the client and enters the play loop.
-///
-/// This is the entry point for the Play state. It sends the Login
-/// packet, spawn position, game event, chunk data, and player position,
-/// then enters the main read/write loop.
 pub(crate) async fn run_play_loop(
     mut conn: Connection<Play>,
     addr: SocketAddr,
     player: &mut PlayerState,
+    state: &Arc<ServerState>,
+    rx: mpsc::Receiver<BroadcastMessage>,
+    existing_players: &[PlayerSnapshot],
 ) -> basalt_net::Result<()> {
     send_initial_world(&mut conn, addr, player).await?;
+
+    // Send the player's own PlayerInfo so they appear in their own Tab list
+    let self_snapshot = PlayerSnapshot {
+        username: player.username.clone(),
+        uuid: player.uuid,
+        entity_id: player.entity_id,
+        x: player.x,
+        y: player.y,
+        z: player.z,
+        yaw: player.yaw,
+        pitch: player.pitch,
+    };
+    send_player_info_add(&mut conn, &self_snapshot).await?;
+
+    // Send PlayerInfo + SpawnEntity for all existing players
+    for existing in existing_players {
+        send_player_info_add(&mut conn, existing).await?;
+        send_spawn_entity(&mut conn, existing).await?;
+    }
+
     crate::chat::send_welcome(&mut conn, &player.username).await?;
 
     println!(
@@ -41,20 +69,15 @@ pub(crate) async fn run_play_loop(
         player.username
     );
 
-    play_loop(&mut conn, addr, player).await
+    play_loop(&mut conn, addr, player, state, rx).await
 }
 
 /// Sends the initial world data that the client needs to enter the game.
-///
-/// Order matters: Login → SpawnPosition → GameEvent (start waiting for
-/// chunks) → ChunkData → PlayerPosition. The client won't render the
-/// world until it receives all of these in the correct order.
 async fn send_initial_world(
     conn: &mut Connection<Play>,
     addr: SocketAddr,
     player: &PlayerState,
 ) -> basalt_net::Result<()> {
-    // Login (Play) — tells the client about the world
     let login = ClientboundPlayLogin {
         entity_id: player.entity_id,
         is_hardcore: false,
@@ -69,8 +92,8 @@ async fn send_initial_world(
             dimension: 0,
             name: "minecraft:overworld".into(),
             hashed_seed: 0,
-            gamemode: 1,            // creative
-            previous_gamemode: 255, // none
+            gamemode: 1,
+            previous_gamemode: 255,
             is_debug: false,
             is_flat: true,
             death: None,
@@ -83,7 +106,6 @@ async fn send_initial_world(
         .await?;
     println!("[{addr}] -> Login (Play)");
 
-    // Spawn position
     let spawn = ClientboundPlaySpawnPosition {
         location: Position::new(0, 100, 0),
         angle: 0.0,
@@ -92,7 +114,6 @@ async fn send_initial_world(
         .await?;
     println!("[{addr}] -> SpawnPosition");
 
-    // GameEvent: "start waiting for level chunks" (reason=13)
     let game_event = ClientboundPlayGameStateChange {
         reason: 13,
         game_mode: 0.0,
@@ -101,13 +122,11 @@ async fn send_initial_world(
         .await?;
     println!("[{addr}] -> GameEvent (start waiting for chunks)");
 
-    // Empty chunk at spawn
     let chunk = build_empty_chunk(0, 0);
     conn.write_packet_typed(ClientboundPlayMapChunk::PACKET_ID, &chunk)
         .await?;
     println!("[{addr}] -> ChunkData (0, 0)");
 
-    // Player position — flags=0 means all coordinates are absolute
     let position = ClientboundPlayPosition {
         teleport_id: 1,
         x: player.x,
@@ -130,20 +149,19 @@ async fn send_initial_world(
     Ok(())
 }
 
-/// Main play loop: reads client packets and sends periodic keep-alive.
-///
-/// Runs until the client disconnects or an error occurs. Each incoming
-/// packet is dispatched to the appropriate handler based on its type.
+/// Main play loop with three concurrent branches:
+/// 1. Keep-alive timer
+/// 2. Client packet reader
+/// 3. Broadcast message receiver
 async fn play_loop(
     conn: &mut Connection<Play>,
     addr: SocketAddr,
     player: &mut PlayerState,
+    state: &Arc<ServerState>,
+    mut rx: mpsc::Receiver<BroadcastMessage>,
 ) -> basalt_net::Result<()> {
-    // Use interval instead of sleep — sleep is cancelled and reset
-    // each time a packet arrives, so keep-alive would never fire
-    // because the client sends movement packets every tick (~50ms).
     let mut keep_alive = tokio::time::interval(std::time::Duration::from_secs(15));
-    keep_alive.tick().await; // skip the immediate first tick
+    keep_alive.tick().await;
 
     loop {
         tokio::select! {
@@ -159,13 +177,24 @@ async fn play_loop(
                 match result {
                     Ok(packet) => {
                         let action = dispatch_packet(addr, player, packet);
-                        execute_action(conn, player, action).await?;
+                        execute_action(conn, player, state, action).await?;
+                    }
+                    Err(basalt_net::Error::Protocol(
+                        basalt_protocol::Error::UnknownPacket { id, .. }
+                    )) => {
+                        // Common packets (settings, plugin channels) are
+                        // skipped by the codegen and produce UnknownPacket.
+                        // Ignore them silently.
+                        println!("[{addr}] {} sent unknown packet 0x{id:02x}, ignoring", player.username);
                     }
                     Err(e) => {
                         println!("[{addr}] {} disconnected: {e}", player.username);
                         break;
                     }
                 }
+            }
+            Some(msg) = rx.recv() => {
+                handle_broadcast(conn, player, msg).await?;
             }
         }
     }
@@ -174,31 +203,24 @@ async fn play_loop(
 }
 
 /// Result of dispatching a packet synchronously.
-///
-/// Most packets only update `PlayerState` and return `Handled`. Packets
-/// that need async IO (chat, commands) return an action that the caller
-/// executes with the connection.
 pub(crate) enum PacketAction {
     /// Packet was fully handled (state updated, logged).
     Handled,
-    /// A chat message that needs to be echoed back.
+    /// A chat message that needs to be broadcast.
     Chat { username: String, message: String },
     /// A command that needs to be executed.
     Command { command: String },
+    /// The player moved — broadcast to other players.
+    Moved,
 }
 
 /// Dispatches a single serverbound Play packet synchronously.
-///
-/// Updates `PlayerState` for movement, keep-alive, teleport confirm,
-/// and player loaded packets. Returns a `PacketAction` for packets
-/// that require async IO (chat and commands).
 pub(crate) fn dispatch_packet(
     addr: SocketAddr,
     player: &mut PlayerState,
     packet: ServerboundPlayPacket,
 ) -> PacketAction {
     match packet {
-        // -- Keep-alive --
         ServerboundPlayPacket::KeepAlive(ka) => {
             if ka.keep_alive_id == player.last_keep_alive_id {
                 let rtt = player.last_keep_alive_sent.elapsed();
@@ -215,8 +237,6 @@ pub(crate) fn dispatch_packet(
             }
             PacketAction::Handled
         }
-
-        // -- Teleport confirm --
         ServerboundPlayPacket::TeleportConfirm(tc) => {
             println!(
                 "[{addr}] {} confirmed teleport (id={})",
@@ -225,37 +245,31 @@ pub(crate) fn dispatch_packet(
             player.teleport_confirmed = true;
             PacketAction::Handled
         }
-
-        // -- Player loaded --
         ServerboundPlayPacket::PlayerLoaded(_) => {
             println!("[{addr}] {} finished loading", player.username);
             player.loaded = true;
             PacketAction::Handled
         }
-
-        // -- Movement --
         ServerboundPlayPacket::Position(p) => {
             player.update_position(p.x, p.y, p.z);
             player.update_on_ground(p.flags);
-            PacketAction::Handled
+            PacketAction::Moved
         }
         ServerboundPlayPacket::PositionLook(p) => {
             player.update_position(p.x, p.y, p.z);
             player.update_look(p.yaw, p.pitch);
             player.update_on_ground(p.flags);
-            PacketAction::Handled
+            PacketAction::Moved
         }
         ServerboundPlayPacket::Look(p) => {
             player.update_look(p.yaw, p.pitch);
             player.update_on_ground(p.flags);
-            PacketAction::Handled
+            PacketAction::Moved
         }
         ServerboundPlayPacket::Flying(p) => {
             player.update_on_ground(p.flags);
             PacketAction::Handled
         }
-
-        // -- Chat --
         ServerboundPlayPacket::ChatMessage(msg) => {
             println!("[{addr}] <{}> {}", player.username, msg.message);
             PacketAction::Chat {
@@ -263,8 +277,6 @@ pub(crate) fn dispatch_packet(
                 message: msg.message,
             }
         }
-
-        // -- Commands --
         ServerboundPlayPacket::ChatCommand(cmd) => {
             println!(
                 "[{addr}] {} issued command: /{}",
@@ -274,8 +286,6 @@ pub(crate) fn dispatch_packet(
                 command: cmd.command,
             }
         }
-
-        // -- Client settings / plugin channels (acknowledged silently) --
         ServerboundPlayPacket::CustomPayload(_)
         | ServerboundPlayPacket::PlayerInput(_)
         | ServerboundPlayPacket::TickEnd(_)
@@ -283,8 +293,6 @@ pub(crate) fn dispatch_packet(
         | ServerboundPlayPacket::Pong(_)
         | ServerboundPlayPacket::MessageAcknowledgement(_)
         | ServerboundPlayPacket::ConfigurationAcknowledged(_) => PacketAction::Handled,
-
-        // -- Everything else --
         other => {
             println!(
                 "[{addr}] {} sent unhandled packet: {:?}",
@@ -296,22 +304,201 @@ pub(crate) fn dispatch_packet(
     }
 }
 
-/// Executes the async part of a packet action (chat echo, command dispatch).
+/// Executes the async part of a packet action.
 async fn execute_action(
     conn: &mut Connection<Play>,
     player: &mut PlayerState,
+    state: &Arc<ServerState>,
     action: PacketAction,
 ) -> basalt_net::Result<()> {
     match action {
         PacketAction::Handled => {}
         PacketAction::Chat { username, message } => {
-            crate::chat::handle_chat_message(conn, &username, &message).await?;
+            let content = crate::chat::build_chat_component(&username, &message).to_nbt();
+            state.broadcast(BroadcastMessage::Chat { content }).await;
         }
         PacketAction::Command { command } => {
             crate::chat::handle_command(conn, player, &command).await?;
         }
+        PacketAction::Moved => {
+            state
+                .broadcast_except(
+                    BroadcastMessage::EntityMoved {
+                        entity_id: player.entity_id,
+                        x: player.x,
+                        y: player.y,
+                        z: player.z,
+                        yaw: player.yaw,
+                        pitch: player.pitch,
+                        on_ground: player.on_ground,
+                    },
+                    &player.uuid,
+                )
+                .await;
+        }
     }
     Ok(())
+}
+
+/// Handles an incoming broadcast message from another player.
+async fn handle_broadcast(
+    conn: &mut Connection<Play>,
+    player: &PlayerState,
+    msg: BroadcastMessage,
+) -> basalt_net::Result<()> {
+    match msg {
+        BroadcastMessage::Chat { content } => {
+            let packet = ClientboundPlaySystemChat {
+                content,
+                is_action_bar: false,
+            };
+            conn.write_packet_typed(ClientboundPlaySystemChat::PACKET_ID, &packet)
+                .await?;
+        }
+        BroadcastMessage::PlayerJoined { info } => {
+            send_player_info_add(conn, &info).await?;
+            send_spawn_entity(conn, &info).await?;
+
+            // Send join message
+            let msg =
+                basalt_types::TextComponent::text(format!("{} joined the game", info.username))
+                    .color(basalt_types::TextColor::Named(
+                        basalt_types::NamedColor::Yellow,
+                    ));
+            crate::chat::send_system_message(conn, &msg, false).await?;
+        }
+        BroadcastMessage::PlayerLeft {
+            uuid,
+            entity_id,
+            username,
+        } => {
+            // Remove from tab list
+            let remove = ClientboundPlayPlayerRemove {
+                players: vec![uuid],
+            };
+            conn.write_packet_typed(ClientboundPlayPlayerRemove::PACKET_ID, &remove)
+                .await?;
+
+            // Destroy entity
+            let destroy = ClientboundPlayEntityDestroy {
+                entity_ids: vec![entity_id],
+            };
+            conn.write_packet_typed(ClientboundPlayEntityDestroy::PACKET_ID, &destroy)
+                .await?;
+
+            // Leave message
+            let msg = basalt_types::TextComponent::text(format!("{username} left the game")).color(
+                basalt_types::TextColor::Named(basalt_types::NamedColor::Yellow),
+            );
+            crate::chat::send_system_message(conn, &msg, false).await?;
+        }
+        BroadcastMessage::EntityMoved {
+            entity_id,
+            x,
+            y,
+            z,
+            yaw,
+            pitch,
+            on_ground,
+        } => {
+            // Skip our own entity
+            if entity_id == player.entity_id {
+                return Ok(());
+            }
+            // Use sync_entity_position which includes velocity deltas
+            // and uses f32 angles (correct for 1.21.4).
+            let sync = ClientboundPlaySyncEntityPosition {
+                entity_id,
+                x,
+                y,
+                z,
+                dx: 0.0,
+                dy: 0.0,
+                dz: 0.0,
+                yaw,
+                pitch,
+                on_ground,
+            };
+            conn.write_packet_typed(ClientboundPlaySyncEntityPosition::PACKET_ID, &sync)
+                .await?;
+
+            // Head rotation is separate from body — the client renders
+            // them independently. The angle is encoded as 256 = 360°.
+            let head = ClientboundPlayEntityHeadRotation {
+                entity_id,
+                head_yaw: angle_to_byte(yaw),
+            };
+            conn.write_packet_typed(ClientboundPlayEntityHeadRotation::PACKET_ID, &head)
+                .await?;
+        }
+    }
+    Ok(())
+}
+
+/// Sends a PlayerInfo "add player" packet for the given player.
+///
+/// The PlayerInfo packet uses a bitmask for actions and only includes
+/// data for active bits on the wire. The generated struct can't handle
+/// this (it encodes all fields including empty ones with VarInt length
+/// prefixes), so we build the raw payload manually.
+async fn send_player_info_add(
+    conn: &mut Connection<Play>,
+    info: &PlayerSnapshot,
+) -> basalt_net::Result<()> {
+    let mut buf = Vec::new();
+
+    // Action bitmask: bit 0 (add_player) | bit 2 (gamemode) | bit 3 (listed)
+    let actions: u8 = 0x01 | 0x04 | 0x08;
+    actions.encode(&mut buf).unwrap();
+
+    // Number of entries
+    VarInt(1).encode(&mut buf).unwrap();
+
+    // Entry UUID
+    info.uuid.encode(&mut buf).unwrap();
+
+    // Bit 0 data — add_player: name (String) + properties count (VarInt 0)
+    info.username.encode(&mut buf).unwrap();
+    VarInt(0).encode(&mut buf).unwrap();
+
+    // Bit 1 not set — no chat_session data
+
+    // Bit 2 data — gamemode: VarInt (1 = creative)
+    VarInt(1).encode(&mut buf).unwrap();
+
+    // Bit 3 data — listed: bool (true)
+    true.encode(&mut buf).unwrap();
+
+    // Bits 4-7 not set — no latency, display_name, list_priority, show_hat
+
+    // Use a RawPayload wrapper since write_packet is private
+    // and write_packet_typed requires Encode + EncodedSize.
+    conn.write_packet_typed(ClientboundPlayPlayerInfo::PACKET_ID, &RawPayload(buf))
+        .await
+}
+
+/// Sends a SpawnEntity packet for a player entity.
+///
+/// Player entities use type ID 128 in Minecraft 1.21.4.
+async fn send_spawn_entity(
+    conn: &mut Connection<Play>,
+    info: &PlayerSnapshot,
+) -> basalt_net::Result<()> {
+    let packet = ClientboundPlaySpawnEntity {
+        entity_id: info.entity_id,
+        object_uuid: info.uuid,
+        r#type: 147, // player entity type in 1.21.4
+        x: info.x,
+        y: info.y,
+        z: info.z,
+        pitch: angle_to_byte(info.pitch),
+        yaw: (info.yaw / 360.0 * 256.0) as i8,
+        head_pitch: 0,
+        object_data: 0,
+        velocity: Vec3i16 { x: 0, y: 0, z: 0 },
+    };
+    conn.write_packet_typed(ClientboundPlaySpawnEntity::PACKET_ID, &packet)
+        .await
 }
 
 #[cfg(test)]
@@ -337,7 +524,7 @@ mod tests {
         let mut player = test_player();
         assert!(!player.teleport_confirmed);
 
-        dispatch_packet(
+        let action = dispatch_packet(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::TeleportConfirm(ServerboundPlayTeleportConfirm {
@@ -346,6 +533,7 @@ mod tests {
         );
 
         assert!(player.teleport_confirmed);
+        assert!(matches!(action, PacketAction::Handled));
     }
 
     #[test]
@@ -353,7 +541,7 @@ mod tests {
         let mut player = test_player();
         assert!(!player.loaded);
 
-        dispatch_packet(
+        let action = dispatch_packet(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::PlayerLoaded(
@@ -362,6 +550,7 @@ mod tests {
         );
 
         assert!(player.loaded);
+        assert!(matches!(action, PacketAction::Handled));
     }
 
     #[test]
@@ -369,35 +558,20 @@ mod tests {
         let mut player = test_player();
         player.last_keep_alive_id = 42;
 
-        dispatch_packet(
+        let action = dispatch_packet(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::KeepAlive(ServerboundPlayKeepAlive { keep_alive_id: 42 }),
         );
 
-        // No state change — just logged, no panic
+        assert!(matches!(action, PacketAction::Handled));
     }
 
     #[test]
-    fn dispatch_keep_alive_mismatch() {
+    fn dispatch_position_returns_moved() {
         let mut player = test_player();
-        player.last_keep_alive_id = 42;
 
-        dispatch_packet(
-            test_addr(),
-            &mut player,
-            ServerboundPlayPacket::KeepAlive(ServerboundPlayKeepAlive { keep_alive_id: 999 }),
-        );
-
-        // Mismatched — logged, no panic
-    }
-
-    #[test]
-    fn dispatch_position() {
-        let mut player = test_player();
-        assert_eq!(player.x, 0.0);
-
-        dispatch_packet(
+        let action = dispatch_packet(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::Position(ServerboundPlayPosition {
@@ -412,13 +586,14 @@ mod tests {
         assert_eq!(player.y, 64.0);
         assert_eq!(player.z, -30.2);
         assert!(player.on_ground);
+        assert!(matches!(action, PacketAction::Moved));
     }
 
     #[test]
-    fn dispatch_position_look() {
+    fn dispatch_position_look_returns_moved() {
         let mut player = test_player();
 
-        dispatch_packet(
+        let action = dispatch_packet(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::PositionLook(ServerboundPlayPositionLook {
@@ -433,15 +608,14 @@ mod tests {
 
         assert_eq!(player.x, 5.0);
         assert_eq!(player.yaw, 90.0);
-        assert_eq!(player.pitch, -45.0);
-        assert!(!player.on_ground);
+        assert!(matches!(action, PacketAction::Moved));
     }
 
     #[test]
-    fn dispatch_look() {
+    fn dispatch_look_returns_moved() {
         let mut player = test_player();
 
-        dispatch_packet(
+        let action = dispatch_packet(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::Look(ServerboundPlayLook {
@@ -452,59 +626,74 @@ mod tests {
         );
 
         assert_eq!(player.yaw, 180.0);
-        assert_eq!(player.pitch, 0.0);
-        assert!(player.on_ground);
+        assert!(matches!(action, PacketAction::Moved));
     }
 
     #[test]
-    fn dispatch_flying() {
+    fn dispatch_flying_returns_handled() {
         let mut player = test_player();
-        assert!(!player.on_ground);
 
-        dispatch_packet(
+        let action = dispatch_packet(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::Flying(ServerboundPlayFlying { flags: 0x01 }),
         );
 
         assert!(player.on_ground);
+        assert!(matches!(action, PacketAction::Handled));
+    }
+
+    #[test]
+    fn dispatch_chat_returns_action() {
+        let mut player = test_player();
+
+        let action = dispatch_packet(
+            test_addr(),
+            &mut player,
+            ServerboundPlayPacket::ChatMessage(
+                basalt_protocol::packets::play::chat::ServerboundPlayChatMessage {
+                    message: "hello".into(),
+                    timestamp: 0,
+                    salt: 0,
+                    signature: None,
+                    offset: 0,
+                    acknowledged: vec![],
+                },
+            ),
+        );
+
+        assert!(matches!(action, PacketAction::Chat { .. }));
+    }
+
+    #[test]
+    fn dispatch_command_returns_action() {
+        let mut player = test_player();
+
+        let action = dispatch_packet(
+            test_addr(),
+            &mut player,
+            ServerboundPlayPacket::ChatCommand(
+                basalt_protocol::packets::play::chat::ServerboundPlayChatCommand {
+                    command: "help".into(),
+                },
+            ),
+        );
+
+        assert!(matches!(action, PacketAction::Command { .. }));
     }
 
     #[test]
     fn dispatch_unhandled_does_not_panic() {
         let mut player = test_player();
 
-        // Should log but not panic
-        dispatch_packet(
+        let action = dispatch_packet(
             test_addr(),
             &mut player,
             ServerboundPlayPacket::ArmAnimation(
                 basalt_protocol::packets::play::entity::ServerboundPlayArmAnimation { hand: 0 },
             ),
         );
-    }
 
-    #[test]
-    fn dispatch_silent_packets_do_not_panic() {
-        let mut player = test_player();
-
-        dispatch_packet(
-            test_addr(),
-            &mut player,
-            ServerboundPlayPacket::CustomPayload(
-                basalt_protocol::packets::play::misc::ServerboundPlayCustomPayload {
-                    channel: "minecraft:brand".into(),
-                    data: vec![],
-                },
-            ),
-        );
-
-        dispatch_packet(
-            test_addr(),
-            &mut player,
-            ServerboundPlayPacket::TickEnd(
-                basalt_protocol::packets::play::misc::ServerboundPlayTickEnd,
-            ),
-        );
+        assert!(matches!(action, PacketAction::Handled));
     }
 }

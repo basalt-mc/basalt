@@ -3,8 +3,12 @@
 //! Manages the full lifecycle of a client connection: Handshake →
 //! Status or Login → Configuration → Play. Each state transition
 //! consumes the connection and produces a new one in the target state.
+//!
+//! The shared `ServerState` is threaded through to the play loop
+//! where it is used for player registration and broadcast.
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use basalt_net::connection::{Connection, Handshake, HandshakeResult};
 use basalt_protocol::packets::configuration::ClientboundConfigurationRegistryData;
@@ -13,14 +17,13 @@ use basalt_protocol::packets::status::{
     ClientboundStatusPing, ClientboundStatusServerInfo, ServerboundStatusPacket,
 };
 use basalt_protocol::registry_data::build_default_registries;
+use tokio::sync::mpsc;
 
 use crate::play::run_play_loop;
 use crate::player::PlayerState;
+use crate::state::{BroadcastMessage, PlayerHandle, PlayerSnapshot, ServerState};
 
 /// JSON response for the server list ping.
-///
-/// Tells the Minecraft client the server name, protocol version,
-/// player count, and description. Displayed in the server browser.
 const SERVER_STATUS: &str = r#"{
     "version": {
         "name": "Basalt 1.21.4",
@@ -40,11 +43,11 @@ const SERVER_STATUS: &str = r#"{
 /// Handles a new TCP connection from start to finish.
 ///
 /// Reads the handshake to determine whether this is a status ping or
-/// a login attempt, then delegates to the appropriate handler. The
-/// connection is fully consumed when this function returns.
+/// a login attempt, then delegates to the appropriate handler.
 pub(crate) async fn handle_connection(
     stream: tokio::net::TcpStream,
     addr: SocketAddr,
+    state: Arc<ServerState>,
 ) -> basalt_net::Result<()> {
     let conn = Connection::<Handshake>::accept(stream);
 
@@ -61,15 +64,12 @@ pub(crate) async fn handle_connection(
                 "[{addr}] Login request (protocol {})",
                 handshake.protocol_version
             );
-            handle_login(conn, addr).await
+            handle_login(conn, addr, state).await
         }
     }
 }
 
 /// Handles the Status state: responds with server info and ping.
-///
-/// The Minecraft client sends a StatusRequest followed by a Ping.
-/// We respond with the server list JSON and echo the ping timestamp.
 async fn handle_status(
     mut conn: Connection<basalt_net::connection::Status>,
     addr: SocketAddr,
@@ -102,8 +102,8 @@ async fn handle_status(
 async fn handle_login(
     mut conn: Connection<basalt_net::connection::Login>,
     addr: SocketAddr,
+    state: Arc<ServerState>,
 ) -> basalt_net::Result<()> {
-    // Read LoginStart
     let (username, player_uuid) = match conn.read_packet().await? {
         ServerboundLoginPacket::LoginStart(login) => {
             println!(
@@ -118,7 +118,6 @@ async fn handle_login(
         }
     };
 
-    // Send LoginSuccess → wait for LoginAcknowledged → Configuration
     let success = ClientboundLoginSuccess {
         uuid: player_uuid,
         username: username.clone(),
@@ -128,8 +127,7 @@ async fn handle_login(
     let conn = conn.send_login_success(&success).await?;
     println!("[{addr}] <- LoginAcknowledged → Configuration");
 
-    // Configuration: send registries then transition to Play
-    handle_configuration(conn, addr, &username, player_uuid).await
+    handle_configuration(conn, addr, &username, player_uuid, state).await
 }
 
 /// Handles the Configuration state: sends all required registries,
@@ -139,6 +137,7 @@ async fn handle_configuration(
     addr: SocketAddr,
     username: &str,
     player_uuid: basalt_types::Uuid,
+    state: Arc<ServerState>,
 ) -> basalt_net::Result<()> {
     let registries = build_default_registries();
     for reg in &registries {
@@ -150,7 +149,53 @@ async fn handle_configuration(
     let conn = conn.finish_configuration().await?;
     println!("[{addr}] <- FinishConfiguration → Play");
 
-    // Create player state and enter the play loop
-    let mut player = PlayerState::new(username.to_string(), player_uuid, 1);
-    run_play_loop(conn, addr, &mut player).await
+    // Assign a unique entity ID and create player state
+    let entity_id = state.next_entity_id();
+    let mut player = PlayerState::new(username.to_string(), player_uuid, entity_id);
+
+    // Create the broadcast channel for this player
+    let (tx, rx) = mpsc::channel::<BroadcastMessage>(64);
+
+    // Register in the server state — get the list of existing players
+    let existing_players = state
+        .register_player(PlayerHandle {
+            username: username.to_string(),
+            uuid: player_uuid,
+            entity_id,
+            sender: tx,
+        })
+        .await;
+
+    // Notify existing players that this player joined
+    let snapshot = PlayerSnapshot {
+        username: player.username.clone(),
+        uuid: player.uuid,
+        entity_id: player.entity_id,
+        x: player.x,
+        y: player.y,
+        z: player.z,
+        yaw: player.yaw,
+        pitch: player.pitch,
+    };
+    state
+        .broadcast_except(
+            BroadcastMessage::PlayerJoined { info: snapshot },
+            &player_uuid,
+        )
+        .await;
+
+    // Run the play loop — this blocks until the player disconnects
+    let result = run_play_loop(conn, addr, &mut player, &state, rx, &existing_players).await;
+
+    // Unregister and notify others
+    state.unregister_player(&player_uuid).await;
+    state
+        .broadcast(BroadcastMessage::PlayerLeft {
+            uuid: player_uuid,
+            entity_id,
+            username: player.username.clone(),
+        })
+        .await;
+
+    result
 }
