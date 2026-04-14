@@ -36,6 +36,7 @@
 pub mod broadcast;
 pub mod context;
 pub mod events;
+pub mod logger;
 pub mod plugin;
 
 // Re-export core types at crate root for convenience.

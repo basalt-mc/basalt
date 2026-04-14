@@ -63,8 +63,10 @@ impl Server {
     /// Each incoming connection is handled in its own Tokio task.
     /// This method never returns under normal operation.
     pub async fn run(&self) {
+        self.config.init_logger();
+
         let listener = TcpListener::bind(&self.config.server.bind).await.unwrap();
-        println!("Basalt server listening on {}", self.config.server.bind);
+        log::info!(target: "basalt::server", "Listening on {}", self.config.server.bind);
 
         let world = self.config.create_world();
         let plugins = self.config.create_plugins();
@@ -90,14 +92,14 @@ impl Server {
     async fn accept_loop_with_state(listener: TcpListener, state: Arc<ServerState>) {
         loop {
             let (stream, addr) = listener.accept().await.unwrap();
-            println!("[{addr}] Connection accepted");
+            log::debug!(target: "basalt::connection", "[{addr}] Accepted");
 
             let state = Arc::clone(&state);
             tokio::spawn(async move {
                 if let Err(e) = connection::handle_connection(stream, addr, state).await {
-                    println!("[{addr}] Error: {e}");
+                    log::error!(target: "basalt::connection", "[{addr}] {e}");
                 }
-                println!("[{addr}] Connection closed");
+                log::debug!(target: "basalt::connection", "[{addr}] Closed");
             });
         }
     }

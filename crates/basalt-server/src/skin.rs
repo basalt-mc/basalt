@@ -60,11 +60,11 @@ struct ProfileResponse {
 pub(crate) async fn fetch_skin_properties(username: &str) -> Vec<ProfileProperty> {
     match fetch_skin_inner(username).await {
         Ok(props) => {
-            println!("[skin] Fetched {} properties for {username}", props.len());
+            log::debug!(target: "basalt::skin", "Fetched {} properties for {username}", props.len());
             props
         }
         Err(e) => {
-            println!("[skin] Failed to fetch skin for {username}: {e}");
+            log::warn!(target: "basalt::skin", "Failed to fetch skin for {username}: {e}");
             Vec::new()
         }
     }

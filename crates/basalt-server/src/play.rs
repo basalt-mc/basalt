@@ -72,10 +72,7 @@ pub(crate) async fn run_play_loop(
 
     crate::chat::send_welcome(&mut conn, &player.username).await?;
 
-    println!(
-        "[{addr}] {} joined the void world! Starting play loop.",
-        player.username
-    );
+    log::info!(target: "basalt::play", "[{addr}] {} joined, starting play loop", player.username);
 
     play_loop(&mut conn, addr, player, state, rx).await
 }
@@ -117,7 +114,7 @@ async fn send_initial_world(
     };
     conn.write_packet_typed(ClientboundPlayLogin::PACKET_ID, &login)
         .await?;
-    println!("[{addr}] -> Login (Play)");
+    log::debug!(target: "basalt::play", "[{addr}] -> Login (Play)");
 
     let spawn_y = state.world.spawn_y() as i32;
     let spawn = ClientboundPlaySpawnPosition {
@@ -126,7 +123,7 @@ async fn send_initial_world(
     };
     conn.write_packet_typed(ClientboundPlaySpawnPosition::PACKET_ID, &spawn)
         .await?;
-    println!("[{addr}] -> SpawnPosition");
+    log::debug!(target: "basalt::play", "[{addr}] -> SpawnPosition");
 
     let game_event = ClientboundPlayGameStateChange {
         reason: 13,
@@ -134,7 +131,7 @@ async fn send_initial_world(
     };
     conn.write_packet_typed(ClientboundPlayGameStateChange::PACKET_ID, &game_event)
         .await?;
-    println!("[{addr}] -> GameEvent (start waiting for chunks)");
+    log::debug!(target: "basalt::play", "[{addr}] -> GameEvent (wait for chunks)");
 
     // Tell the client where to center its chunk rendering
     let spawn_cx = (player.x as i32) >> 4;
@@ -147,7 +144,7 @@ async fn send_initial_world(
         .await?;
     let chunk_count =
         send_chunks_around(conn, state, player, spawn_cx, spawn_cz, VIEW_RADIUS).await?;
-    println!("[{addr}] -> ChunkData ({chunk_count} chunks, radius {VIEW_RADIUS})");
+    log::debug!(target: "basalt::play", "[{addr}] -> {chunk_count} chunks (radius {VIEW_RADIUS})");
 
     let position = ClientboundPlayPosition {
         teleport_id: 1,
@@ -163,10 +160,7 @@ async fn send_initial_world(
     };
     conn.write_packet_typed(ClientboundPlayPosition::PACKET_ID, &position)
         .await?;
-    println!(
-        "[{addr}] -> PlayerPosition ({}, {}, {})",
-        player.x, player.y, player.z
-    );
+    log::debug!(target: "basalt::play", "[{addr}] -> Position ({}, {}, {})", player.x, player.y, player.z);
 
     Ok(())
 }
@@ -219,10 +213,10 @@ async fn play_loop(
                         // Common packets (settings, plugin channels) are
                         // skipped by the codegen and produce UnknownPacket.
                         // Ignore them silently.
-                        println!("[{addr}] {} sent unknown packet 0x{id:02x}, ignoring", player.username);
+                        log::trace!(target: "basalt::play", "[{addr}] {} unknown packet 0x{id:02x}", player.username);
                     }
                     Err(e) => {
-                        println!("[{addr}] {} disconnected: {e}", player.username);
+                        log::info!(target: "basalt::play", "[{addr}] {} disconnected: {e}", player.username);
                         break;
                     }
                 }
@@ -251,29 +245,19 @@ fn packet_to_event(
         ServerboundPlayPacket::KeepAlive(ka) => {
             if ka.keep_alive_id == player.last_keep_alive_id {
                 let rtt = player.last_keep_alive_sent.elapsed();
-                println!(
-                    "[{addr}] {} keep-alive OK (RTT: {}ms)",
-                    player.username,
-                    rtt.as_millis()
-                );
+                log::trace!(target: "basalt::play", "[{addr}] {} keep-alive OK (RTT: {}ms)", player.username, rtt.as_millis());
             } else {
-                println!(
-                    "[{addr}] {} keep-alive mismatch: expected {}, got {}",
-                    player.username, player.last_keep_alive_id, ka.keep_alive_id
-                );
+                log::warn!(target: "basalt::play", "[{addr}] {} keep-alive mismatch: expected {}, got {}", player.username, player.last_keep_alive_id, ka.keep_alive_id);
             }
             None
         }
         ServerboundPlayPacket::TeleportConfirm(tc) => {
-            println!(
-                "[{addr}] {} confirmed teleport (id={})",
-                player.username, tc.teleport_id
-            );
+            log::trace!(target: "basalt::play", "[{addr}] {} teleport confirmed (id={})", player.username, tc.teleport_id);
             player.teleport_confirmed = true;
             None
         }
         ServerboundPlayPacket::PlayerLoaded(_) => {
-            println!("[{addr}] {} finished loading", player.username);
+            log::debug!(target: "basalt::play", "[{addr}] {} finished loading", player.username);
             player.loaded = true;
             None
         }
@@ -334,7 +318,7 @@ fn packet_to_event(
             None
         }
         ServerboundPlayPacket::ChatMessage(msg) => {
-            println!("[{addr}] <{}> {}", player.username, msg.message);
+            log::info!(target: "basalt::play", "[{addr}] <{}> {}", player.username, msg.message);
             Some(Box::new(ChatMessageEvent {
                 username: player.username.clone(),
                 message: msg.message,
@@ -342,10 +326,7 @@ fn packet_to_event(
             }))
         }
         ServerboundPlayPacket::ChatCommand(cmd) => {
-            println!(
-                "[{addr}] {} issued command: /{}",
-                player.username, cmd.command
-            );
+            log::info!(target: "basalt::play", "[{addr}] {} issued /{}", player.username, cmd.command);
             Some(Box::new(CommandEvent {
                 command: cmd.command,
                 player_uuid: player.uuid,
@@ -355,10 +336,7 @@ fn packet_to_event(
         ServerboundPlayPacket::BlockDig(dig) => {
             let pos = dig.location;
             if dig.status == 0 {
-                println!(
-                    "[{addr}] {} broke block at ({}, {}, {})",
-                    player.username, pos.x, pos.y, pos.z
-                );
+                log::debug!(target: "basalt::play", "[{addr}] {} broke block ({}, {}, {})", player.username, pos.x, pos.y, pos.z);
                 Some(Box::new(BlockBrokenEvent {
                     x: pos.x,
                     y: pos.y,
@@ -380,10 +358,7 @@ fn packet_to_event(
             if let Some(item_id) = item.item_id
                 && let Some(block_state) = basalt_world::block::item_to_default_block_state(item_id)
             {
-                println!(
-                    "[{addr}] {} placed block at ({px}, {py}, {pz}) state={block_state}",
-                    player.username
-                );
+                log::debug!(target: "basalt::play", "[{addr}] {} placed block ({px}, {py}, {pz}) state={block_state}", player.username);
                 Some(Box::new(BlockPlacedEvent {
                     x: px,
                     y: py,
@@ -418,11 +393,7 @@ fn packet_to_event(
         | ServerboundPlayPacket::UseItem(_)
         | ServerboundPlayPacket::ArmAnimation(_) => None,
         other => {
-            println!(
-                "[{addr}] {} sent unhandled packet: {:?}",
-                player.username,
-                std::mem::discriminant(&other)
-            );
+            log::trace!(target: "basalt::play", "[{addr}] {} unhandled packet: {:?}", player.username, std::mem::discriminant(&other));
             None
         }
     }
