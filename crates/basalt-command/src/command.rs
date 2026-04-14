@@ -3,24 +3,26 @@
 //! Each command implements this trait and is registered on a
 //! [`CommandRegistry`](crate::CommandRegistry). When a player
 //! types `/name args`, the registry looks up the command by name
-//! and calls `execute` with the arguments and server context.
+//! and calls `execute` with the arguments and context.
 
-use basalt_api::context::ServerContext;
+use basalt_core::Context;
 
-/// A server command that can be executed by players.
+use crate::args::CommandArgs;
+
+/// A server command that can be executed by players or the console.
 ///
 /// # Example
 ///
 /// ```ignore
 /// use basalt_command::Command;
-/// use basalt_api::context::ServerContext;
+/// use basalt_core::Context;
 ///
 /// pub struct PingCommand;
 ///
 /// impl Command for PingCommand {
 ///     fn name(&self) -> &str { "ping" }
 ///     fn description(&self) -> &str { "Responds with pong" }
-///     fn execute(&self, _args: &str, ctx: &ServerContext) {
+///     fn execute(&self, _args: &CommandArgs, ctx: &dyn Context) {
 ///         ctx.send_message("Pong!");
 ///     }
 /// }
@@ -32,10 +34,6 @@ pub trait Command: Send + Sync {
     /// A short description for the help listing.
     fn description(&self) -> &str;
 
-    /// Executes the command with the given arguments.
-    ///
-    /// `args` is the remainder of the command string after the name,
-    /// e.g., for `/tp 10 64 -5`, args is `"10 64 -5"`.
-    /// Empty string if the command was invoked without arguments.
-    fn execute(&self, args: &str, ctx: &ServerContext);
+    /// Executes the command with parsed arguments.
+    fn execute(&self, args: &CommandArgs, ctx: &dyn Context);
 }
