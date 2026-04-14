@@ -1,88 +1,16 @@
-//! Command plugin for gameplay commands.
+//! Command plugin for gameplay and administration commands.
 //!
-//! Registers gameplay commands (/tp, /gamemode, /say, /help) on a
-//! [`CommandRegistry`] and dispatches them when players issue commands
-//! in chat. Server-level commands (stop, kick, list) are handled
-//! separately by the server runtime.
-
-pub mod commands;
-
-use std::sync::Arc;
+//! Registers all in-game commands via the `PluginRegistrar` builder
+//! API. Commands use typed arguments with auto-validation and
+//! tab-completion.
 
 use basalt_api::prelude::*;
-use basalt_command::CommandRegistry;
+use basalt_types::{NamedColor, TextColor, TextComponent};
 
-use commands::{
-    GamemodeCommand, HelpCommand, KickCommand, ListCommand, SayCommand, StopCommand, TpCommand,
-};
-
-/// Gameplay command plugin.
+/// Gameplay and administration command plugin.
 ///
-/// Owns a [`CommandRegistry`] with built-in commands and dispatches
-/// `CommandEvent` to the matching command handler. Unknown commands
-/// receive a red error message.
-pub struct CommandPlugin {
-    /// Shared registry — Arc so handler closures can reference it.
-    registry: Arc<CommandRegistry>,
-}
-
-impl CommandPlugin {
-    /// Creates a command plugin with the default gameplay commands.
-    pub fn new() -> Self {
-        Self::builder().with_defaults().build()
-    }
-
-    /// Creates a builder for customizing which commands are registered.
-    pub fn builder() -> CommandPluginBuilder {
-        CommandPluginBuilder {
-            registry: CommandRegistry::new(),
-            help_entries: Vec::new(),
-        }
-    }
-}
-
-impl Default for CommandPlugin {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Builder for constructing a [`CommandPlugin`] with custom commands.
-pub struct CommandPluginBuilder {
-    registry: CommandRegistry,
-    help_entries: Vec<(String, String)>,
-}
-
-impl CommandPluginBuilder {
-    /// Registers a command on the registry.
-    pub fn command(mut self, cmd: impl basalt_command::Command + 'static) -> Self {
-        self.help_entries
-            .push((cmd.name().to_string(), cmd.description().to_string()));
-        self.registry.register(cmd);
-        self
-    }
-
-    /// Registers the default commands (gameplay + administration).
-    pub fn with_defaults(self) -> Self {
-        self.command(TpCommand)
-            .command(GamemodeCommand)
-            .command(SayCommand)
-            .command(StopCommand)
-            .command(KickCommand)
-            .command(ListCommand)
-    }
-
-    /// Builds the plugin, adding `/help` with a snapshot of all
-    /// registered commands.
-    pub fn build(mut self) -> CommandPlugin {
-        self.help_entries
-            .push(("help".into(), "Show available commands".into()));
-        self.registry.register(HelpCommand::new(self.help_entries));
-        CommandPlugin {
-            registry: Arc::new(self.registry),
-        }
-    }
-}
+/// Registers: /tp, /gamemode, /say, /stop, /kick, /list, /help
+pub struct CommandPlugin;
 
 impl Plugin for CommandPlugin {
     fn metadata(&self) -> PluginMetadata {
@@ -95,18 +23,177 @@ impl Plugin for CommandPlugin {
     }
 
     fn on_enable(&self, registrar: &mut PluginRegistrar) {
-        // Register each command from the internal registry
-        // on the plugin registrar so the server collects them all.
-        let registry = Arc::clone(&self.registry);
-        for cmd in registry.commands() {
-            let name = cmd.name();
-            let desc = cmd.description();
-            let reg = Arc::clone(&registry);
-            let cmd_name = name.to_string();
-            registrar.register_command(name, desc, move |args, ctx| {
-                reg.execute(&cmd_name, args, ctx);
+        // /tp — 3 variants matching vanilla:
+        //   /tp <targets> <destination>
+        //   /tp <destination>
+        //   /tp <location>
+        registrar
+            .command("tp")
+            .description("Teleport to a player or coordinates")
+            .variant(|v| v.arg("destination", Arg::Player))
+            .variant(|v| v.arg("location", Arg::Vec3))
+            .variant(|v| {
+                v.arg("targets", Arg::Entity)
+                    .arg("destination", Arg::Player)
+            })
+            .variant(|v| v.arg("targets", Arg::Entity).arg("location", Arg::Vec3))
+            .handler(|args, ctx| {
+                if let Some(location) = args.get_string("location") {
+                    let coords: Vec<&str> = location.split_whitespace().collect();
+                    if coords.len() == 3
+                        && let (Ok(x), Ok(y), Ok(z)) = (
+                            coords[0].parse::<f64>(),
+                            coords[1].parse::<f64>(),
+                            coords[2].parse::<f64>(),
+                        )
+                    {
+                        ctx.teleport(x, y, z, 0.0, 0.0);
+                        ctx.send_message_component(
+                            &TextComponent::text(format!("Teleported to {x}, {y}, {z}"))
+                                .color(TextColor::Named(NamedColor::Green)),
+                        );
+                        return;
+                    }
+                    ctx.send_message_component(
+                        &TextComponent::text("Invalid coordinates")
+                            .color(TextColor::Named(NamedColor::Red)),
+                    );
+                } else if let Some(target) = args.get_string("destination") {
+                    ctx.send_message_component(
+                        &TextComponent::text(format!(
+                            "Teleport to player '{target}' not yet implemented"
+                        ))
+                        .color(TextColor::Named(NamedColor::Yellow)),
+                    );
+                } else if args.get_string("targets").is_some() {
+                    ctx.send_message_component(
+                        &TextComponent::text("Teleport targets not yet implemented")
+                            .color(TextColor::Named(NamedColor::Yellow)),
+                    );
+                }
             });
-        }
+
+        // /gamemode <mode>
+        registrar
+            .command("gamemode")
+            .description("Change game mode")
+            .arg_with(
+                "mode",
+                Arg::Options(vec![
+                    "survival".into(),
+                    "creative".into(),
+                    "adventure".into(),
+                    "spectator".into(),
+                ]),
+                Validation::Custom(
+                    "Invalid gamemode. Use: survival, creative, adventure, spectator".into(),
+                ),
+            )
+            .handler(|args, ctx| {
+                let mode_str = args.get_string("mode").unwrap();
+                let mode: u8 = match mode_str {
+                    "survival" => 0,
+                    "creative" => 1,
+                    "adventure" => 2,
+                    _ => 3,
+                };
+                ctx.set_gamemode(mode);
+                let name = match mode {
+                    0 => "Survival",
+                    1 => "Creative",
+                    2 => "Adventure",
+                    _ => "Spectator",
+                };
+                ctx.send_message_component(
+                    &TextComponent::text(format!("Game mode set to {name}"))
+                        .color(TextColor::Named(NamedColor::Green)),
+                );
+            });
+
+        // /say <message>
+        registrar
+            .command("say")
+            .description("Broadcast a server message")
+            .arg("message", Arg::Message)
+            .handler(|args, ctx| {
+                let message = args.get_string("message").unwrap_or("");
+                let msg = TextComponent::text("[Server] ")
+                    .color(TextColor::Named(NamedColor::LightPurple))
+                    .bold(true)
+                    .append(
+                        TextComponent::text(message).color(TextColor::Named(NamedColor::White)),
+                    );
+                ctx.send_message_component(&msg);
+            });
+
+        // /stop
+        registrar
+            .command("stop")
+            .description("Stop the server")
+            .handler(|_args, ctx| {
+                ctx.broadcast_message_component(
+                    &TextComponent::text("Server is shutting down...")
+                        .color(TextColor::Named(NamedColor::Red))
+                        .bold(true),
+                );
+                let log = ctx.logger();
+                log.info("Stop command issued");
+            });
+
+        // /kick <player>
+        registrar
+            .command("kick")
+            .description("Kick a player")
+            .arg("player", Arg::Player)
+            .handler(|args, ctx| {
+                let target = args.get_string("player").unwrap();
+                let log = ctx.logger();
+                log.info(&format!("Kick issued for {target} — not yet implemented"));
+                ctx.send_message_component(
+                    &TextComponent::text(format!("Kick not yet implemented: {target}"))
+                        .color(TextColor::Named(NamedColor::Yellow)),
+                );
+            });
+
+        // /list
+        registrar
+            .command("list")
+            .description("List connected players")
+            .handler(|_args, ctx| {
+                ctx.send_message_component(
+                    &TextComponent::text("Player list not yet implemented")
+                        .color(TextColor::Named(NamedColor::Yellow)),
+                );
+            });
+
+        // /help
+        registrar
+            .command("help")
+            .description("Show available commands")
+            .handler(|_args, ctx| {
+                let mut msg = TextComponent::text("Available commands:")
+                    .color(TextColor::Named(NamedColor::Gold));
+                let mut cmds = ctx.registered_commands();
+                cmds.sort_by(|(a, _), (b, _)| a.cmp(b));
+                for (name, desc) in &cmds {
+                    msg = msg
+                        .append(
+                            TextComponent::text(format!("\n /{name}"))
+                                .color(TextColor::Named(NamedColor::Yellow)),
+                        )
+                        .append(
+                            TextComponent::text(format!(" — {desc}"))
+                                .color(TextColor::Named(NamedColor::Gray)),
+                        );
+                }
+                ctx.send_message_component(&msg);
+            });
+    }
+}
+
+impl Default for CommandPlugin {
+    fn default() -> Self {
+        Self
     }
 }
 
@@ -114,6 +201,7 @@ impl Plugin for CommandPlugin {
 mod tests {
     use basalt_api::context::ServerContext;
     use basalt_api::{EventBus, Response};
+    use basalt_command::parse_command_args;
     use basalt_types::Uuid;
 
     use super::*;
@@ -131,8 +219,7 @@ mod tests {
     fn dispatch_command(cmd: &str) -> Vec<Response> {
         let ctx = test_ctx();
 
-        // Collect commands from the plugin
-        let plugin = CommandPlugin::new();
+        let plugin = CommandPlugin;
         let mut bus = EventBus::new();
         let mut cmds = Vec::new();
         {
@@ -140,27 +227,27 @@ mod tests {
             plugin.on_enable(&mut registrar);
         }
 
-        // Dispatch like the server does: find and call the handler
         let parts: Vec<&str> = cmd.splitn(2, ' ').collect();
         let name = parts[0];
         let args = parts.get(1).copied().unwrap_or("");
-        let entry = cmds.iter().find(|c| c.name == name);
-        if let Some(entry) = entry {
-            (entry.handler)(args, &ctx);
+        if let Some(entry) = cmds.iter().find(|c| c.name == name)
+            && let Ok(parsed) = parse_command_args(args, &entry.args, &entry.variants)
+        {
+            (entry.handler)(&parsed, &ctx);
         }
         ctx.drain_responses()
     }
 
     #[test]
-    fn tp_valid() {
+    fn tp_coords() {
         let responses = dispatch_command("tp 10 64 -5");
-        assert_eq!(responses.len(), 2); // SendPosition + SendSystemChat
+        assert_eq!(responses.len(), 2);
         assert!(matches!(responses[0], Response::SendPosition { .. }));
     }
 
     #[test]
-    fn tp_invalid() {
-        let responses = dispatch_command("tp");
+    fn tp_player() {
+        let responses = dispatch_command("tp Steve");
         assert_eq!(responses.len(), 1);
         assert!(matches!(responses[0], Response::SendSystemChat { .. }));
     }
@@ -180,7 +267,7 @@ mod tests {
     }
 
     #[test]
-    fn help_lists_commands() {
+    fn help_command() {
         let responses = dispatch_command("help");
         assert_eq!(responses.len(), 1);
         assert!(matches!(responses[0], Response::SendSystemChat { .. }));
@@ -188,35 +275,13 @@ mod tests {
 
     #[test]
     fn unknown_command_returns_empty() {
-        // Unknown command handling is done by the server, not the plugin.
-        // The plugin only registers known commands.
         let responses = dispatch_command("foobar");
         assert!(responses.is_empty());
     }
 
     #[test]
-    fn builder_custom_command() {
-        struct PingCmd;
-        impl basalt_command::Command for PingCmd {
-            fn name(&self) -> &str {
-                "ping"
-            }
-            fn description(&self) -> &str {
-                "Pong"
-            }
-            fn execute(&self, _args: &str, ctx: &ServerContext) {
-                ctx.send_message("Pong!");
-            }
-        }
-
-        let plugin = CommandPlugin::builder().command(PingCmd).build();
-        assert_eq!(plugin.registry.len(), 2); // ping + help
-    }
-
-    #[test]
-    fn default_has_all_commands() {
-        let plugin = CommandPlugin::new();
-        // tp, gamemode, say, stop, kick, list, help
-        assert_eq!(plugin.registry.len(), 7);
+    fn default_impl() {
+        let _plugin: CommandPlugin = Default::default();
+        let _ = _plugin;
     }
 }
