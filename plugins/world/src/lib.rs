@@ -21,7 +21,7 @@ impl Plugin for WorldPlugin {
         }
     }
 
-    fn on_enable(&self, registrar: &mut EventRegistrar) {
+    fn on_enable(&self, registrar: &mut PluginRegistrar) {
         registrar.on::<PlayerMovedEvent>(Stage::Process, 0, |event, ctx| {
             let new_cx = (event.x as i32) >> 4;
             let new_cz = (event.z as i32) >> 4;
@@ -62,7 +62,8 @@ mod tests {
         };
 
         let mut bus = EventBus::new();
-        let mut registrar = EventRegistrar::new(&mut bus);
+        let mut cmds = Vec::new();
+        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
         WorldPlugin.on_enable(&mut registrar);
         bus.dispatch(&mut event, &ctx);
 
@@ -93,7 +94,8 @@ mod tests {
         };
 
         let mut bus = EventBus::new();
-        let mut registrar = EventRegistrar::new(&mut bus);
+        let mut cmds = Vec::new();
+        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
         WorldPlugin.on_enable(&mut registrar);
         bus.dispatch(&mut event, &ctx);
 

@@ -26,7 +26,7 @@ impl Plugin for StoragePlugin {
         }
     }
 
-    fn on_enable(&self, registrar: &mut EventRegistrar) {
+    fn on_enable(&self, registrar: &mut PluginRegistrar) {
         registrar.on::<BlockBrokenEvent>(Stage::Post, 10, |event, ctx| {
             ctx.world().persist_chunk(event.x >> 4, event.z >> 4);
         });
@@ -62,7 +62,8 @@ mod tests {
         };
 
         let mut bus = EventBus::new();
-        let mut registrar = EventRegistrar::new(&mut bus);
+        let mut cmds = Vec::new();
+        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
         // Block plugin sets the block, storage plugin persists
         basalt_plugin_block::BlockPlugin.on_enable(&mut registrar);
         StoragePlugin.on_enable(&mut registrar);

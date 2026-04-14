@@ -42,7 +42,7 @@ pub mod plugin;
 // Re-export core types at crate root for convenience.
 pub use broadcast::{BroadcastMessage, PlayerSnapshot, ProfileProperty};
 pub use context::{Response, ServerContext};
-pub use plugin::{EventRegistrar, Plugin, PluginMetadata};
+pub use plugin::{CommandEntry, Plugin, PluginMetadata, PluginRegistrar};
 
 // Re-export basalt-events types that plugins need.
 pub use basalt_events::{Event, EventBus, Stage};
@@ -59,6 +59,6 @@ pub mod prelude {
         BlockBrokenEvent, BlockPlacedEvent, ChatMessageEvent, CommandEvent, PlayerJoinedEvent,
         PlayerLeftEvent, PlayerMovedEvent,
     };
-    pub use crate::plugin::{EventRegistrar, Plugin, PluginMetadata};
+    pub use crate::plugin::{Plugin, PluginMetadata, PluginRegistrar};
     pub use basalt_events::Stage;
 }
