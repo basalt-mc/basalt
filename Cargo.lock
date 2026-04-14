@@ -165,6 +165,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "basalt-plugin-command"
+version = "0.1.0"
+dependencies = [
+ "basalt-api",
+ "basalt-command",
+ "basalt-types",
+ "basalt-world",
+]
+
+[[package]]
 name = "basalt-plugin-lifecycle"
 version = "0.1.0"
 dependencies = [
@@ -222,6 +232,7 @@ dependencies = [
  "basalt-net",
  "basalt-plugin-block",
  "basalt-plugin-chat",
+ "basalt-plugin-command",
  "basalt-plugin-lifecycle",
  "basalt-plugin-movement",
  "basalt-plugin-storage",
