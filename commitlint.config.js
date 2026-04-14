@@ -252,6 +252,16 @@ const api = [
   'api/broadcast',
 ];
 
+const core = [
+  // Cross-module changes within basalt-core.
+  // Example: "feat(core): add Permission trait"
+  'core',
+
+  // Context trait: shared abstraction for command/plugin execution.
+  // Example: "feat(core/context): add send_title method"
+  'core/context',
+];
+
 const command = [
   // Cross-module changes within basalt-command.
   // Example: "feat(command): add argument parser"
@@ -336,7 +346,7 @@ const keywords = [
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...command, ...storage, ...keywords]],
+    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...keywords]],
     'scope-empty': [2, 'never'],
   },
 };
