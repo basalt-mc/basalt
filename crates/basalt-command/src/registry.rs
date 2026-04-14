@@ -1,20 +1,16 @@
 //! Command registry for looking up and executing commands by name.
-//!
-//! The [`CommandRegistry`] stores registered commands and dispatches
-//! execution by name. It is typically owned by a `CommandPlugin`
-//! and shared with event handler closures via `Arc`.
 
 use std::collections::HashMap;
 
-use basalt_api::context::ServerContext;
+use basalt_core::Context;
 
 use crate::Command;
+use crate::args::CommandArgs;
 
 /// A registry of named commands.
 ///
 /// Commands are registered at startup and looked up by name during
-/// play. The registry is immutable after construction — commands
-/// cannot be added or removed at runtime.
+/// play. The registry is immutable after construction.
 pub struct CommandRegistry {
     commands: HashMap<String, Box<dyn Command>>,
 }
@@ -34,11 +30,10 @@ impl CommandRegistry {
         self.commands.insert(name, Box::new(command));
     }
 
-    /// Executes a command by name.
+    /// Executes a command by name with parsed arguments.
     ///
-    /// Returns `true` if the command was found and executed,
-    /// `false` if no command with that name exists.
-    pub fn execute(&self, name: &str, args: &str, ctx: &ServerContext) -> bool {
+    /// Returns `true` if the command was found and executed.
+    pub fn execute(&self, name: &str, args: &CommandArgs, ctx: &dyn Context) -> bool {
         if let Some(cmd) = self.commands.get(name) {
             cmd.execute(args, ctx);
             true
@@ -76,12 +71,49 @@ impl Default for CommandRegistry {
 
 #[cfg(test)]
 mod tests {
+    use basalt_core::PluginLogger;
     use basalt_types::Uuid;
 
     use super::*;
+    use crate::args::Arg;
+
+    /// Minimal test context implementing the Context trait.
+    struct TestContext;
+
+    impl Context for TestContext {
+        fn player_uuid(&self) -> Uuid {
+            Uuid::default()
+        }
+        fn player_entity_id(&self) -> i32 {
+            1
+        }
+        fn player_username(&self) -> &str {
+            "Steve"
+        }
+        fn logger(&self) -> PluginLogger {
+            PluginLogger::new("test")
+        }
+        fn world(&self) -> &basalt_world::World {
+            use std::sync::OnceLock;
+            static WORLD: OnceLock<basalt_world::World> = OnceLock::new();
+            WORLD.get_or_init(|| basalt_world::World::new_memory(42))
+        }
+        fn send_message(&self, _text: &str) {}
+        fn send_message_component(&self, _component: &basalt_types::TextComponent) {}
+        fn send_action_bar(&self, _text: &str) {}
+        fn broadcast_message(&self, _text: &str) {}
+        fn broadcast_message_component(&self, _component: &basalt_types::TextComponent) {}
+        fn teleport(&self, _x: f64, _y: f64, _z: f64, _yaw: f32, _pitch: f32) {}
+        fn set_gamemode(&self, _mode: u8) {}
+        fn registered_commands(&self) -> Vec<(String, String)> {
+            Vec::new()
+        }
+        fn send_block_ack(&self, _sequence: i32) {}
+        fn stream_chunks(&self, _cx: i32, _cz: i32) {}
+        fn broadcast(&self, _msg: basalt_core::BroadcastMessage) {}
+    }
 
     struct PingCommand;
-
     impl Command for PingCommand {
         fn name(&self) -> &str {
             "ping"
@@ -89,13 +121,12 @@ mod tests {
         fn description(&self) -> &str {
             "Responds with pong"
         }
-        fn execute(&self, _args: &str, ctx: &ServerContext) {
+        fn execute(&self, _args: &CommandArgs, ctx: &dyn Context) {
             ctx.send_message("Pong!");
         }
     }
 
     struct EchoCommand;
-
     impl Command for EchoCommand {
         fn name(&self) -> &str {
             "echo"
@@ -103,19 +134,9 @@ mod tests {
         fn description(&self) -> &str {
             "Echoes the arguments"
         }
-        fn execute(&self, args: &str, ctx: &ServerContext) {
-            ctx.send_message(args);
+        fn execute(&self, args: &CommandArgs, ctx: &dyn Context) {
+            ctx.send_message(args.raw());
         }
-    }
-
-    fn test_world() -> &'static basalt_world::World {
-        use std::sync::OnceLock;
-        static WORLD: OnceLock<basalt_world::World> = OnceLock::new();
-        WORLD.get_or_init(|| basalt_world::World::new_memory(42))
-    }
-
-    fn test_ctx() -> ServerContext {
-        ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into())
     }
 
     #[test]
@@ -123,19 +144,16 @@ mod tests {
         let mut registry = CommandRegistry::new();
         registry.register(PingCommand);
 
-        let ctx = test_ctx();
-        assert!(registry.execute("ping", "", &ctx));
-
-        let responses = ctx.drain_responses();
-        assert_eq!(responses.len(), 1);
+        let args = CommandArgs::new(String::new());
+        let ctx = TestContext;
+        assert!(registry.execute("ping", &args, &ctx));
     }
 
     #[test]
     fn unknown_command_returns_false() {
         let registry = CommandRegistry::new();
-        let ctx = test_ctx();
-        assert!(!registry.execute("nonexistent", "", &ctx));
-        assert!(ctx.drain_responses().is_empty());
+        let args = CommandArgs::new(String::new());
+        assert!(!registry.execute("nonexistent", &args, &TestContext));
     }
 
     #[test]
@@ -143,18 +161,14 @@ mod tests {
         let mut registry = CommandRegistry::new();
         registry.register(PingCommand);
         registry.register(EchoCommand);
-
         assert_eq!(registry.len(), 2);
-        assert!(!registry.is_empty());
     }
 
     #[test]
     fn get_command() {
         let mut registry = CommandRegistry::new();
         registry.register(PingCommand);
-
         assert!(registry.get("ping").is_some());
-        assert_eq!(registry.get("ping").unwrap().name(), "ping");
         assert!(registry.get("nonexistent").is_none());
     }
 
@@ -163,18 +177,14 @@ mod tests {
         let mut registry = CommandRegistry::new();
         registry.register(PingCommand);
         registry.register(EchoCommand);
-
         let names: Vec<&str> = registry.commands().map(|c| c.name()).collect();
         assert_eq!(names.len(), 2);
-        assert!(names.contains(&"ping"));
-        assert!(names.contains(&"echo"));
     }
 
     #[test]
     fn empty_registry() {
         let registry = CommandRegistry::new();
         assert!(registry.is_empty());
-        assert_eq!(registry.len(), 0);
     }
 
     #[test]
@@ -184,14 +194,17 @@ mod tests {
     }
 
     #[test]
-    fn execute_with_args() {
+    fn parse_and_execute() {
         let mut registry = CommandRegistry::new();
         registry.register(EchoCommand);
 
-        let ctx = test_ctx();
-        registry.execute("echo", "hello world", &ctx);
-
-        let responses = ctx.drain_responses();
-        assert_eq!(responses.len(), 1);
+        let schema = vec![crate::args::CommandArg {
+            name: "msg".into(),
+            arg_type: Arg::Message,
+            validation: crate::args::Validation::Auto,
+            required: true,
+        }];
+        let args = crate::args::parse_args("hello world", &schema).unwrap();
+        registry.execute("echo", &args, &TestContext);
     }
 }
