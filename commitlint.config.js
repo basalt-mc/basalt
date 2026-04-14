@@ -252,6 +252,20 @@ const api = [
   'api/broadcast',
 ];
 
+const command = [
+  // Cross-module changes within basalt-command.
+  // Example: "feat(command): add argument parser"
+  'command',
+
+  // Command trait definition.
+  // Example: "feat(command/command): add completions method"
+  'command/command',
+
+  // CommandRegistry: registration, lookup, execution.
+  // Example: "perf(command/registry): use phf for O(1) lookup"
+  'command/registry',
+];
+
 const storage = [
   // Cross-module changes within basalt-storage.
   // Example: "feat(storage): add player data persistence"
@@ -322,7 +336,7 @@ const keywords = [
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...storage, ...keywords]],
+    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...command, ...storage, ...keywords]],
     'scope-empty': [2, 'never'],
   },
 };
