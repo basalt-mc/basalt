@@ -11,13 +11,16 @@
 
 ## Architecture
 
-Ten crates in `crates/` (infrastructure), seven plugin crates in `plugins/` (features), and an `xtask` codegen tool:
+Eleven crates in `crates/` (infrastructure), seven plugin crates in `plugins/` (features), and an `xtask` codegen tool:
 
 ```
-basalt-types → basalt-derive → basalt-protocol → basalt-net → basalt-server
-                                      ↑                            ↑
-                                   xtask (codegen)     basalt-events → basalt-api → basalt-command → plugins/*
-                                                              basalt-world, basalt-storage
+basalt-types → basalt-core (Context trait) → basalt-command (args, parsing)
+                    ↑                              ↑
+              basalt-world                   basalt-api (ServerContext, Plugin, events)
+                                                   ↑
+basalt-derive → basalt-protocol → basalt-net → basalt-server → plugins/*
+                      ↑
+                   xtask (codegen)
 ```
 
 | Crate | Purpose | Key dependencies |
@@ -27,11 +30,12 @@ basalt-types → basalt-derive → basalt-protocol → basalt-net → basalt-ser
 | `basalt-protocol` | Packet definitions, version-aware registry, registry data | `basalt-types`, `basalt-derive` |
 | `basalt-net` | Async networking, encryption, compression, connection typestate, middleware pipeline | `basalt-protocol`, `tokio`, `aes`, `cfb8`, `flate2` |
 | `basalt-events` | Generic event bus with staged handler dispatch (Validate → Process → Post) | none |
-| `basalt-api` | Public plugin API: `Plugin` trait, `ServerContext`, events, `EventRegistrar` | `basalt-events`, `basalt-types`, `basalt-world` |
+| `basalt-core` | `Context` trait, `BroadcastMessage`, `PlayerSnapshot`, `PluginLogger` | `basalt-types`, `basalt-world` |
+| `basalt-command` | Typed argument API (Arg, Validation, parsing), `Command` trait | `basalt-core` |
+| `basalt-api` | Public plugin API: `Plugin` trait, `ServerContext` (impl Context), events, `PluginRegistrar` | `basalt-core`, `basalt-command`, `basalt-events` |
 | `basalt-world` | World generation, chunk storage, paletted containers, block state registry | `basalt-types`, `basalt-protocol`, `basalt-storage` |
 | `basalt-storage` | BSR region file format with LZ4 compression for chunk persistence | `lz4_flex` |
-| `basalt-command` | Command trait and `CommandRegistry` for server commands | `basalt-api` |
-| `basalt-server` | Server runtime: connection lifecycle, play loop, plugin registration | `basalt-api`, `basalt-net`, all plugin crates |
+| `basalt-server` | Server runtime: connection lifecycle, play loop, plugin registration, DeclareCommands | `basalt-api`, `basalt-net`, all plugin crates |
 | `xtask` | Code generation from minecraft-data JSON → Rust packet structs | `serde_json` |
 
 Plugin crates under `plugins/`:
@@ -46,11 +50,11 @@ Plugin crates under `plugins/`:
 | `basalt-plugin-lifecycle` | Player join/leave broadcast |
 | `basalt-plugin-movement` | Player position/look broadcast |
 
-- `basalt-events` has zero external dependencies — pure Rust event infrastructure.
-- `basalt-api` is the public plugin API — both built-in and external plugins depend on it.
-- `basalt-server` is the runtime orchestrator — it depends on `basalt-api` and all plugin crates.
-- Plugin crates depend only on `basalt-api` (and optionally `basalt-world` for block access).
-- External plugins follow the same pattern as built-in ones — same `Plugin` trait, same `ServerContext` API.
+- `basalt-core` provides the `Context` trait (shared abstraction for in-game and future console contexts) and shared types (`BroadcastMessage`, `PlayerSnapshot`, `PluginLogger`).
+- `basalt-command` provides typed argument API (`Arg`, `Validation`, `CommandArg`, `CommandArgs`, parsing with variant support) and the `Command` trait. Depends on `basalt-core`, NOT on `basalt-api` (no circular dependency).
+- `basalt-api` provides `ServerContext` (implements `Context`), `Plugin` trait, `PluginRegistrar` with fluent command builder (`.command("tp").arg("pos", Arg::Vec3).handler(...)`).
+- `basalt-server` builds the DeclareCommands Brigadier tree from registered command args, handles TabComplete requests, and dispatches commands with auto-parsing/validation.
+- Plugin crates depend only on `basalt-api`. External plugins follow the same pattern as built-in ones.
 - `xtask` is a standalone binary that generates code into `basalt-protocol`.
 
 ### basalt-events architecture
@@ -184,8 +188,9 @@ basalt/
 │   ├── basalt-protocol/
 │   ├── basalt-net/
 │   ├── basalt-events/         # Event bus with staged handler dispatch (Validate/Process/Post)
+│   ├── basalt-core/           # Context trait, shared types (BroadcastMessage, PluginLogger)
 │   ├── basalt-api/            # Public plugin API: Plugin trait, ServerContext, events
-│   ├── basalt-command/        # Command trait and CommandRegistry
+│   ├── basalt-command/        # Typed argument API, Command trait, parsing
 │   ├── basalt-world/          # World generation, chunk cache, paletted containers
 │   ├── basalt-storage/        # BSR region format, LZ4 compression, disk persistence
 │   └── basalt-server/         # Server runtime: connection lifecycle, play loop
