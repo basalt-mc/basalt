@@ -11,12 +11,12 @@
 
 ## Architecture
 
-Nine crates in `crates/` (infrastructure), six plugin crates in `plugins/` (features), and an `xtask` codegen tool:
+Ten crates in `crates/` (infrastructure), seven plugin crates in `plugins/` (features), and an `xtask` codegen tool:
 
 ```
 basalt-types → basalt-derive → basalt-protocol → basalt-net → basalt-server
                                       ↑                            ↑
-                                   xtask (codegen)     basalt-events → basalt-api → plugins/*
+                                   xtask (codegen)     basalt-events → basalt-api → basalt-command → plugins/*
                                                               basalt-world, basalt-storage
 ```
 
@@ -30,6 +30,7 @@ basalt-types → basalt-derive → basalt-protocol → basalt-net → basalt-ser
 | `basalt-api` | Public plugin API: `Plugin` trait, `ServerContext`, events, `EventRegistrar` | `basalt-events`, `basalt-types`, `basalt-world` |
 | `basalt-world` | World generation, chunk storage, paletted containers, block state registry | `basalt-types`, `basalt-protocol`, `basalt-storage` |
 | `basalt-storage` | BSR region file format with LZ4 compression for chunk persistence | `lz4_flex` |
+| `basalt-command` | Command trait and `CommandRegistry` for server commands | `basalt-api` |
 | `basalt-server` | Server runtime: connection lifecycle, play loop, plugin registration | `basalt-api`, `basalt-net`, all plugin crates |
 | `xtask` | Code generation from minecraft-data JSON → Rust packet structs | `serde_json` |
 
@@ -37,7 +38,8 @@ Plugin crates under `plugins/`:
 
 | Plugin | Purpose |
 |--------|---------|
-| `basalt-plugin-chat` | Chat broadcast + command dispatch (/say, /tp, /gamemode, /help) |
+| `basalt-plugin-chat` | Chat message broadcast to all players |
+| `basalt-plugin-command` | Command dispatch: gameplay (/tp, /gamemode, /say, /help) + admin (/stop, /kick, /list) |
 | `basalt-plugin-block` | Block breaking/placing: world mutation + ack + broadcast |
 | `basalt-plugin-world` | Chunk streaming on player chunk boundary crossing |
 | `basalt-plugin-storage` | Chunk persistence to disk after block changes |
@@ -183,11 +185,13 @@ basalt/
 │   ├── basalt-net/
 │   ├── basalt-events/         # Event bus with staged handler dispatch (Validate/Process/Post)
 │   ├── basalt-api/            # Public plugin API: Plugin trait, ServerContext, events
+│   ├── basalt-command/        # Command trait and CommandRegistry
 │   ├── basalt-world/          # World generation, chunk cache, paletted containers
 │   ├── basalt-storage/        # BSR region format, LZ4 compression, disk persistence
 │   └── basalt-server/         # Server runtime: connection lifecycle, play loop
 ├── plugins/                   # Features (each plugin = independent crate)
-│   ├── chat/                  # ChatPlugin: commands + chat broadcast
+│   ├── chat/                  # ChatPlugin: chat broadcast
+│   ├── command/               # CommandPlugin: /tp, /gamemode, /say, /help, /stop, /kick, /list
 │   ├── block/                 # BlockPlugin: block interaction
 │   ├── world/                 # WorldPlugin: chunk streaming
 │   ├── storage/               # StoragePlugin: chunk persistence
