@@ -15,6 +15,7 @@ basalt-world = { workspace = true }
 
 # Built-in plugins
 basalt-plugin-chat = { path = "../../plugins/chat" }
+basalt-plugin-command = { path = "../../plugins/command" }
 basalt-plugin-block = { path = "../../plugins/block" }
 basalt-plugin-world = { path = "../../plugins/world" }
 basalt-plugin-storage = { path = "../../plugins/storage" }
