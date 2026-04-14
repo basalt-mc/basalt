@@ -21,7 +21,7 @@ impl Plugin for BlockPlugin {
         }
     }
 
-    fn on_enable(&self, registrar: &mut EventRegistrar) {
+    fn on_enable(&self, registrar: &mut PluginRegistrar) {
         // Process: mutate world state
         registrar.on::<BlockBrokenEvent>(Stage::Process, 0, |event, ctx| {
             ctx.world()
@@ -85,7 +85,8 @@ mod tests {
         };
 
         let mut bus = EventBus::new();
-        let mut registrar = EventRegistrar::new(&mut bus);
+        let mut cmds = Vec::new();
+        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
         BlockPlugin.on_enable(&mut registrar);
         bus.dispatch(&mut event, &ctx);
 
@@ -119,7 +120,8 @@ mod tests {
 
         let mut bus = EventBus::new();
         // Validate handler cancels
-        let mut registrar = EventRegistrar::new(&mut bus);
+        let mut cmds = Vec::new();
+        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
         registrar.on::<BlockBrokenEvent>(Stage::Validate, 0, |event, _| {
             event.cancel();
         });

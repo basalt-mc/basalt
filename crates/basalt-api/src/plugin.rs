@@ -56,7 +56,7 @@ pub trait Plugin: Send + Sync + 'static {
     /// The `registrar` provides typed methods for subscribing to events
     /// at specific stages with priority ordering. This is the only way
     /// to register handlers.
-    fn on_enable(&self, registrar: &mut EventRegistrar);
+    fn on_enable(&self, registrar: &mut PluginRegistrar);
 
     /// Called when the plugin is disabled (server shutdown).
     ///
@@ -87,38 +87,42 @@ pub struct PluginMetadata {
     pub dependencies: &'static [&'static str],
 }
 
-/// Typed registration interface for event handlers.
-///
-/// Wraps [`EventBus`] and locks the context type to [`ServerContext`].
-/// Plugins use this to subscribe handlers without accessing the bus
-/// directly, which prevents registering handlers with a wrong context
-/// type.
-pub struct EventRegistrar<'a> {
-    bus: &'a mut EventBus,
+/// Handler function type for commands.
+pub type CommandHandler = Box<dyn Fn(&str, &ServerContext) + Send + Sync>;
+
+/// A registered command entry (name, description, handler).
+pub struct CommandEntry {
+    /// Command name without the leading `/`.
+    pub name: String,
+    /// Short description for help listing.
+    pub description: String,
+    /// The command handler function.
+    pub handler: CommandHandler,
 }
 
-impl<'a> EventRegistrar<'a> {
-    /// Creates a new registrar wrapping the given event bus.
-    pub fn new(bus: &'a mut EventBus) -> Self {
-        Self { bus }
+/// Plugin registration interface for events and commands.
+///
+/// Passed to [`Plugin::on_enable`] at startup. Plugins use it to
+/// register event handlers and commands. After all plugins are
+/// enabled, the server collects registered commands to build the
+/// `DeclareCommands` packet and the command dispatch table.
+pub struct PluginRegistrar<'a> {
+    bus: &'a mut EventBus,
+    commands: &'a mut Vec<CommandEntry>,
+}
+
+impl<'a> PluginRegistrar<'a> {
+    /// Creates a new registrar wrapping the given event bus and
+    /// command list.
+    pub fn new(bus: &'a mut EventBus, commands: &'a mut Vec<CommandEntry>) -> Self {
+        Self { bus, commands }
     }
 
-    /// Registers a handler for event type `E` at the given stage.
+    /// Registers an event handler for event type `E` at the given stage.
     ///
     /// Lower priority values run first within the same stage.
     /// The handler receives a mutable reference to the event and
     /// a shared reference to [`ServerContext`].
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// registrar.on::<BlockBrokenEvent>(Stage::Validate, 0, |event, ctx| {
-    ///     // Check permissions, optionally cancel
-    ///     if !can_build(ctx.player_uuid()) {
-    ///         event.cancel();
-    ///     }
-    /// });
-    /// ```
     pub fn on<E>(
         &mut self,
         stage: Stage,
@@ -129,7 +133,37 @@ impl<'a> EventRegistrar<'a> {
     {
         self.bus.on::<E, ServerContext>(stage, priority, handler);
     }
+
+    /// Registers a command that players can invoke with `/<name>`.
+    ///
+    /// The handler receives the argument string (everything after
+    /// the command name) and the server context.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// registrar.register_command("home", "Teleport to spawn", |args, ctx| {
+    ///     ctx.teleport(0.0, 64.0, 0.0, 0.0, 0.0);
+    ///     ctx.send_message("Teleported home!");
+    /// });
+    /// ```
+    pub fn register_command(
+        &mut self,
+        name: &str,
+        description: &str,
+        handler: impl Fn(&str, &ServerContext) + Send + Sync + 'static,
+    ) {
+        self.commands.push(CommandEntry {
+            name: name.to_string(),
+            description: description.to_string(),
+            handler: Box::new(handler),
+        });
+    }
 }
+
+/// Backward-compatible alias.
+#[deprecated(note = "renamed to PluginRegistrar")]
+pub type EventRegistrar<'a> = PluginRegistrar<'a>;
 
 #[cfg(test)]
 mod tests {
@@ -147,7 +181,7 @@ mod tests {
             }
         }
 
-        fn on_enable(&self, _registrar: &mut EventRegistrar) {
+        fn on_enable(&self, _registrar: &mut PluginRegistrar) {
             // no-op for metadata test
         }
     }
@@ -173,10 +207,24 @@ mod tests {
         use crate::events::ChatMessageEvent;
 
         let mut bus = EventBus::new();
+        let mut commands = Vec::new();
         {
-            let mut registrar = EventRegistrar::new(&mut bus);
+            let mut registrar = PluginRegistrar::new(&mut bus, &mut commands);
             registrar.on::<ChatMessageEvent>(Stage::Post, 0, |_event, _ctx| {});
         }
         assert_eq!(bus.handler_count(), 1);
+    }
+
+    #[test]
+    fn registrar_registers_command() {
+        let mut bus = EventBus::new();
+        let mut commands = Vec::new();
+        {
+            let mut registrar = PluginRegistrar::new(&mut bus, &mut commands);
+            registrar.register_command("test", "A test command", |_args, _ctx| {});
+        }
+        assert_eq!(commands.len(), 1);
+        assert_eq!(commands[0].name, "test");
+        assert_eq!(commands[0].description, "A test command");
     }
 }

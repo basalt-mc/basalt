@@ -21,7 +21,7 @@ impl Plugin for LifecyclePlugin {
         }
     }
 
-    fn on_enable(&self, registrar: &mut EventRegistrar) {
+    fn on_enable(&self, registrar: &mut PluginRegistrar) {
         registrar.on::<PlayerJoinedEvent>(Stage::Post, 0, |event, ctx| {
             ctx.broadcast(BroadcastMessage::PlayerJoined {
                 info: event.info.clone(),
@@ -70,7 +70,8 @@ mod tests {
         };
 
         let mut bus = EventBus::new();
-        let mut registrar = EventRegistrar::new(&mut bus);
+        let mut cmds = Vec::new();
+        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
         LifecyclePlugin.on_enable(&mut registrar);
         bus.dispatch(&mut event, &ctx);
 
@@ -92,7 +93,8 @@ mod tests {
         };
 
         let mut bus = EventBus::new();
-        let mut registrar = EventRegistrar::new(&mut bus);
+        let mut cmds = Vec::new();
+        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
         LifecyclePlugin.on_enable(&mut registrar);
         bus.dispatch(&mut event, &ctx);
 

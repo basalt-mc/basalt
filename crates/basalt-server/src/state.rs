@@ -26,6 +26,8 @@ pub(crate) struct ServerState {
     pub world: basalt_world::World,
     /// Event bus with registered plugin handlers.
     pub event_bus: EventBus,
+    /// Pre-built DeclareCommands packet payload (empty if no commands).
+    pub declare_commands: Vec<u8>,
 }
 
 /// A handle to a connected player, stored in the server state registry.
@@ -54,24 +56,62 @@ impl ServerState {
 
     /// Creates a server state with a given world and plugin set.
     ///
-    /// Each plugin's `on_enable` is called with an `EventRegistrar`
-    /// to register its event handlers on the bus.
+    /// Each plugin's `on_enable` is called with a `PluginRegistrar`
+    /// to register event handlers and commands. After all plugins
+    /// are enabled, the collected commands are used to build the
+    /// `DeclareCommands` packet and the command dispatch handler.
     pub fn with_world_and_plugins(
         world: basalt_world::World,
         plugins: Vec<Box<dyn basalt_api::Plugin>>,
     ) -> Arc<Self> {
         let (broadcast_tx, _) = broadcast::channel(256);
         let mut event_bus = EventBus::new();
-        let mut registrar = basalt_api::EventRegistrar::new(&mut event_bus);
-        for plugin in &plugins {
-            log::info!(target: "basalt::plugin", "Enabling {} v{}", plugin.metadata().name, plugin.metadata().version);
-            plugin.on_enable(&mut registrar);
+        let mut commands = Vec::new();
+        {
+            let mut registrar = basalt_api::PluginRegistrar::new(&mut event_bus, &mut commands);
+            for plugin in &plugins {
+                log::info!(target: "basalt::plugin", "Enabling {} v{}", plugin.metadata().name, plugin.metadata().version);
+                plugin.on_enable(&mut registrar);
+            }
         }
+
+        // Build DeclareCommands packet from all registered commands
+        let declare_commands = build_declare_commands(&commands);
+
+        // Register command dispatch handler on the event bus
+        if !commands.is_empty() {
+            let commands: Vec<basalt_api::CommandEntry> = commands.into_iter().collect();
+            let commands = std::sync::Arc::new(commands);
+            event_bus.on::<basalt_api::events::CommandEvent, basalt_api::context::ServerContext>(
+                basalt_events::Stage::Process,
+                -100, // high priority — runs before other Process handlers
+                move |event, ctx| {
+                    let parts: Vec<&str> = event.command.splitn(2, ' ').collect();
+                    let cmd = parts[0];
+                    let args = parts.get(1).copied().unwrap_or("");
+                    let found = commands.iter().find(|c| c.name == cmd);
+                    if let Some(entry) = found {
+                        (entry.handler)(args, ctx);
+                    } else {
+                        ctx.send_message_component(
+                            &basalt_types::TextComponent::text(format!("Unknown command: /{cmd}"))
+                                .color(basalt_types::TextColor::Named(
+                                    basalt_types::NamedColor::Red,
+                                )),
+                        );
+                    }
+                },
+            );
+        }
+
+        log::info!(target: "basalt::server", "Registered {} commands", declare_commands.1);
+
         Arc::new(Self {
             next_entity_id: AtomicI32::new(1),
             players: DashMap::new(),
             broadcast_tx,
             world,
+            declare_commands: declare_commands.0,
             event_bus,
         })
     }
@@ -134,6 +174,48 @@ impl ServerState {
     pub fn player_count(&self) -> usize {
         self.players.len()
     }
+}
+
+/// Builds the raw DeclareCommands packet payload from registered commands.
+///
+/// Returns (payload_bytes, command_count). The Brigadier tree has a root
+/// node with one literal child per command, all marked as executable.
+fn build_declare_commands(commands: &[basalt_api::CommandEntry]) -> (Vec<u8>, usize) {
+    use basalt_types::{Encode, VarInt};
+
+    let count = commands.len();
+    if count == 0 {
+        return (Vec::new(), 0);
+    }
+
+    let mut buf = Vec::new();
+
+    // Total nodes = 1 root + N literals
+    VarInt((count + 1) as i32).encode(&mut buf).unwrap();
+
+    // Node 0: root (type=0, children=[1..=N])
+    0u8.encode(&mut buf).unwrap(); // flags = root
+    VarInt(count as i32).encode(&mut buf).unwrap();
+    for i in 1..=count {
+        VarInt(i as i32).encode(&mut buf).unwrap();
+    }
+
+    // Nodes 1..N: literal nodes, sorted by name
+    let mut names: Vec<&str> = commands.iter().map(|c| c.name.as_str()).collect();
+    names.sort();
+    for name in names {
+        let flags: u8 = 0x01 | 0x04; // type=literal, executable
+        flags.encode(&mut buf).unwrap();
+        VarInt(0).encode(&mut buf).unwrap(); // no children
+        // Minecraft string: VarInt length + UTF-8 bytes
+        VarInt(name.len() as i32).encode(&mut buf).unwrap();
+        buf.extend_from_slice(name.as_bytes());
+    }
+
+    // root_index = 0
+    VarInt(0).encode(&mut buf).unwrap();
+
+    (buf, count)
 }
 
 #[cfg(test)]

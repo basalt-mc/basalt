@@ -9,10 +9,8 @@ pub mod commands;
 
 use std::sync::Arc;
 
-use basalt_api::events::CommandEvent;
 use basalt_api::prelude::*;
 use basalt_command::CommandRegistry;
-use basalt_types::{NamedColor, TextColor, TextComponent};
 
 use commands::{
     GamemodeCommand, HelpCommand, KickCommand, ListCommand, SayCommand, StopCommand, TpCommand,
@@ -96,20 +94,19 @@ impl Plugin for CommandPlugin {
         }
     }
 
-    fn on_enable(&self, registrar: &mut EventRegistrar) {
+    fn on_enable(&self, registrar: &mut PluginRegistrar) {
+        // Register each command from the internal registry
+        // on the plugin registrar so the server collects them all.
         let registry = Arc::clone(&self.registry);
-        registrar.on::<CommandEvent>(Stage::Process, 0, move |event, ctx| {
-            let parts: Vec<&str> = event.command.splitn(2, ' ').collect();
-            let cmd = parts[0];
-            let args = parts.get(1).copied().unwrap_or("");
-
-            if !registry.execute(cmd, args, ctx) {
-                ctx.send_message_component(
-                    &TextComponent::text(format!("Unknown command: /{cmd}"))
-                        .color(TextColor::Named(NamedColor::Red)),
-                );
-            }
-        });
+        for cmd in registry.commands() {
+            let name = cmd.name();
+            let desc = cmd.description();
+            let reg = Arc::clone(&registry);
+            let cmd_name = name.to_string();
+            registrar.register_command(name, desc, move |args, ctx| {
+                reg.execute(&cmd_name, args, ctx);
+            });
+        }
     }
 }
 
@@ -133,17 +130,24 @@ mod tests {
 
     fn dispatch_command(cmd: &str) -> Vec<Response> {
         let ctx = test_ctx();
-        let mut event = CommandEvent {
-            command: cmd.into(),
-            player_uuid: Uuid::default(),
-            cancelled: false,
-        };
 
+        // Collect commands from the plugin
         let plugin = CommandPlugin::new();
         let mut bus = EventBus::new();
-        let mut registrar = EventRegistrar::new(&mut bus);
-        plugin.on_enable(&mut registrar);
-        bus.dispatch(&mut event, &ctx);
+        let mut cmds = Vec::new();
+        {
+            let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
+            plugin.on_enable(&mut registrar);
+        }
+
+        // Dispatch like the server does: find and call the handler
+        let parts: Vec<&str> = cmd.splitn(2, ' ').collect();
+        let name = parts[0];
+        let args = parts.get(1).copied().unwrap_or("");
+        let entry = cmds.iter().find(|c| c.name == name);
+        if let Some(entry) = entry {
+            (entry.handler)(args, &ctx);
+        }
         ctx.drain_responses()
     }
 
@@ -183,10 +187,11 @@ mod tests {
     }
 
     #[test]
-    fn unknown_command() {
+    fn unknown_command_returns_empty() {
+        // Unknown command handling is done by the server, not the plugin.
+        // The plugin only registers known commands.
         let responses = dispatch_command("foobar");
-        assert_eq!(responses.len(), 1);
-        assert!(matches!(responses[0], Response::SendSystemChat { .. }));
+        assert!(responses.is_empty());
     }
 
     #[test]

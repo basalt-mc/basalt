@@ -11,7 +11,9 @@ use std::time::Instant;
 
 use basalt_net::connection::{Connection, Play};
 use basalt_protocol::packets::play::ServerboundPlayPacket;
-use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
+use basalt_protocol::packets::play::chat::{
+    ClientboundPlayDeclareCommands, ClientboundPlaySystemChat,
+};
 use basalt_protocol::packets::play::entity::{
     ClientboundPlayEntityDestroy, ClientboundPlayEntityHeadRotation, ClientboundPlaySpawnEntity,
     ClientboundPlaySyncEntityPosition,
@@ -49,6 +51,7 @@ pub(crate) async fn run_play_loop(
     existing_players: &[PlayerSnapshot],
 ) -> crate::error::Result<()> {
     send_initial_world(&mut conn, addr, player, state).await?;
+    send_declare_commands(&mut conn, addr, state).await?;
 
     // Send the player's own PlayerInfo so they appear in their own Tab list
     let self_snapshot = PlayerSnapshot {
@@ -162,6 +165,26 @@ async fn send_initial_world(
         .await?;
     log::debug!(target: "basalt::play", "[{addr}] -> Position ({}, {}, {})", player.x, player.y, player.z);
 
+    Ok(())
+}
+
+/// Sends the DeclareCommands packet for client tab-completion.
+///
+/// Skipped if no commands are registered (command plugin disabled).
+async fn send_declare_commands(
+    conn: &mut Connection<Play>,
+    addr: SocketAddr,
+    state: &Arc<ServerState>,
+) -> crate::error::Result<()> {
+    if state.declare_commands.is_empty() {
+        return Ok(());
+    }
+    conn.write_packet_typed(
+        ClientboundPlayDeclareCommands::PACKET_ID,
+        &RawPayload(state.declare_commands.clone()),
+    )
+    .await?;
+    log::debug!(target: "basalt::play", "[{addr}] -> DeclareCommands");
     Ok(())
 }
 

@@ -21,7 +21,7 @@ impl Plugin for ChatPlugin {
         }
     }
 
-    fn on_enable(&self, registrar: &mut EventRegistrar) {
+    fn on_enable(&self, registrar: &mut PluginRegistrar) {
         registrar.on::<ChatMessageEvent>(Stage::Post, 0, |event, ctx| {
             let component = build_chat_component(&event.username, &event.message);
             ctx.broadcast_message_component(&component);
@@ -61,7 +61,8 @@ mod tests {
         };
 
         let mut bus = EventBus::new();
-        let mut registrar = EventRegistrar::new(&mut bus);
+        let mut cmds = Vec::new();
+        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
         ChatPlugin.on_enable(&mut registrar);
         bus.dispatch(&mut event, &ctx);
 

@@ -20,7 +20,7 @@ impl Plugin for MovementPlugin {
         }
     }
 
-    fn on_enable(&self, registrar: &mut EventRegistrar) {
+    fn on_enable(&self, registrar: &mut PluginRegistrar) {
         registrar.on::<PlayerMovedEvent>(Stage::Post, 0, |event, ctx| {
             ctx.broadcast(BroadcastMessage::EntityMoved {
                 entity_id: event.entity_id,
@@ -65,7 +65,8 @@ mod tests {
         };
 
         let mut bus = EventBus::new();
-        let mut registrar = EventRegistrar::new(&mut bus);
+        let mut cmds = Vec::new();
+        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
         MovementPlugin.on_enable(&mut registrar);
         bus.dispatch(&mut event, &ctx);
 

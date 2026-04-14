@@ -274,7 +274,6 @@ impl ServerConfig {
         if self.plugins.block {
             plugins.push(Box::new(basalt_plugin_block::BlockPlugin));
         }
-        // StoragePlugin is only active in read-write mode
         if self.plugins.block && self.world.storage == StorageMode::ReadWrite {
             plugins.push(Box::new(basalt_plugin_storage::StoragePlugin));
         }
