@@ -113,8 +113,10 @@ pub enum StorageMode {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct PluginsSection {
-    /// Chat messages and slash commands.
+    /// Chat message broadcast.
     pub chat: bool,
+    /// Gameplay commands (/tp, /gamemode, /say, /help).
+    pub command: bool,
     /// Block breaking and placing.
     pub block: bool,
     /// Chunk streaming on movement.
@@ -148,6 +150,7 @@ impl Default for PluginsSection {
     fn default() -> Self {
         Self {
             chat: true,
+            command: true,
             block: true,
             world: true,
             lifecycle: true,
@@ -259,6 +262,9 @@ impl ServerConfig {
         if self.plugins.chat {
             plugins.push(Box::new(basalt_plugin_chat::ChatPlugin));
         }
+        if self.plugins.command {
+            plugins.push(Box::new(basalt_plugin_command::CommandPlugin::new()));
+        }
         if self.plugins.movement {
             plugins.push(Box::new(basalt_plugin_movement::MovementPlugin));
         }
@@ -356,8 +362,8 @@ storage = "none"
     fn create_plugins_all_enabled() {
         let config = ServerConfig::default();
         let plugins = config.create_plugins();
-        // 6 plugins: lifecycle, chat, movement, world, block, storage
-        assert_eq!(plugins.len(), 6);
+        // 7 plugins: lifecycle, chat, command, movement, world, block, storage
+        assert_eq!(plugins.len(), 7);
     }
 
     #[test]
@@ -365,8 +371,8 @@ storage = "none"
         let mut config = ServerConfig::default();
         config.world.storage = StorageMode::ReadOnly;
         let plugins = config.create_plugins();
-        // 5 plugins: no StoragePlugin
-        assert_eq!(plugins.len(), 5);
+        // 6 plugins: no StoragePlugin
+        assert_eq!(plugins.len(), 6);
         assert!(plugins.iter().all(|p| p.metadata().name != "storage"));
     }
 
@@ -374,6 +380,7 @@ storage = "none"
     fn create_plugins_none_disabled() {
         let mut config = ServerConfig::default();
         config.plugins.chat = false;
+        config.plugins.command = false;
         config.plugins.block = false;
         config.plugins.world = false;
         config.plugins.lifecycle = false;
