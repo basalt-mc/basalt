@@ -2,8 +2,7 @@
 //!
 //! A lightweight Minecraft 1.21.4 server built on the Basalt protocol
 //! library. Handles the full client lifecycle from handshake through
-//! play, with support for multi-player, chat broadcast, commands,
-//! and player position tracking.
+//! play, with plugin-based game logic loaded from `basalt.toml`.
 //!
 //! # Usage
 //!
@@ -12,12 +11,13 @@
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let server = Server::new("0.0.0.0:25565");
+//!     let server = Server::new();
 //!     server.run().await;
 //! }
 //! ```
 
 mod chat;
+pub mod config;
 mod connection;
 pub mod error;
 mod helpers;
@@ -28,31 +28,34 @@ mod state;
 
 use std::sync::Arc;
 
+use config::ServerConfig;
 use tokio::net::TcpListener;
 
 use state::ServerState;
 
 /// A Basalt Minecraft server instance.
 ///
-/// Listens for incoming TCP connections and spawns a task for each
-/// client. All connection tasks share a `ServerState` that tracks
-/// who is online, assigns unique entity IDs, and routes broadcast
-/// messages between players.
+/// Loads configuration from `basalt.toml` (or defaults), registers
+/// plugins, and listens for incoming TCP connections.
 pub struct Server {
-    /// The address to bind the TCP listener to.
-    bind_addr: String,
+    /// Server configuration loaded from `basalt.toml`.
+    config: ServerConfig,
 }
 
 impl Server {
-    /// Creates a new server that will listen on the given address.
+    /// Creates a new server with configuration loaded from `basalt.toml`.
     ///
-    /// The address is not bound until `run()` is called. Use
-    /// `"0.0.0.0:25565"` to listen on all interfaces on the default
-    /// Minecraft port.
-    pub fn new(bind_addr: &str) -> Self {
+    /// If `basalt.toml` doesn't exist, sensible defaults are used
+    /// (all plugins enabled, read-write storage, seed 42).
+    pub fn new() -> Self {
         Self {
-            bind_addr: bind_addr.to_string(),
+            config: ServerConfig::load(),
         }
+    }
+
+    /// Creates a new server with the given configuration.
+    pub fn with_config(config: ServerConfig) -> Self {
+        Self { config }
     }
 
     /// Starts the server and listens for connections indefinitely.
@@ -60,19 +63,31 @@ impl Server {
     /// Each incoming connection is handled in its own Tokio task.
     /// This method never returns under normal operation.
     pub async fn run(&self) {
-        let listener = TcpListener::bind(&self.bind_addr).await.unwrap();
-        println!("Basalt server listening on {}", self.bind_addr);
-        Self::accept_loop(listener).await;
+        let listener = TcpListener::bind(&self.config.server.bind).await.unwrap();
+        println!("Basalt server listening on {}", self.config.server.bind);
+
+        let world = self.config.create_world();
+        let plugins = self.config.create_plugins();
+        let state = ServerState::with_world_and_plugins(world, plugins);
+
+        Self::accept_loop_with_state(listener, state).await;
     }
 
-    /// Accepts connections on the given listener until it is dropped.
+    /// Accepts connections on the given listener with default config.
     ///
-    /// Creates a shared `ServerState` and passes it to every connection
-    /// task. Exposed for testing — tests can bind to port 0 and pass
-    /// the listener directly, avoiding port conflicts.
+    /// Exposed for testing — tests can bind to port 0 and pass the
+    /// listener directly, avoiding port conflicts.
     pub async fn accept_loop(listener: TcpListener) {
-        let state = ServerState::new();
+        let config = ServerConfig::default();
+        let world = config.create_world();
+        let plugins = config.create_plugins();
+        let state = ServerState::with_world_and_plugins(world, plugins);
 
+        Self::accept_loop_with_state(listener, state).await;
+    }
+
+    /// Accepts connections with an existing server state.
+    async fn accept_loop_with_state(listener: TcpListener, state: Arc<ServerState>) {
         loop {
             let (stream, addr) = listener.accept().await.unwrap();
             println!("[{addr}] Connection accepted");
@@ -85,5 +100,11 @@ impl Server {
                 println!("[{addr}] Connection closed");
             });
         }
+    }
+}
+
+impl Default for Server {
+    fn default() -> Self {
+        Self::new()
     }
 }

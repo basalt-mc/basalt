@@ -45,16 +45,21 @@ pub(crate) struct PlayerHandle {
 }
 
 impl ServerState {
-    /// Creates a new server state with default built-in plugins.
+    /// Creates a new server state with default config (all plugins, read-write).
+    #[cfg(test)]
     pub fn new() -> Arc<Self> {
-        Self::with_plugins(default_plugins())
+        let config = crate::config::ServerConfig::default();
+        Self::with_world_and_plugins(config.create_world(), config.create_plugins())
     }
 
-    /// Creates a server state with the given plugins registered.
+    /// Creates a server state with a given world and plugin set.
     ///
     /// Each plugin's `on_enable` is called with an `EventRegistrar`
     /// to register its event handlers on the bus.
-    pub fn with_plugins(plugins: Vec<Box<dyn basalt_api::Plugin>>) -> Arc<Self> {
+    pub fn with_world_and_plugins(
+        world: basalt_world::World,
+        plugins: Vec<Box<dyn basalt_api::Plugin>>,
+    ) -> Arc<Self> {
         let (broadcast_tx, _) = broadcast::channel(256);
         let mut event_bus = EventBus::new();
         let mut registrar = basalt_api::EventRegistrar::new(&mut event_bus);
@@ -70,7 +75,7 @@ impl ServerState {
             next_entity_id: AtomicI32::new(1),
             players: DashMap::new(),
             broadcast_tx,
-            world: basalt_world::World::new(42, "world"),
+            world,
             event_bus,
         })
     }
@@ -133,21 +138,6 @@ impl ServerState {
     pub fn player_count(&self) -> usize {
         self.players.len()
     }
-}
-
-/// Returns the default set of built-in plugins.
-///
-/// These cover all core server functionality: lifecycle, chat,
-/// movement, world streaming, block interaction, and storage.
-pub(crate) fn default_plugins() -> Vec<Box<dyn basalt_api::Plugin>> {
-    vec![
-        Box::new(basalt_plugin_lifecycle::LifecyclePlugin),
-        Box::new(basalt_plugin_chat::ChatPlugin),
-        Box::new(basalt_plugin_movement::MovementPlugin),
-        Box::new(basalt_plugin_world::WorldPlugin),
-        Box::new(basalt_plugin_block::BlockPlugin),
-        Box::new(basalt_plugin_storage::StoragePlugin),
-    ]
 }
 
 #[cfg(test)]

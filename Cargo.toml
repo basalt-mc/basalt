@@ -43,6 +43,9 @@ lz4_flex = "0.11"
 # Noise generation
 noise = "0.9"
 
+# Configuration
+toml = "0.8"
+
 # Concurrent data structures
 dashmap = "6"
 
