@@ -263,7 +263,7 @@ impl ServerConfig {
             plugins.push(Box::new(basalt_plugin_chat::ChatPlugin));
         }
         if self.plugins.command {
-            plugins.push(Box::new(basalt_plugin_command::CommandPlugin::new()));
+            plugins.push(Box::new(basalt_plugin_command::CommandPlugin));
         }
         if self.plugins.movement {
             plugins.push(Box::new(basalt_plugin_movement::MovementPlugin));

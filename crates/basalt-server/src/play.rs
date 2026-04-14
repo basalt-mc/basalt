@@ -12,7 +12,8 @@ use std::time::Instant;
 use basalt_net::connection::{Connection, Play};
 use basalt_protocol::packets::play::ServerboundPlayPacket;
 use basalt_protocol::packets::play::chat::{
-    ClientboundPlayDeclareCommands, ClientboundPlaySystemChat,
+    ClientboundPlayDeclareCommands, ClientboundPlaySystemChat, ClientboundPlayTabComplete,
+    ClientboundPlayTabCompleteMatches, ServerboundPlayTabComplete,
 };
 use basalt_protocol::packets::play::entity::{
     ClientboundPlayEntityDestroy, ClientboundPlayEntityHeadRotation, ClientboundPlaySpawnEntity,
@@ -51,7 +52,6 @@ pub(crate) async fn run_play_loop(
     existing_players: &[PlayerSnapshot],
 ) -> crate::error::Result<()> {
     send_initial_world(&mut conn, addr, player, state).await?;
-    send_declare_commands(&mut conn, addr, state).await?;
 
     // Send the player's own PlayerInfo so they appear in their own Tab list
     let self_snapshot = PlayerSnapshot {
@@ -118,6 +118,9 @@ async fn send_initial_world(
     conn.write_packet_typed(ClientboundPlayLogin::PACKET_ID, &login)
         .await?;
     log::debug!(target: "basalt::play", "[{addr}] -> Login (Play)");
+
+    // DeclareCommands must be sent right after Login, before chunks
+    send_declare_commands(conn, addr, state).await?;
 
     let spawn_y = state.world.spawn_y() as i32;
     let spawn = ClientboundPlaySpawnPosition {
@@ -188,6 +191,87 @@ async fn send_declare_commands(
     Ok(())
 }
 
+/// Handles a serverbound TabComplete request.
+///
+/// Finds the command being typed and the current argument position,
+/// then sends matching suggestions from Options or Player arg types.
+async fn handle_tab_complete(
+    conn: &mut Connection<Play>,
+    state: &Arc<ServerState>,
+    tc: &ServerboundPlayTabComplete,
+) -> crate::error::Result<()> {
+    use basalt_command::Arg;
+
+    let text = tc.text.trim_start_matches('/');
+    let parts: Vec<&str> = text.split_whitespace().collect();
+
+    let cmd_name = parts.first().copied().unwrap_or("");
+    let arg_index = if text.ends_with(' ') {
+        parts.len().saturating_sub(1)
+    } else {
+        parts.len().saturating_sub(2)
+    };
+    let prefix = if text.ends_with(' ') {
+        ""
+    } else {
+        parts.last().copied().unwrap_or("")
+    };
+
+    let mut suggestions = Vec::new();
+
+    if let Some(meta) = state.command_args.iter().find(|c| c.name == cmd_name) {
+        // Get the arg lists to search
+        let arg_lists: Vec<&Vec<basalt_command::CommandArg>> = if !meta.variants.is_empty() {
+            meta.variants.iter().collect()
+        } else {
+            vec![&meta.args]
+        };
+
+        for arg_list in &arg_lists {
+            if let Some(arg_def) = arg_list.get(arg_index) {
+                match &arg_def.arg_type {
+                    Arg::Options(choices) => {
+                        for choice in choices {
+                            if choice.starts_with(prefix) {
+                                suggestions.push(ClientboundPlayTabCompleteMatches {
+                                    r#match: choice.clone(),
+                                    tooltip: None,
+                                });
+                            }
+                        }
+                    }
+                    // Entity/Player/GameProfile — client handles natively
+                    Arg::Boolean => {
+                        for val in &["true", "false"] {
+                            if val.starts_with(prefix) {
+                                suggestions.push(ClientboundPlayTabCompleteMatches {
+                                    r#match: (*val).to_string(),
+                                    tooltip: None,
+                                });
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    if !suggestions.is_empty() {
+        let start = (tc.text.len() - prefix.len()) as i32;
+        let response = ClientboundPlayTabComplete {
+            transaction_id: tc.transaction_id,
+            start,
+            length: prefix.len() as i32,
+            matches: suggestions,
+        };
+        conn.write_packet_typed(ClientboundPlayTabComplete::PACKET_ID, &response)
+            .await?;
+    }
+
+    Ok(())
+}
+
 /// Main play loop with three concurrent branches:
 /// 1. Keep-alive timer
 /// 2. Client packet reader
@@ -215,6 +299,11 @@ async fn play_loop(
             result = conn.read_packet() => {
                 match result {
                     Ok(packet) => {
+                        // Handle TabComplete inline (not an event)
+                        if let ServerboundPlayPacket::TabComplete(tc) = &packet {
+                            handle_tab_complete(conn, state, tc).await?;
+                            continue;
+                        }
                         if let Some(mut event) = packet_to_event(addr, player, packet) {
                             // Safety: Arc<ServerState> lives for the entire server.
                             // The world reference is valid for the duration of dispatch.
@@ -225,6 +314,11 @@ async fn play_loop(
                                 player.uuid,
                                 player.entity_id,
                                 player.username.clone(),
+                            );
+                            ctx.set_command_list(
+                                state.command_args.iter()
+                                    .map(|c| (c.name.clone(), c.description.clone()))
+                                    .collect(),
                             );
                             state.event_bus.dispatch_dyn(&mut *event, &ctx);
                             execute_responses(conn, state, player, &ctx.drain_responses()).await?;
