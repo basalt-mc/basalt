@@ -9,3 +9,4 @@ repository.workspace = true
 basalt-events = { workspace = true }
 basalt-types = { workspace = true }
 basalt-world = { workspace = true }
+log = { workspace = true }

@@ -39,6 +39,8 @@ pub struct ServerContext {
     player_entity_id: i32,
     /// Username of the player who triggered this event.
     player_username: String,
+    /// Name of the plugin currently being dispatched.
+    plugin_name: RefCell<String>,
 }
 
 impl ServerContext {
@@ -64,7 +66,16 @@ impl ServerContext {
             player_uuid,
             player_entity_id,
             player_username,
+            plugin_name: RefCell::new(String::new()),
         }
+    }
+
+    /// Sets the plugin name for logger context.
+    ///
+    /// Called internally before each handler runs so `logger()`
+    /// returns the correct target.
+    pub fn set_plugin_name(&self, name: &str) {
+        *self.plugin_name.borrow_mut() = name.to_string();
     }
 
     // --- Player identity ---
@@ -82,6 +93,16 @@ impl ServerContext {
     /// Returns the username of the player who triggered this event.
     pub fn player_username(&self) -> &str {
         &self.player_username
+    }
+
+    // --- Logger ---
+
+    /// Returns a logger scoped to the current plugin.
+    ///
+    /// Messages are logged with target `basalt::plugin::<name>`,
+    /// making them easy to filter in log output.
+    pub fn logger(&self) -> crate::logger::PluginLogger {
+        crate::logger::PluginLogger::new(&self.plugin_name.borrow())
     }
 
     // --- World access ---

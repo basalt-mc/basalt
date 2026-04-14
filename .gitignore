@@ -106,3 +106,4 @@ sniffcraft/
 
 ## world save data (runtime-generated, not the plugin crate)
 /world/
+crates/basalt-server/world/

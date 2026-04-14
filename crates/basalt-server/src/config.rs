@@ -29,6 +29,54 @@ pub struct ServerConfig {
 pub struct ServerSection {
     /// Address to bind the TCP listener to.
     pub bind: String,
+    /// Log level: trace, debug, info, warn, error.
+    pub log_level: LogLevel,
+    /// Log format: pretty (human-readable) or json (structured).
+    pub log_format: LogFormat,
+}
+
+/// Log output format.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogFormat {
+    /// Human-readable format with colors and aligned fields.
+    #[default]
+    Pretty,
+    /// Structured JSON, one object per line.
+    Json,
+}
+
+/// Log verbosity level.
+///
+/// Maps directly to `log::LevelFilter`. Configurable via `basalt.toml`
+/// and overridable via the `RUST_LOG` environment variable.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLevel {
+    /// Very verbose: keep-alive RTT, chunk counts, unhandled packets.
+    Trace,
+    /// Protocol flow: packets sent/received, state transitions.
+    Debug,
+    /// Important events: server start, player join/leave, plugins loaded.
+    #[default]
+    Info,
+    /// Non-critical problems: skin fetch failure, keep-alive mismatch.
+    Warn,
+    /// Connection errors and fatal issues.
+    Error,
+}
+
+impl LogLevel {
+    /// Converts to `log::LevelFilter` for logger initialization.
+    pub fn to_level_filter(self) -> log::LevelFilter {
+        match self {
+            Self::Trace => log::LevelFilter::Trace,
+            Self::Debug => log::LevelFilter::Debug,
+            Self::Info => log::LevelFilter::Info,
+            Self::Warn => log::LevelFilter::Warn,
+            Self::Error => log::LevelFilter::Error,
+        }
+    }
 }
 
 /// World generation and storage settings.
@@ -81,6 +129,8 @@ impl Default for ServerSection {
     fn default() -> Self {
         Self {
             bind: "0.0.0.0:25565".into(),
+            log_level: LogLevel::Info,
+            log_format: LogFormat::Pretty,
         }
     }
 }
@@ -115,6 +165,47 @@ impl ServerConfig {
         Self::load_from(Path::new("basalt.toml"))
     }
 
+    /// Initializes the logger based on the config's log level and format.
+    ///
+    /// Uses `env_logger` with the configured level as default.
+    /// The `RUST_LOG` environment variable overrides the config
+    /// if set, allowing runtime adjustment without editing the file.
+    ///
+    /// Formats:
+    /// - `pretty`: `[2026-04-14 10:32:01] INFO  [basalt::server] message`
+    /// - `json`: `{"ts":"2026-04-14T10:32:01Z","level":"INFO","target":"basalt::server","msg":"message"}`
+    pub fn init_logger(&self) {
+        use std::io::Write;
+
+        let format = self.server.log_format;
+        env_logger::Builder::new()
+            .filter_level(self.server.log_level.to_level_filter())
+            .parse_default_env()
+            .format(move |buf, record| match format {
+                LogFormat::Pretty => {
+                    let level = record.level();
+                    let target = record.target();
+                    writeln!(
+                        buf,
+                        "{} {level:<5} [{target}] {}",
+                        buf.timestamp(),
+                        record.args()
+                    )
+                }
+                LogFormat::Json => {
+                    writeln!(
+                        buf,
+                        r#"{{"ts":"{}","level":"{}","target":"{}","msg":"{}"}}"#,
+                        buf.timestamp(),
+                        record.level(),
+                        record.target(),
+                        record.args()
+                    )
+                }
+            })
+            .init();
+    }
+
     /// Loads the config from the given path.
     ///
     /// Returns the default config if the file doesn't exist.
@@ -124,7 +215,7 @@ impl ServerConfig {
                 panic!("Failed to parse {}: {e}", path.display());
             }),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                println!("[config] No basalt.toml found, using defaults");
+                log::info!("No basalt.toml found, using defaults");
                 Self::default()
             }
             Err(e) => {
@@ -141,13 +232,17 @@ impl ServerConfig {
     pub fn create_world(&self) -> basalt_world::World {
         match self.world.storage {
             StorageMode::None => {
-                println!("[world] Memory-only (no persistence)");
+                log::info!(
+                    "World: memory-only (no persistence), seed {}",
+                    self.world.seed
+                );
                 basalt_world::World::new_memory(self.world.seed)
             }
             StorageMode::ReadOnly | StorageMode::ReadWrite => {
-                println!(
-                    "[world] Storage: {:?}, seed: {}, dir: world/",
-                    self.world.storage, self.world.seed
+                log::info!(
+                    "World: {:?} storage, seed {}, dir world/",
+                    self.world.storage,
+                    self.world.seed
                 );
                 basalt_world::World::new(self.world.seed, "world")
             }

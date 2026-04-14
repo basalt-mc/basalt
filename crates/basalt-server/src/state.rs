@@ -64,11 +64,7 @@ impl ServerState {
         let mut event_bus = EventBus::new();
         let mut registrar = basalt_api::EventRegistrar::new(&mut event_bus);
         for plugin in &plugins {
-            println!(
-                "[plugins] Enabling {} v{}",
-                plugin.metadata().name,
-                plugin.metadata().version
-            );
+            log::info!(target: "basalt::plugin", "Enabling {} v{}", plugin.metadata().name, plugin.metadata().version);
             plugin.on_enable(&mut registrar);
         }
         Arc::new(Self {

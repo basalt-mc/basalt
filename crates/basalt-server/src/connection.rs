@@ -56,17 +56,11 @@ pub(crate) async fn handle_connection(
 
     match conn.read_handshake().await? {
         HandshakeResult::Status(conn, handshake) => {
-            println!(
-                "[{addr}] Status request (protocol {})",
-                handshake.protocol_version
-            );
+            log::debug!(target: "basalt::connection", "[{addr}] Status request (protocol {})", handshake.protocol_version);
             handle_status(conn, addr).await
         }
         HandshakeResult::Login(conn, handshake) => {
-            println!(
-                "[{addr}] Login request (protocol {})",
-                handshake.protocol_version
-            );
+            log::info!(target: "basalt::connection", "[{addr}] Login (protocol {})", handshake.protocol_version);
             handle_login(conn, addr, state).await
         }
     }
@@ -79,21 +73,21 @@ async fn handle_status(
 ) -> crate::error::Result<()> {
     let packet = conn.read_packet().await?;
     if let ServerboundStatusPacket::PingStart(_) = packet {
-        println!("[{addr}] <- StatusRequest");
+        log::debug!(target: "basalt::connection", "[{addr}] <- StatusRequest");
     }
 
     let response = ClientboundStatusServerInfo {
         response: SERVER_STATUS.into(),
     };
     conn.write_status_response(&response).await?;
-    println!("[{addr}] -> StatusResponse");
+    log::debug!(target: "basalt::connection", "[{addr}] -> StatusResponse");
 
     let packet = conn.read_packet().await?;
     if let ServerboundStatusPacket::Ping(ping) = packet {
-        println!("[{addr}] <- Ping (time={})", ping.time);
+        log::debug!(target: "basalt::connection", "[{addr}] <- Ping (time={})", ping.time);
         let pong = ClientboundStatusPing { time: ping.time };
         conn.write_ping_response(&pong).await?;
-        println!("[{addr}] -> Pong");
+        log::debug!(target: "basalt::connection", "[{addr}] -> Pong");
     }
 
     Ok(())
@@ -109,14 +103,11 @@ async fn handle_login(
 ) -> crate::error::Result<()> {
     let (username, player_uuid) = match conn.read_packet().await? {
         ServerboundLoginPacket::LoginStart(login) => {
-            println!(
-                "[{addr}] <- LoginStart (username={}, uuid={})",
-                login.username, login.player_uuid
-            );
+            log::info!(target: "basalt::connection", "[{addr}] {}: LoginStart", login.username);
             (login.username, login.player_uuid)
         }
         _ => {
-            println!("[{addr}] <- Unexpected packet, expected LoginStart");
+            log::warn!(target: "basalt::connection", "[{addr}] Unexpected packet, expected LoginStart");
             return Ok(());
         }
     };
@@ -126,9 +117,9 @@ async fn handle_login(
         username: username.clone(),
         properties: vec![],
     };
-    println!("[{addr}] -> LoginSuccess");
+    log::debug!(target: "basalt::connection", "[{addr}] -> LoginSuccess");
     let conn = conn.send_login_success(&success).await?;
-    println!("[{addr}] <- LoginAcknowledged → Configuration");
+    log::debug!(target: "basalt::connection", "[{addr}] Login → Configuration");
 
     handle_configuration(conn, addr, &username, player_uuid, state).await
 }
@@ -152,11 +143,11 @@ async fn handle_configuration(
     for reg in &registries {
         conn.write_packet_typed(ClientboundConfigurationRegistryData::PACKET_ID, reg)
             .await?;
-        println!("[{addr}] -> RegistryData ({})", reg.id);
+        log::trace!(target: "basalt::connection", "[{addr}] -> RegistryData ({})", reg.id);
     }
 
     let conn = conn.finish_configuration().await?;
-    println!("[{addr}] <- FinishConfiguration → Play");
+    log::debug!(target: "basalt::connection", "[{addr}] Configuration → Play");
 
     // Collect skin result — the fetch ran during the config exchange
     let skin_properties = skin_task.await.unwrap_or_default();
