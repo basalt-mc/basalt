@@ -11,12 +11,13 @@
 
 ## Architecture
 
-Eight crates in a Cargo workspace under `crates/`, plus an `xtask` codegen tool:
+Nine crates in `crates/` (infrastructure), six plugin crates in `plugins/` (features), and an `xtask` codegen tool:
 
 ```
 basalt-types → basalt-derive → basalt-protocol → basalt-net → basalt-server
                                       ↑                            ↑
-                                   xtask (codegen)     basalt-events, basalt-world
+                                   xtask (codegen)     basalt-events → basalt-api → plugins/*
+                                                              basalt-world, basalt-storage
 ```
 
 | Crate | Purpose | Key dependencies |
@@ -26,16 +27,28 @@ basalt-types → basalt-derive → basalt-protocol → basalt-net → basalt-ser
 | `basalt-protocol` | Packet definitions, version-aware registry, registry data | `basalt-types`, `basalt-derive` |
 | `basalt-net` | Async networking, encryption, compression, connection typestate, middleware pipeline | `basalt-protocol`, `tokio`, `aes`, `cfb8`, `flate2` |
 | `basalt-events` | Generic event bus with staged handler dispatch (Validate → Process → Post) | none |
+| `basalt-api` | Public plugin API: `Plugin` trait, `ServerContext`, events, `EventRegistrar` | `basalt-events`, `basalt-types`, `basalt-world` |
 | `basalt-world` | World generation, chunk storage, paletted containers, block state registry | `basalt-types`, `basalt-protocol`, `basalt-storage` |
 | `basalt-storage` | BSR region file format with LZ4 compression for chunk persistence | `lz4_flex` |
-| `basalt-server` | Minecraft server: connection lifecycle, play loop, chat, commands, chunk streaming | `basalt-net`, `basalt-events`, `basalt-world`, `tokio`, `dashmap`, `reqwest` |
+| `basalt-server` | Server runtime: connection lifecycle, play loop, plugin registration | `basalt-api`, `basalt-net`, all plugin crates |
 | `xtask` | Code generation from minecraft-data JSON → Rust packet structs | `serde_json` |
 
-- `basalt-types` and `basalt-derive` have no interdependency.
-- `basalt-protocol` depends on both.
-- `basalt-net` depends on `basalt-protocol`.
+Plugin crates under `plugins/`:
+
+| Plugin | Purpose |
+|--------|---------|
+| `basalt-plugin-chat` | Chat broadcast + command dispatch (/say, /tp, /gamemode, /help) |
+| `basalt-plugin-block` | Block breaking/placing: world mutation + ack + broadcast |
+| `basalt-plugin-world` | Chunk streaming on player chunk boundary crossing |
+| `basalt-plugin-storage` | Chunk persistence to disk after block changes |
+| `basalt-plugin-lifecycle` | Player join/leave broadcast |
+| `basalt-plugin-movement` | Player position/look broadcast |
+
 - `basalt-events` has zero external dependencies — pure Rust event infrastructure.
-- `basalt-server` depends on `basalt-net`, `basalt-events`, and `basalt-world` — it is the top-level application crate.
+- `basalt-api` is the public plugin API — both built-in and external plugins depend on it.
+- `basalt-server` is the runtime orchestrator — it depends on `basalt-api` and all plugin crates.
+- Plugin crates depend only on `basalt-api` (and optionally `basalt-world` for block access).
+- External plugins follow the same pattern as built-in ones — same `Plugin` trait, same `ServerContext` API.
 - `xtask` is a standalone binary that generates code into `basalt-protocol`.
 
 ### basalt-events architecture
@@ -50,6 +63,20 @@ If any Validate handler cancels an event, Process and Post are skipped entirely.
 
 Server features are implemented as plugin handlers registered on the event bus. Each plugin can be enabled/disabled via server config — zero overhead for disabled features. This enables composable server profiles: an auth server only registers login + commands, a lobby adds read-only world, a game server enables everything.
 
+### basalt-api (public plugin API)
+
+The API crate is the single public interface for all plugins:
+
+- **`Plugin` trait** — `metadata()`, `on_enable(&mut EventRegistrar)`, `on_disable()`
+- **`PluginMetadata`** — name, version, author, dependencies
+- **`EventRegistrar`** — typed wrapper around `EventBus`, locks context to `ServerContext`
+- **`ServerContext`** — high-level handler context with methods: `send_message()`, `broadcast_message()`, `teleport()`, `set_gamemode()`, `world()`, `send_block_ack()`, `stream_chunks()`, player identity getters
+- **Events** — `BlockBrokenEvent`, `BlockPlacedEvent`, `PlayerMovedEvent`, `ChatMessageEvent`, `CommandEvent`, `PlayerJoinedEvent`, `PlayerLeftEvent`
+- **Macros** — `cancellable_event!` and `event!` exported for custom event types
+- **Types** — `BroadcastMessage`, `PlayerSnapshot`, `ProfileProperty`
+
+`Response` and `ResponseQueue` are `pub(crate)` — hidden behind `ServerContext` methods.
+
 ### basalt-server structure
 
 ```
@@ -59,17 +86,9 @@ crates/basalt-server/
 │   ├── state.rs         # ServerState: player registry, entity IDs, broadcast, EventBus
 │   ├── connection.rs    # Per-player lifecycle: handshake → login → config → play
 │   ├── play.rs          # Play loop: packet_to_event → dispatch → execute_responses
-│   ├── events.rs        # Concrete event types (BlockBroken, PlayerMoved, Chat, etc.)
-│   ├── context.rs       # EventContext, ResponseQueue, Response enum
-│   ├── handlers/
-│   │   ├── mod.rs       # register_all() — registers all plugin handlers
-│   │   ├── lifecycle.rs # LifecycleHandler: join/leave broadcasts
-│   │   ├── chat.rs      # ChatHandler: commands + chat broadcast
-│   │   ├── movement.rs  # PlayerInputHandler: movement broadcast
-│   │   ├── world.rs     # WorldHandler: chunk streaming on boundary crossing
-│   │   └── block.rs     # BlockInteractionHandler: world mutation + block broadcasts
 │   ├── player.rs        # PlayerState: position, rotation, inventory, keep-alive
-│   ├── chat.rs          # Chat formatting helpers (build_chat_component, send_welcome)
+│   ├── chat.rs          # Chat formatting helpers (send_welcome, send_system_message)
+│   ├── skin.rs          # Mojang API skin fetching
 │   └── helpers.rs       # angle_to_byte, RawPayload wrapper
 ├── examples/
 │   └── server.rs        # 14-line launcher: Server::new("0.0.0.0:25565").run().await
@@ -79,28 +98,29 @@ crates/basalt-server/
 
 ### Event-driven architecture
 
-- `ServerState` holds the `EventBus` alongside the player registry, broadcast channel, and `World`
 - Packets are converted to typed events via `packet_to_event()`, dispatched through staged handlers, and responses executed asynchronously via `execute_responses()`
-- Handlers are sync (no connection access). They queue async work through `ResponseQueue` using `Response` enum variants (Broadcast, SendBlockAck, StreamChunks, etc.)
-- 5 built-in handler plugins, each with a `register(&mut EventBus)` method:
+- Handlers are sync. They interact with the server through `ServerContext` methods which queue deferred responses
+- 6 built-in plugins under `plugins/`, each implementing `Plugin`:
 
 | Plugin | Events | Stages |
 |--------|--------|--------|
-| `LifecycleHandler` | PlayerJoined, PlayerLeft | Post: broadcast |
-| `ChatHandler` | ChatMessage, Command | Process: execute commands, Post: broadcast chat |
-| `PlayerInputHandler` | PlayerMoved | Post: broadcast movement |
-| `WorldHandler` | PlayerMoved | Process: chunk streaming |
-| `BlockInteractionHandler` | BlockBroken, BlockPlaced | Process: world mutation, Post: ack + broadcast |
+| `LifecyclePlugin` | PlayerJoined, PlayerLeft | Post: broadcast |
+| `ChatPlugin` | ChatMessage, Command | Process: execute commands, Post: broadcast chat |
+| `MovementPlugin` | PlayerMoved | Post: broadcast movement |
+| `WorldPlugin` | PlayerMoved | Process: chunk streaming |
+| `BlockPlugin` | BlockBroken, BlockPlaced | Process: world mutation, Post: ack + broadcast |
+| `StoragePlugin` | BlockBroken, BlockPlaced | Post: persist chunk (priority 10) |
 
-- Plugins are registered at startup via `register_all()`. Future: config-driven registration for composable server profiles (auth, lobby, game)
+- Plugins are registered at startup via `Plugin::on_enable(&mut EventRegistrar)`
 - Non-event packets (keep-alive, teleport confirm, inventory updates) stay inline in the play loop
+- External plugins use the exact same API as built-in ones — no backdoor
 
 ### Multi-player architecture
 
 - `ServerState` holds a `DashMap` player registry (lock-free), an atomic entity ID counter, a `tokio::sync::broadcast` channel, the `World`, and the `EventBus`
 - Each player subscribes to the broadcast channel on join and polls it in the play loop's third `select!` branch
 - `broadcast()` is O(1) fan-out — receivers filter their own messages (join, movement)
-- Join/leave lifecycle is dispatched through the event bus; handlers queue broadcast responses
+- Join/leave lifecycle is dispatched through the event bus; plugins queue broadcast responses
 
 ### basalt-world architecture
 
@@ -156,15 +176,23 @@ basalt/
 ├── .husky/
 │   ├── commit-msg
 │   └── pre-commit
-├── crates/
+├── crates/                   # Infrastructure (never optional)
 │   ├── basalt-types/
 │   ├── basalt-derive/
 │   ├── basalt-protocol/
 │   ├── basalt-net/
-│   ├── basalt-world/          # World generation, chunk cache, paletted containers
 │   ├── basalt-events/         # Event bus with staged handler dispatch (Validate/Process/Post)
+│   ├── basalt-api/            # Public plugin API: Plugin trait, ServerContext, events
+│   ├── basalt-world/          # World generation, chunk cache, paletted containers
 │   ├── basalt-storage/        # BSR region format, LZ4 compression, disk persistence
-│   └── basalt-server/         # Minecraft server: connection lifecycle, play loop, chat, commands
+│   └── basalt-server/         # Server runtime: connection lifecycle, play loop
+├── plugins/                   # Features (each plugin = independent crate)
+│   ├── chat/                  # ChatPlugin: commands + chat broadcast
+│   ├── block/                 # BlockPlugin: block interaction
+│   ├── world/                 # WorldPlugin: chunk streaming
+│   ├── storage/               # StoragePlugin: chunk persistence
+│   ├── lifecycle/             # LifecyclePlugin: join/leave broadcast
+│   └── movement/              # MovementPlugin: position broadcast
 ├── minecraft-data/           # Git submodule — PrismarineJS/minecraft-data
 ├── xtask/                    # Codegen tool
 │   └── src/
