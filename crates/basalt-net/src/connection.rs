@@ -152,15 +152,23 @@ impl Connection<Login> {
         self.write_packet(ClientboundLoginSuccess::PACKET_ID, success)
             .await?;
 
-        // Read packets until LoginAcknowledged
+        // Read packets until LoginAcknowledged, with a limit to prevent
+        // malicious clients from stalling the server indefinitely
+        let mut attempts = 0;
         loop {
             let raw = self.read_raw().await?;
+            attempts += 1;
+            if attempts > 100 {
+                return Err(Error::Io(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "client did not send LoginAcknowledged after 100 packets",
+                )));
+            }
             let mut cursor = raw.payload.as_slice();
             let packet = ServerboundLoginPacket::decode_by_id(raw.id, &mut cursor)?;
             if let ServerboundLoginPacket::LoginAcknowledged(_) = packet {
                 return Ok(self.transition());
             }
-            // Ignore other login packets
         }
     }
 
@@ -215,8 +223,12 @@ impl Connection<Configuration> {
                 Ok(ServerboundConfigurationPacket::FinishConfiguration(_)) => {
                     return Ok(self.transition());
                 }
-                Ok(_) => {}  // Ignore known non-finish packets
-                Err(_) => {} // Ignore unknown/common packets (settings, brand, etc.)
+                Ok(_) => {} // Ignore known non-finish packets
+                Err(_) => {
+                    // Unknown or common packets (settings, brand, resource packs)
+                    // are expected here — the client sends optional config data
+                    // that our codegen may not cover
+                }
             }
         }
     }
