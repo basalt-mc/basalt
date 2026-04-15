@@ -56,3 +56,8 @@ doc = false
 name = "fuzz_position"
 path = "fuzz_targets/position.rs"
 doc = false
+
+[[bin]]
+name = "fuzz_decompress"
+path = "fuzz_targets/decompress.rs"
+doc = false
