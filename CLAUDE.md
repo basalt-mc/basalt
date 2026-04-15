@@ -526,13 +526,61 @@ All jobs run in parallel. The concurrency group cancels in-progress runs on the 
 
 ## Testing strategy
 
-Three levels of testing:
+Four levels of testing:
 
 1. **Unit tests** — each type, each packet, known values, edge cases (VarInt max, empty strings, deep NBT)
 2. **Property-based tests** (`proptest`) — `decode(encode(x)) == x` for all types and packets
 3. **Real packet fixtures** — captured from a vanilla Minecraft client/server, compatibility regression tests
+4. **Fuzz testing** (`cargo-fuzz` / libfuzzer) — feeds arbitrary bytes to protocol decoders to catch panics, OOM, and buffer overreads
 
 Benchmarks (`criterion`) from day one: encode/decode throughput, allocations per packet, pipeline middleware latency.
+
+### Fuzz testing
+
+Fuzz targets live in `fuzz/fuzz_targets/`, one per decoder. The `fuzz/` directory is a standalone crate excluded from the workspace (`exclude = ["fuzz"]` in root `Cargo.toml`) because it requires nightly and `libfuzzer-sys`.
+
+**Current targets:**
+
+| Target | Decoder | Risk |
+|--------|---------|------|
+| `fuzz_varint` | `VarInt::decode` | Variable-length, controls allocation sizes |
+| `fuzz_string` | `String::decode` | VarInt length + UTF-8 validation |
+| `fuzz_nbt` | `NbtCompound::decode` | Recursive, nested compounds/lists |
+| `fuzz_slot` | `Slot::decode` | Component count parsing |
+| `fuzz_opaque` | `OpaqueBytes::decode` | Length-prefixed buffer |
+
+**Running locally:**
+
+```bash
+# Install cargo-fuzz (once)
+cargo install cargo-fuzz
+
+# Run a single target
+cd fuzz && cargo +nightly fuzz run fuzz_nbt
+
+# Run with max input size (recommended for NBT)
+cd fuzz && cargo +nightly fuzz run fuzz_nbt -- -max_len=4096
+
+# Run for a fixed duration
+cd fuzz && cargo +nightly fuzz run fuzz_varint -- -max_total_time=60
+```
+
+**CI integration (two tiers):**
+
+1. **Smoke (PR only)** — in `ci.yml`: each target runs 30s via a matrix (all 5 in parallel). Catches regressions without blocking the pipeline.
+2. **Nightly (scheduled)** — in `fuzz-nightly.yml`: each target runs 10 min at 03:00 UTC. Corpus is cached between runs via `actions/cache`, growing over time for deeper coverage. Also triggerable manually via `workflow_dispatch`.
+
+**Adding a new fuzz target:**
+
+1. Create `fuzz/fuzz_targets/<name>.rs` with a `fuzz_target!` macro
+2. Add a `[[bin]]` entry in `fuzz/Cargo.toml`
+3. Add the target name to the `matrix.target` list in **both** `ci.yml` (fuzz smoke job) and `fuzz-nightly.yml`
+
+**Design rules for fuzz targets:**
+
+- Must not panic on any input — if the decoder returns `Err`, that's fine
+- If decode succeeds, verify roundtrip: `decode(encode(decoded)) == decoded`
+- Cap `Vec::with_capacity` to `buf.len()` (or element-size-adjusted) to prevent OOM from malicious length fields — this is a real bug the fuzzer already caught in NBT list decoding
 
 ### Server testing
 
