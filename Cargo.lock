@@ -162,6 +162,7 @@ name = "basalt-plugin-block"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
+ "basalt-test-utils",
  "basalt-types",
  "basalt-world",
 ]
@@ -171,8 +172,8 @@ name = "basalt-plugin-chat"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
+ "basalt-test-utils",
  "basalt-types",
- "basalt-world",
 ]
 
 [[package]]
@@ -190,8 +191,8 @@ name = "basalt-plugin-lifecycle"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
+ "basalt-test-utils",
  "basalt-types",
- "basalt-world",
 ]
 
 [[package]]
@@ -199,8 +200,7 @@ name = "basalt-plugin-movement"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-types",
- "basalt-world",
+ "basalt-test-utils",
 ]
 
 [[package]]
@@ -209,6 +209,7 @@ version = "0.1.0"
 dependencies = [
  "basalt-api",
  "basalt-plugin-block",
+ "basalt-test-utils",
  "basalt-types",
  "basalt-world",
  "tempfile",
@@ -219,7 +220,7 @@ name = "basalt-plugin-world"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-types",
+ "basalt-test-utils",
  "basalt-world",
 ]
 
@@ -273,6 +274,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "basalt-test-utils"
+version = "0.1.0"
+dependencies = [
+ "basalt-api",
+ "basalt-events",
+ "basalt-types",
+ "basalt-world",
+]
+
+[[package]]
 name = "basalt-types"
 version = "0.1.0"
 dependencies = [
@@ -289,6 +300,8 @@ dependencies = [
  "basalt-protocol",
  "basalt-storage",
  "basalt-types",
+ "criterion",
+ "dashmap",
  "noise",
  "tempfile",
 ]
