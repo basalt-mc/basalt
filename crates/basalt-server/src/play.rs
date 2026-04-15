@@ -305,12 +305,8 @@ async fn play_loop(
                             continue;
                         }
                         if let Some(mut event) = packet_to_event(addr, player, packet) {
-                            // Safety: Arc<ServerState> lives for the entire server.
-                            // The world reference is valid for the duration of dispatch.
-                            let world: &basalt_world::World = &state.world;
-                            let world: &'static basalt_world::World = unsafe { &*(world as *const _) };
                             let ctx = ServerContext::new(
-                                world,
+                                Arc::clone(&state.world),
                                 player.uuid,
                                 player.entity_id,
                                 player.username.clone(),
