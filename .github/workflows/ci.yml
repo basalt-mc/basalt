@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+  pull-requests: write
+  deployments: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -13,6 +18,21 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # ── Build debug deps first, cache for all downstream jobs ─────────
+  build:
+    name: Build (debug)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, llvm-tools-preview, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: build-debug
+      - run: cargo build --lib --bins --tests --examples --all-features
+
+  # ── Format (no deps needed) ─────────────────────────────────────
   format:
     name: Format
     runs-on: ubuntu-latest
@@ -23,8 +43,10 @@ jobs:
           components: rustfmt
       - run: cargo fmt --all --check
 
+  # ── Debug-profile jobs (depend on build dev) ─────────────────────
   clippy:
     name: Clippy
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,19 +54,27 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --all-targets --all-features -- -D warnings
+        with:
+          shared-key: build-debug
+          save-if: false
+      - run: cargo clippy --lib --bins --tests --examples --all-features -- -D warnings
 
   test:
     name: Test
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: build-debug
+          save-if: false
       - run: cargo test --all-features
 
   coverage:
     name: Coverage
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,12 +82,16 @@ jobs:
         with:
           components: llvm-tools-preview
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: build-debug
+          save-if: false
       - uses: taiki-e/install-action@cargo-llvm-cov
       - run: cargo llvm-cov --all-features --fail-under-lines 90 --ignore-filename-regex "(examples|packets/)"
 
   codegen:
     name: Codegen Drift Check
     if: github.event_name == 'pull_request'
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -65,6 +99,9 @@ jobs:
           submodules: true
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: build-debug
+          save-if: false
       - run: cargo run --package xtask -- codegen
       - run: cargo fmt --all
       - name: Check generated code is up to date
@@ -74,6 +111,73 @@ jobs:
             exit 1
           fi
 
+  proptest:
+    name: Extended Proptests
+    if: github.event_name == 'pull_request'
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: build-debug
+          save-if: false
+      - name: Run proptests with extended case count
+        env:
+          PROPTEST_CASES: 1000
+        run: cargo test --all-features -- proptest
+
+  # ── Benchmark jobs (nightly toolchain, independent) ───────────────
+  benchmark:
+    name: Bench ${{ matrix.bench }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - bench: varint
+            crate: basalt-types
+          - bench: nbt
+            crate: basalt-types
+          - bench: chunk
+            crate: basalt-world
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: bench-nightly
+
+      # Restore previous benchmark data from cache
+      - uses: actions/cache@v4
+        with:
+          path: ./benchmark-data.json
+          key: bench-${{ matrix.bench }}-${{ github.sha }}
+          restore-keys: |
+            bench-${{ matrix.bench }}-
+
+      - name: Run benchmark
+        env:
+          CRATE: ${{ matrix.crate }}
+          BENCH: ${{ matrix.bench }}
+        run: |
+          set -o pipefail
+          cargo +nightly bench -p "$CRATE" --bench "$BENCH" | tee output.txt
+
+      - name: Compare and store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: ${{ matrix.bench }}
+          tool: cargo
+          output-file-path: output.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          external-data-json-path: ./benchmark-data.json
+          alert-threshold: "110%"
+          comment-on-alert: true
+          fail-on-alert: ${{ github.event_name == 'pull_request' }}
+
+  # ── Independent jobs (no build dep) ──────────────────────────────
   fuzz:
     name: Fuzz ${{ matrix.target }}
     if: github.event_name == 'pull_request'
