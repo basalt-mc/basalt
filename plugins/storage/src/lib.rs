@@ -48,9 +48,9 @@ mod tests {
     #[test]
     fn storage_persists_to_disk() {
         let dir = tempfile::tempdir().unwrap();
-        let world = Box::leak(Box::new(basalt_world::World::new(42, dir.path())));
+        let world = std::sync::Arc::new(basalt_world::World::new(42, dir.path()));
 
-        let ctx = ServerContext::new(world, Uuid::default(), 1, "Steve".into());
+        let ctx = ServerContext::new(world.clone(), Uuid::default(), 1, "Steve".into());
         let mut event = BlockPlacedEvent {
             x: 5,
             y: 100,
