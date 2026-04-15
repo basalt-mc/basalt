@@ -194,7 +194,7 @@ fn write_offset_table(file: &mut File, table: &[(u32, u32)]) -> io::Result<()> {
         buf.extend_from_slice(&size.to_le_bytes());
     }
     file.write_all(&buf)?;
-    file.flush()?;
+    file.sync_all()?;
     Ok(())
 }
 
