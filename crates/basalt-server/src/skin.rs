@@ -70,11 +70,15 @@ pub(crate) async fn fetch_skin_properties(username: &str) -> Vec<ProfileProperty
     }
 }
 
+/// Shared HTTP client to avoid allocating a connection pool per request.
+static HTTP_CLIENT: std::sync::LazyLock<reqwest::Client> =
+    std::sync::LazyLock::new(reqwest::Client::new);
+
 /// Inner implementation that returns Result for error handling.
 async fn fetch_skin_inner(
     username: &str,
 ) -> Result<Vec<ProfileProperty>, Box<dyn std::error::Error>> {
-    let client = reqwest::Client::new();
+    let client = &*HTTP_CLIENT;
 
     // Step 1: username → UUID
     let url = format!("https://api.mojang.com/users/profiles/minecraft/{username}");
