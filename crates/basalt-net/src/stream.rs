@@ -29,6 +29,8 @@ pub struct ProtocolStream {
     /// Packets with uncompressed size >= threshold are zlib-compressed.
     /// `None` means compression is disabled.
     compression_threshold: Option<usize>,
+    /// Reusable buffer for encrypting outgoing data, avoiding per-write allocation.
+    encrypt_buf: Vec<u8>,
 }
 
 impl ProtocolStream {
@@ -38,6 +40,7 @@ impl ProtocolStream {
             stream,
             cipher: None,
             compression_threshold: None,
+            encrypt_buf: Vec::new(),
         }
     }
 
@@ -204,9 +207,10 @@ impl ProtocolStream {
     /// `AsyncWriteExt::write_all` with transparent encryption.
     pub async fn write_all(&mut self, data: &[u8]) -> std::io::Result<()> {
         if let Some(cipher) = &mut self.cipher {
-            let mut encrypted = data.to_vec();
-            cipher.encrypt(&mut encrypted);
-            self.stream.write_all(&encrypted).await
+            self.encrypt_buf.clear();
+            self.encrypt_buf.extend_from_slice(data);
+            cipher.encrypt(&mut self.encrypt_buf);
+            self.stream.write_all(&self.encrypt_buf).await
         } else {
             self.stream.write_all(data).await
         }
