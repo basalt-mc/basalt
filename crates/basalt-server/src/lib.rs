@@ -65,7 +65,13 @@ impl Server {
     pub async fn run(&self) {
         self.config.init_logger();
 
-        let listener = TcpListener::bind(&self.config.server.bind).await.unwrap();
+        let listener = match TcpListener::bind(&self.config.server.bind).await {
+            Ok(l) => l,
+            Err(e) => {
+                log::error!(target: "basalt::server", "Failed to bind {}: {e}", self.config.server.bind);
+                return;
+            }
+        };
         log::info!(target: "basalt::server", "Listening on {}", self.config.server.bind);
 
         let world = self.config.create_world();
@@ -91,7 +97,13 @@ impl Server {
     /// Accepts connections with an existing server state.
     async fn accept_loop_with_state(listener: TcpListener, state: Arc<ServerState>) {
         loop {
-            let (stream, addr) = listener.accept().await.unwrap();
+            let (stream, addr) = match listener.accept().await {
+                Ok(conn) => conn,
+                Err(e) => {
+                    log::error!(target: "basalt::connection", "Accept failed: {e}");
+                    continue;
+                }
+            };
             log::debug!(target: "basalt::connection", "[{addr}] Accepted");
 
             let state = Arc::clone(&state);
