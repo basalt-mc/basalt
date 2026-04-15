@@ -6,7 +6,7 @@
 //! event dispatch completes.
 
 use std::cell::RefCell;
-
+use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 use basalt_core::broadcast::BroadcastMessage;
@@ -28,7 +28,7 @@ const GAME_STATE_CHANGE_GAMEMODE: u8 = 3;
 /// `drain_responses`) are not part of the `Context` trait.
 pub struct ServerContext {
     /// Shared world reference for block access and chunk persistence.
-    world: &'static basalt_world::World,
+    world: Arc<basalt_world::World>,
     /// Queue for deferred async responses.
     responses: ResponseQueue,
     /// UUID of the player who triggered this event.
@@ -51,7 +51,7 @@ static GLOBAL_TELEPORT_COUNTER: AtomicI32 = AtomicI32::new(1);
 impl ServerContext {
     /// Creates a new context for a single event dispatch.
     pub fn new(
-        world: &'static basalt_world::World,
+        world: Arc<basalt_world::World>,
         player_uuid: Uuid,
         player_entity_id: i32,
         player_username: String,
@@ -107,7 +107,7 @@ impl Context for ServerContext {
     }
 
     fn world(&self) -> &basalt_world::World {
-        self.world
+        &self.world
     }
 
     fn send_message(&self, text: &str) {
@@ -250,10 +250,8 @@ pub enum Response {
 mod tests {
     use super::*;
 
-    fn test_world() -> &'static basalt_world::World {
-        use std::sync::OnceLock;
-        static WORLD: OnceLock<basalt_world::World> = OnceLock::new();
-        WORLD.get_or_init(|| basalt_world::World::new_memory(42))
+    fn test_world() -> Arc<basalt_world::World> {
+        Arc::new(basalt_world::World::new_memory(42))
     }
 
     fn test_ctx() -> ServerContext {
