@@ -38,25 +38,11 @@ impl Plugin for CommandPlugin {
             })
             .variant(|v| v.arg("targets", Arg::Entity).arg("location", Arg::Vec3))
             .handler(|args, ctx| {
-                if let Some(location) = args.get_string("location") {
-                    let coords: Vec<&str> = location.split_whitespace().collect();
-                    if coords.len() == 3
-                        && let (Ok(x), Ok(y), Ok(z)) = (
-                            coords[0].parse::<f64>(),
-                            coords[1].parse::<f64>(),
-                            coords[2].parse::<f64>(),
-                        )
-                    {
-                        ctx.teleport(x, y, z, 0.0, 0.0);
-                        ctx.send_message_component(
-                            &TextComponent::text(format!("Teleported to {x}, {y}, {z}"))
-                                .color(TextColor::Named(NamedColor::Green)),
-                        );
-                        return;
-                    }
+                if let Some((x, y, z)) = args.get_vec3("location") {
+                    ctx.teleport(x, y, z, 0.0, 0.0);
                     ctx.send_message_component(
-                        &TextComponent::text("Invalid coordinates")
-                            .color(TextColor::Named(NamedColor::Red)),
+                        &TextComponent::text(format!("Teleported to {x}, {y}, {z}"))
+                            .color(TextColor::Named(NamedColor::Green)),
                     );
                 } else if let Some(target) = args.get_string("destination") {
                     ctx.send_message_component(
