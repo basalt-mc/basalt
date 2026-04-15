@@ -37,6 +37,7 @@
 //! - `#[variant(id = N)]` — explicit discriminant (default: sequential from 0)
 
 mod attrs;
+mod codegen;
 mod decode;
 mod encode;
 mod packet;

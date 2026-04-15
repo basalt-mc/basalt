@@ -62,36 +62,8 @@ fn derive_encoded_size_struct(input: &DeriveInput, data: &DataStruct) -> Result<
         let field_name = field.ident.as_ref().unwrap();
         let attr = parse_field_attr(&field.attrs)?;
 
-        let size = if attr.varint {
-            quote! {
-                basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(self.#field_name))
-            }
-        } else if attr.optional {
-            quote! {
-                1 + match &self.#field_name {
-                    Some(value) => basalt_types::EncodedSize::encoded_size(value),
-                    None => 0,
-                }
-            }
-        } else if attr.length_varint && attr.element_varint {
-            quote! {
-                basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(self.#field_name.len() as i32))
-                + self.#field_name.iter().map(|item| basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(*item))).sum::<usize>()
-            }
-        } else if attr.length_varint {
-            quote! {
-                basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(self.#field_name.len() as i32))
-                + self.#field_name.iter().map(|item| basalt_types::EncodedSize::encoded_size(item)).sum::<usize>()
-            }
-        } else if attr.rest {
-            quote! {
-                self.#field_name.len()
-            }
-        } else {
-            quote! {
-                basalt_types::EncodedSize::encoded_size(&self.#field_name)
-            }
-        };
+        let val = quote! { &self.#field_name };
+        let size = crate::codegen::field_size(&val, &attr);
 
         field_sizes.push(size);
     }
@@ -140,30 +112,8 @@ fn derive_encoded_size_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
                     .map(|f| {
                         let fname = f.ident.as_ref().unwrap();
                         let attr = parse_field_attr(&f.attrs)?;
-                        Ok(if attr.varint {
-                            quote! { basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(*#fname)) }
-                        } else if attr.optional {
-                            quote! {
-                                1 + match #fname {
-                                    Some(value) => basalt_types::EncodedSize::encoded_size(value),
-                                    None => 0,
-                                }
-                            }
-                        } else if attr.length_varint && attr.element_varint {
-                            quote! {
-                                basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(#fname.len() as i32))
-                                + #fname.iter().map(|item| basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(*item))).sum::<usize>()
-                            }
-                        } else if attr.length_varint {
-                            quote! {
-                                basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(#fname.len() as i32))
-                                + #fname.iter().map(|item| basalt_types::EncodedSize::encoded_size(item)).sum::<usize>()
-                            }
-                        } else if attr.rest {
-                            quote! { #fname.len() }
-                        } else {
-                            quote! { basalt_types::EncodedSize::encoded_size(#fname) }
-                        })
+                        let val = quote! { #fname };
+                        Ok(crate::codegen::field_size(&val, &attr))
                     })
                     .collect::<Result<Vec<_>>>()?;
                 quote! {
