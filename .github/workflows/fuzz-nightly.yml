@@ -1,0 +1,64 @@
+name: Fuzz Nightly
+
+on:
+  schedule:
+    # Every night at 03:00 UTC
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: fuzz-nightly
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # 10 minutes per target
+  FUZZ_DURATION: 600
+
+jobs:
+  fuzz:
+    name: Fuzz ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - fuzz_varint
+          - fuzz_string
+          - fuzz_nbt
+          - fuzz_slot
+          - fuzz_opaque
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz
+          shared-key: fuzz-${{ matrix.target }}
+      - run: cargo install cargo-fuzz
+
+      # Restore corpus from previous runs
+      - uses: actions/cache@v4
+        with:
+          path: fuzz/corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.sha }}
+          restore-keys: |
+            fuzz-corpus-${{ matrix.target }}-
+
+      - name: Run fuzzer
+        working-directory: fuzz
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          mkdir -p "corpus/$TARGET"
+          cargo +nightly fuzz run "$TARGET" -- \
+            -max_total_time=$FUZZ_DURATION \
+            -max_len=4096
+
+      # Save corpus for next run (grows over time)
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: fuzz/corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.sha }}
