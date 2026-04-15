@@ -153,6 +153,7 @@ dependencies = [
  "basalt-protocol",
  "basalt-types",
  "flate2",
+ "log",
  "thiserror",
  "tokio",
 ]
