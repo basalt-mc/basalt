@@ -82,7 +82,8 @@ pub fn field_decode(
             let #field_name = {
                 let len: basalt_types::VarInt = basalt_types::Decode::decode(buf)?;
                 let len = len.0 as usize;
-                let mut items = Vec::with_capacity(len);
+                // Cap allocation to remaining buffer to prevent OOM
+                let mut items = Vec::with_capacity(len.min(buf.len()));
                 for _ in 0..len {
                     let var: basalt_types::VarInt = basalt_types::Decode::decode(buf)?;
                     items.push(var.0);
@@ -95,7 +96,8 @@ pub fn field_decode(
             let #field_name = {
                 let len: basalt_types::VarInt = basalt_types::Decode::decode(buf)?;
                 let len = len.0 as usize;
-                let mut items = Vec::with_capacity(len);
+                // Cap allocation to remaining buffer to prevent OOM
+                let mut items = Vec::with_capacity(len.min(buf.len()));
                 for _ in 0..len {
                     items.push(basalt_types::Decode::decode(buf)?);
                 }
