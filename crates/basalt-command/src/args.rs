@@ -88,7 +88,7 @@ pub struct CommandArg {
 }
 
 /// A parsed argument value.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ArgValue {
     /// A string value.
     String(std::string::String),
@@ -96,6 +96,12 @@ pub enum ArgValue {
     Integer(i64),
     /// A parsed double.
     Double(f64),
+    /// A parsed boolean.
+    Boolean(bool),
+    /// Three f64 coordinates (x, y, z).
+    Vec3(f64, f64, f64),
+    /// Three i32 coordinates (x, y, z).
+    BlockPos(i32, i32, i32),
 }
 
 /// Parsed command arguments accessible by name.
@@ -146,19 +152,48 @@ impl CommandArgs {
         }
     }
 
+    /// Gets a boolean argument by name.
+    pub fn get_bool(&self, name: &str) -> Option<bool> {
+        match self.values.get(name) {
+            Some(ArgValue::Boolean(v)) => Some(*v),
+            _ => None,
+        }
+    }
+
+    /// Gets a Vec3 argument by name (x, y, z as f64).
+    pub fn get_vec3(&self, name: &str) -> Option<(f64, f64, f64)> {
+        match self.values.get(name) {
+            Some(ArgValue::Vec3(x, y, z)) => Some((*x, *y, *z)),
+            _ => None,
+        }
+    }
+
+    /// Gets a BlockPos argument by name (x, y, z as i32).
+    pub fn get_block_pos(&self, name: &str) -> Option<(i32, i32, i32)> {
+        match self.values.get(name) {
+            Some(ArgValue::BlockPos(x, y, z)) => Some((*x, *y, *z)),
+            _ => None,
+        }
+    }
+
     /// Returns the raw argument string before parsing.
     pub fn raw(&self) -> &str {
         &self.raw
     }
 }
 
-/// Returns how many tokens a given arg type consumes.
-fn token_count(arg: &Arg) -> usize {
-    match arg {
-        Arg::Vec3 | Arg::BlockPos => 3,
-        Arg::Vec2 | Arg::ColumnPos | Arg::Rotation => 2,
-        Arg::Message => 0, // greedy — consumes the rest
-        _ => 1,
+impl Arg {
+    /// Returns how many tokens this argument type consumes.
+    ///
+    /// Vec3 and BlockPos consume 3 tokens, Vec2/ColumnPos/Rotation consume 2,
+    /// Message is greedy (0 means "consume all remaining"), everything else is 1.
+    pub fn token_count(&self) -> usize {
+        match self {
+            Arg::Vec3 | Arg::BlockPos => 3,
+            Arg::Vec2 | Arg::ColumnPos | Arg::Rotation => 2,
+            Arg::Message => 0, // greedy — consumes the rest
+            _ => 1,
+        }
     }
 }
 
@@ -181,8 +216,8 @@ pub fn parse_command_args(
     // Vec3 before matching as a Player name.
     let mut sorted: Vec<&Vec<CommandArg>> = variants.iter().collect();
     sorted.sort_by(|a, b| {
-        let count_a: usize = a.iter().map(|arg| token_count(&arg.arg_type)).sum();
-        let count_b: usize = b.iter().map(|arg| token_count(&arg.arg_type)).sum();
+        let count_a: usize = a.iter().map(|arg| arg.arg_type.token_count()).sum();
+        let count_b: usize = b.iter().map(|arg| arg.arg_type.token_count()).sum();
         count_b.cmp(&count_a)
     });
 
@@ -227,12 +262,7 @@ pub fn parse_args(raw: &str, schema: &[CommandArg]) -> Result<CommandArgs, std::
             break;
         }
 
-        // How many tokens this arg consumes
-        let count = match &arg_def.arg_type {
-            Arg::Vec3 | Arg::BlockPos => 3,
-            Arg::Vec2 | Arg::ColumnPos | Arg::Rotation => 2,
-            _ => 1,
-        };
+        let count = arg_def.arg_type.token_count();
 
         if tok >= tokens.len() {
             if arg_def.required {
@@ -241,7 +271,7 @@ pub fn parse_args(raw: &str, schema: &[CommandArg]) -> Result<CommandArgs, std::
             continue;
         }
 
-        // Multi-token types: join tokens into a single string value
+        // Multi-token types: parse into typed values
         if count > 1 {
             if tok + count > tokens.len() {
                 if arg_def.required {
@@ -252,8 +282,37 @@ pub fn parse_args(raw: &str, schema: &[CommandArg]) -> Result<CommandArgs, std::
                 }
                 continue;
             }
-            let value = tokens[tok..tok + count].join(" ");
-            args.insert(arg_def.name.clone(), ArgValue::String(value));
+            let value = match &arg_def.arg_type {
+                Arg::Vec3 => {
+                    let x = tokens[tok]
+                        .parse::<f64>()
+                        .map_err(|_| format!("Invalid coordinate for '{}'", arg_def.name))?;
+                    let y = tokens[tok + 1]
+                        .parse::<f64>()
+                        .map_err(|_| format!("Invalid coordinate for '{}'", arg_def.name))?;
+                    let z = tokens[tok + 2]
+                        .parse::<f64>()
+                        .map_err(|_| format!("Invalid coordinate for '{}'", arg_def.name))?;
+                    ArgValue::Vec3(x, y, z)
+                }
+                Arg::BlockPos => {
+                    let x = tokens[tok]
+                        .parse::<i32>()
+                        .map_err(|_| format!("Invalid block coordinate for '{}'", arg_def.name))?;
+                    let y = tokens[tok + 1]
+                        .parse::<i32>()
+                        .map_err(|_| format!("Invalid block coordinate for '{}'", arg_def.name))?;
+                    let z = tokens[tok + 2]
+                        .parse::<i32>()
+                        .map_err(|_| format!("Invalid block coordinate for '{}'", arg_def.name))?;
+                    ArgValue::BlockPos(x, y, z)
+                }
+                _ => {
+                    // Vec2, ColumnPos, Rotation: store as joined string for now
+                    ArgValue::String(tokens[tok..tok + count].join(" "))
+                }
+            };
+            args.insert(arg_def.name.clone(), value);
             tok += count;
             continue;
         }
@@ -314,8 +373,11 @@ pub fn parse_args(raw: &str, schema: &[CommandArg]) -> Result<CommandArgs, std::
                 }
             }
             Arg::Boolean => match token {
-                "true" | "false" => {
-                    args.insert(arg_def.name.clone(), ArgValue::String(token.to_string()));
+                "true" => {
+                    args.insert(arg_def.name.clone(), ArgValue::Boolean(true));
+                }
+                "false" => {
+                    args.insert(arg_def.name.clone(), ArgValue::Boolean(false));
                 }
                 _ => {
                     return Err(match &arg_def.validation {
@@ -464,7 +526,10 @@ mod tests {
     fn parse_boolean_valid() {
         let schema = vec![arg("flag", Arg::Boolean)];
         let result = parse_args("true", &schema).unwrap();
-        assert_eq!(result.get_string("flag"), Some("true"));
+        assert_eq!(result.get_bool("flag"), Some(true));
+
+        let result = parse_args("false", &schema).unwrap();
+        assert_eq!(result.get_bool("flag"), Some(false));
     }
 
     #[test]
@@ -502,5 +567,38 @@ mod tests {
         let schema = vec![arg("msg", Arg::String)];
         let result = parse_args("hello world", &schema).unwrap();
         assert_eq!(result.raw(), "hello world");
+    }
+
+    #[test]
+    fn parse_vec3_typed() {
+        let schema = vec![arg("pos", Arg::Vec3)];
+        let result = parse_args("10.5 64.0 -5.0", &schema).unwrap();
+        assert_eq!(result.get_vec3("pos"), Some((10.5, 64.0, -5.0)));
+        assert_eq!(result.get_string("pos"), None); // not stored as string
+    }
+
+    #[test]
+    fn parse_vec3_invalid() {
+        let schema = vec![arg("pos", Arg::Vec3)];
+        let err = parse_args("10.5 abc -5.0", &schema).unwrap_err();
+        assert!(err.contains("Invalid coordinate"));
+    }
+
+    #[test]
+    fn parse_block_pos_typed() {
+        let schema = vec![arg("pos", Arg::BlockPos)];
+        let result = parse_args("10 64 -5", &schema).unwrap();
+        assert_eq!(result.get_block_pos("pos"), Some((10, 64, -5)));
+    }
+
+    #[test]
+    fn token_count_method() {
+        assert_eq!(Arg::Vec3.token_count(), 3);
+        assert_eq!(Arg::BlockPos.token_count(), 3);
+        assert_eq!(Arg::Vec2.token_count(), 2);
+        assert_eq!(Arg::Rotation.token_count(), 2);
+        assert_eq!(Arg::Message.token_count(), 0);
+        assert_eq!(Arg::String.token_count(), 1);
+        assert_eq!(Arg::Boolean.token_count(), 1);
     }
 }
