@@ -54,8 +54,8 @@ impl Slot {
 /// Encodes a Slot in the Minecraft protocol format.
 ///
 /// Empty slots encode as a single VarInt(0). Non-empty slots encode the
-/// item count, item ID, then component counts (both set to 0 for now)
-/// since we don't parse individual components.
+/// item count, item ID, then component data. If no components are present,
+/// explicit zero counts are written (VarInt(0) + VarInt(0)).
 impl Encode for Slot {
     /// Writes the slot to the buffer.
     fn encode(&self, buf: &mut Vec<u8>) -> Result<()> {
@@ -64,7 +64,13 @@ impl Encode for Slot {
             if let Some(item_id) = self.item_id {
                 VarInt(item_id).encode(buf)?;
             }
-            buf.extend_from_slice(&self.component_data);
+            if self.component_data.is_empty() {
+                // No components: write explicit zero counts
+                VarInt(0).encode(buf)?; // components to add
+                VarInt(0).encode(buf)?; // components to remove
+            } else {
+                buf.extend_from_slice(&self.component_data);
+            }
         }
         Ok(())
     }
@@ -73,7 +79,10 @@ impl Encode for Slot {
 /// Decodes a Slot from the Minecraft protocol format.
 ///
 /// Reads the item count. If zero, returns an empty slot. Otherwise reads
-/// the item ID and stores remaining component data as raw bytes.
+/// the item ID and component counts. Items with zero components decode
+/// cleanly, allowing correct `Vec<Slot>` support. Items with components
+/// store the raw component data as opaque bytes until a full component
+/// parser is implemented.
 impl Decode for Slot {
     /// Reads a slot from the buffer.
     fn decode(buf: &mut &[u8]) -> Result<Self> {
@@ -84,10 +93,37 @@ impl Decode for Slot {
 
         let item_id = VarInt::decode(buf)?.0;
 
-        // Read component counts and data as opaque bytes
-        // Components are complex (switch on type) — we store them raw
-        let component_data = buf.to_vec();
-        *buf = &buf[buf.len()..];
+        // Read component counts to properly advance the cursor
+        let num_add = VarInt::decode(buf)?.0;
+        let num_remove = VarInt::decode(buf)?.0;
+
+        if num_add == 0 && num_remove == 0 {
+            // No components — cursor correctly positioned for next slot
+            return Ok(Self {
+                item_count,
+                item_id: Some(item_id),
+                component_data: Vec::new(),
+            });
+        }
+
+        // Components present — re-encode counts + data as opaque for roundtrip
+        let mut component_data = Vec::new();
+        VarInt(num_add).encode(&mut component_data)?;
+        VarInt(num_remove).encode(&mut component_data)?;
+
+        // Components-to-remove are single VarInt type IDs
+        for _ in 0..num_remove {
+            let id = VarInt::decode(buf)?;
+            id.encode(&mut component_data)?;
+        }
+
+        if num_add > 0 {
+            // Components-to-add are variable-length and type-dependent.
+            // Without a full component parser, consume remaining bytes.
+            // TODO: implement component parser for full multi-slot support
+            component_data.extend_from_slice(buf);
+            *buf = &buf[buf.len()..];
+        }
 
         Ok(Self {
             item_count,
@@ -106,7 +142,11 @@ impl EncodedSize for Slot {
         } else {
             count_size
                 + self.item_id.map_or(0, |id| VarInt(id).encoded_size())
-                + self.component_data.len()
+                + if self.component_data.is_empty() {
+                    2 // VarInt(0) + VarInt(0) for zero component counts
+                } else {
+                    self.component_data.len()
+                }
         }
     }
 }
@@ -172,7 +212,27 @@ mod tests {
     #[test]
     fn encoded_size_non_empty() {
         let slot = Slot::new(1, 1);
-        // VarInt(1) = 1 byte for count + VarInt(1) = 1 byte for id = 2
-        assert_eq!(slot.encoded_size(), 2);
+        // VarInt(1) = 1 byte for count + VarInt(1) = 1 byte for id
+        // + VarInt(0) + VarInt(0) = 2 bytes for zero component counts = 4
+        assert_eq!(slot.encoded_size(), 4);
+    }
+
+    #[test]
+    fn consecutive_slot_roundtrip() {
+        // Two simple slots encoded back-to-back must decode independently
+        let slot1 = Slot::new(1, 10);
+        let slot2 = Slot::new(2, 20);
+        let mut buf = Vec::new();
+        slot1.encode(&mut buf).unwrap();
+        slot2.encode(&mut buf).unwrap();
+
+        let mut cursor = buf.as_slice();
+        let d1 = Slot::decode(&mut cursor).unwrap();
+        let d2 = Slot::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(d1.item_count, 10);
+        assert_eq!(d1.item_id, Some(1));
+        assert_eq!(d2.item_count, 20);
+        assert_eq!(d2.item_id, Some(2));
     }
 }
