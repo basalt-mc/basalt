@@ -74,7 +74,7 @@ impl Server {
         };
         log::info!(target: "basalt::server", "Listening on {}", self.config.server.bind);
 
-        let world = self.config.create_world();
+        let world = Arc::new(self.config.create_world());
         let plugins = self.config.create_plugins();
         let state = ServerState::with_world_and_plugins(world, plugins);
 
@@ -87,7 +87,7 @@ impl Server {
     /// listener directly, avoiding port conflicts.
     pub async fn accept_loop(listener: TcpListener) {
         let config = ServerConfig::default();
-        let world = config.create_world();
+        let world = Arc::new(config.create_world());
         let plugins = config.create_plugins();
         let state = ServerState::with_world_and_plugins(world, plugins);
 

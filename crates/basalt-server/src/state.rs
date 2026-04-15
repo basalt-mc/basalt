@@ -24,7 +24,7 @@ pub(crate) struct ServerState {
     /// Broadcast channel sender — O(1) fan-out to all subscribers.
     broadcast_tx: broadcast::Sender<BroadcastMessage>,
     /// The world — chunk cache and terrain generator.
-    pub world: basalt_world::World,
+    pub world: std::sync::Arc<basalt_world::World>,
     /// Event bus with registered plugin handlers.
     pub event_bus: EventBus,
     /// Pre-built DeclareCommands packet payload (empty if no commands).
@@ -68,7 +68,10 @@ impl ServerState {
     #[cfg(test)]
     pub fn new() -> Arc<Self> {
         let config = crate::config::ServerConfig::default();
-        Self::with_world_and_plugins(config.create_world(), config.create_plugins())
+        Self::with_world_and_plugins(
+            std::sync::Arc::new(config.create_world()),
+            config.create_plugins(),
+        )
     }
 
     /// Creates a server state with a given world and plugin set.
@@ -78,7 +81,7 @@ impl ServerState {
     /// are enabled, the collected commands are used to build the
     /// `DeclareCommands` packet and the command dispatch handler.
     pub fn with_world_and_plugins(
-        world: basalt_world::World,
+        world: std::sync::Arc<basalt_world::World>,
         plugins: Vec<Box<dyn basalt_api::Plugin>>,
     ) -> Arc<Self> {
         let (broadcast_tx, _) = broadcast::channel(256);
