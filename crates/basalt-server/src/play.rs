@@ -338,8 +338,14 @@ async fn play_loop(
                     }
                 }
             }
-            Ok(msg) = rx.recv() => {
-                handle_broadcast(conn, player, msg).await?;
+            result = rx.recv() => {
+                match result {
+                    Ok(msg) => handle_broadcast(conn, player, msg).await?,
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        log::warn!(target: "basalt::play", "[{addr}] {} missed {n} broadcast messages", player.username);
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                }
             }
         }
     }
