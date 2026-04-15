@@ -58,7 +58,13 @@ impl Encode for OpaqueBytes {
 impl Decode for OpaqueBytes {
     /// Decodes a VarInt length prefix then reads that many bytes.
     fn decode(buf: &mut &[u8]) -> Result<Self> {
-        let len = VarInt::decode(buf)?.0 as usize;
+        let raw_len = VarInt::decode(buf)?.0;
+        if raw_len < 0 {
+            return Err(Error::InvalidData(format!(
+                "negative opaque length: {raw_len}"
+            )));
+        }
+        let len = raw_len as usize;
         if buf.len() < len {
             return Err(Error::BufferUnderflow {
                 needed: len,

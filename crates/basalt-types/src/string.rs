@@ -41,7 +41,13 @@ impl Decode for String {
     /// the declared length, or `Error::InvalidUtf8` if the bytes are not
     /// valid UTF-8.
     fn decode(buf: &mut &[u8]) -> Result<Self> {
-        let len = VarInt::decode(buf)?.0 as usize;
+        let raw_len = VarInt::decode(buf)?.0;
+        if raw_len < 0 {
+            return Err(Error::InvalidData(format!(
+                "negative string length: {raw_len}"
+            )));
+        }
+        let len = raw_len as usize;
         if len > MAX_STRING_BYTES {
             return Err(Error::StringTooLong {
                 len,
