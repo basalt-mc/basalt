@@ -1,0 +1,13 @@
+[package]
+name = "basalt-test-utils"
+version = "0.1.0"
+description = "Shared test helpers for Basalt plugin and server tests"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+basalt-api = { workspace = true }
+basalt-world = { workspace = true }
+basalt-types = { workspace = true }
+basalt-events = { workspace = true }
