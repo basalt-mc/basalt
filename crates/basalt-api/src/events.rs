@@ -81,6 +81,7 @@ macro_rules! event {
 /// Fired when the server receives a `BlockDig` packet with status 0.
 /// If cancelled, the block remains unchanged and no acknowledgement
 /// or broadcast is sent.
+#[derive(Debug, Clone)]
 pub struct BlockBrokenEvent {
     /// Block X coordinate (absolute world coordinates).
     pub x: i32,
@@ -102,6 +103,7 @@ cancellable_event!(BlockBrokenEvent);
 /// Fired when the server receives a `BlockPlace` packet with a valid
 /// held item that maps to a block state. The placement position has
 /// already been computed from the target block + face offset.
+#[derive(Debug, Clone)]
 pub struct BlockPlacedEvent {
     /// Placement X coordinate (absolute world coordinates).
     pub x: i32,
@@ -126,6 +128,7 @@ cancellable_event!(BlockPlacedEvent);
 /// state. Carries the previous chunk coordinates for chunk boundary
 /// detection. Not cancellable — the server is not authoritative for
 /// position in vanilla Minecraft.
+#[derive(Debug, Clone)]
 pub struct PlayerMovedEvent {
     /// The moving player's entity ID.
     pub entity_id: i32,
@@ -151,6 +154,7 @@ event!(PlayerMovedEvent);
 /// A player sent a chat message.
 ///
 /// If cancelled, the message is not broadcast to any player.
+#[derive(Debug, Clone)]
 pub struct ChatMessageEvent {
     /// The sender's username.
     pub username: String,
@@ -164,6 +168,7 @@ cancellable_event!(ChatMessageEvent);
 /// A player issued a command (e.g., `/tp 0 64 0`).
 ///
 /// If cancelled, the command is not executed.
+#[derive(Debug, Clone)]
 pub struct CommandEvent {
     /// The command string without the leading `/`.
     pub command: String,
@@ -177,6 +182,7 @@ cancellable_event!(CommandEvent);
 /// A new player has joined the server and entered the Play state.
 ///
 /// Not cancellable — the player is already connected.
+#[derive(Debug, Clone)]
 pub struct PlayerJoinedEvent {
     /// Snapshot of the joining player's state.
     pub info: PlayerSnapshot,
@@ -186,6 +192,7 @@ event!(PlayerJoinedEvent);
 /// A player has disconnected from the server.
 ///
 /// Not cancellable — the connection is already closed.
+#[derive(Debug, Clone)]
 pub struct PlayerLeftEvent {
     /// The leaving player's UUID.
     pub uuid: Uuid,
