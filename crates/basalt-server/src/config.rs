@@ -23,7 +23,7 @@ pub struct ServerConfig {
     pub plugins: PluginsSection,
 }
 
-/// Network settings.
+/// Network and runtime settings.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct ServerSection {
@@ -33,6 +33,34 @@ pub struct ServerSection {
     pub log_level: LogLevel,
     /// Log format: pretty (human-readable) or json (structured).
     pub log_format: LogFormat,
+    /// Performance tuning.
+    pub performance: PerformanceSection,
+}
+
+/// Performance tuning settings.
+///
+/// Configured via `[server.performance]` in `basalt.toml`.
+///
+/// # Example
+///
+/// ```toml
+/// [server.performance]
+/// # Max chunks in memory. Each chunk ≈ 192 KB.
+/// # 4096 chunks ≈ 768 MB, 8192 chunks ≈ 1.5 GB.
+/// chunk_cache_max_entries = 4096
+/// ```
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct PerformanceSection {
+    /// Maximum number of chunks kept in the memory cache.
+    ///
+    /// When exceeded, the least recently accessed chunks are evicted.
+    /// Dirty chunks (modified since last persist) are saved to disk
+    /// before eviction.
+    ///
+    /// Each chunk uses approximately 192 KB of memory.
+    /// Default: 4096 (~768 MB).
+    pub chunk_cache_max_entries: usize,
 }
 
 /// Log output format.
@@ -133,6 +161,15 @@ impl Default for ServerSection {
             bind: "0.0.0.0:25565".into(),
             log_level: LogLevel::Info,
             log_format: LogFormat::Pretty,
+            performance: PerformanceSection::default(),
+        }
+    }
+}
+
+impl Default for PerformanceSection {
+    fn default() -> Self {
+        Self {
+            chunk_cache_max_entries: 4096,
         }
     }
 }
@@ -233,21 +270,23 @@ impl ServerConfig {
     /// - `read-only` → loads from `world/`, no writes
     /// - `read-write` → loads from `world/`, writes back
     pub fn create_world(&self) -> basalt_world::World {
+        let max_chunks = self.server.performance.chunk_cache_max_entries;
+        let approx_mb = max_chunks * 192 / 1024;
         match self.world.storage {
             StorageMode::None => {
                 log::info!(
-                    "World: memory-only (no persistence), seed {}",
+                    "World: memory-only (no persistence), seed {}, cache {max_chunks} chunks (~{approx_mb} MB)",
                     self.world.seed
                 );
-                basalt_world::World::new_memory(self.world.seed)
+                basalt_world::World::new_memory_with_capacity(self.world.seed, max_chunks)
             }
             StorageMode::ReadOnly | StorageMode::ReadWrite => {
                 log::info!(
-                    "World: {:?} storage, seed {}, dir world/",
+                    "World: {:?} storage, seed {}, dir world/, cache {max_chunks} chunks (~{approx_mb} MB)",
                     self.world.storage,
                     self.world.seed
                 );
-                basalt_world::World::new(self.world.seed, "world")
+                basalt_world::World::new_with_capacity(self.world.seed, "world", max_chunks)
             }
         }
     }
