@@ -11,13 +11,10 @@ thiserror = { workspace = true }
 indexmap = { workspace = true }
 
 [dev-dependencies]
-criterion = { workspace = true }
 proptest = { workspace = true }
 
 [[bench]]
 name = "varint"
-harness = false
 
 [[bench]]
 name = "nbt"
-harness = false

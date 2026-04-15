@@ -1,4 +1,7 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+#![feature(test)]
+extern crate test;
+
+use test::{Bencher, black_box};
 
 use basalt_types::nbt::{NbtCompound, NbtTag};
 use basalt_types::{Decode, Encode, EncodedSize};
@@ -19,78 +22,60 @@ fn build_registry_compound() -> NbtCompound {
     compound
 }
 
-fn bench_nbt_encode(c: &mut Criterion) {
-    let mut group = c.benchmark_group("nbt_encode");
-
-    group.bench_function("small (3 entries)", |b| {
-        let mut compound = NbtCompound::new();
-        compound.insert("x", NbtTag::Int(10));
-        compound.insert("y", NbtTag::Int(64));
-        compound.insert("z", NbtTag::Int(-20));
-        let mut buf = Vec::with_capacity(compound.encoded_size());
-        b.iter(|| {
-            buf.clear();
-            compound.encode(black_box(&mut buf)).unwrap();
-        });
+#[bench]
+fn nbt_encode_small(b: &mut Bencher) {
+    let mut compound = NbtCompound::new();
+    compound.insert("x", NbtTag::Int(10));
+    compound.insert("y", NbtTag::Int(64));
+    compound.insert("z", NbtTag::Int(-20));
+    let mut buf = Vec::with_capacity(compound.encoded_size());
+    b.iter(|| {
+        buf.clear();
+        compound.encode(black_box(&mut buf)).unwrap();
     });
-
-    group.bench_function("registry (47 entries)", |b| {
-        let compound = build_registry_compound();
-        let mut buf = Vec::with_capacity(compound.encoded_size());
-        b.iter(|| {
-            buf.clear();
-            compound.encode(black_box(&mut buf)).unwrap();
-        });
-    });
-
-    group.finish();
 }
 
-fn bench_nbt_decode(c: &mut Criterion) {
-    let mut group = c.benchmark_group("nbt_decode");
-
-    group.bench_function("small (3 entries)", |b| {
-        let mut compound = NbtCompound::new();
-        compound.insert("x", NbtTag::Int(10));
-        compound.insert("y", NbtTag::Int(64));
-        compound.insert("z", NbtTag::Int(-20));
-        let mut buf = Vec::new();
-        compound.encode(&mut buf).unwrap();
-        b.iter(|| {
-            let mut cursor = black_box(buf.as_slice());
-            NbtCompound::decode(&mut cursor).unwrap()
-        });
-    });
-
-    group.bench_function("registry (47 entries)", |b| {
-        let compound = build_registry_compound();
-        let mut buf = Vec::new();
-        compound.encode(&mut buf).unwrap();
-        b.iter(|| {
-            let mut cursor = black_box(buf.as_slice());
-            NbtCompound::decode(&mut cursor).unwrap()
-        });
-    });
-
-    group.finish();
-}
-
-fn bench_nbt_lookup(c: &mut Criterion) {
+#[bench]
+fn nbt_encode_registry(b: &mut Bencher) {
     let compound = build_registry_compound();
-
-    c.bench_function("nbt_compound_get (47 entries)", |b| {
-        b.iter(|| {
-            black_box(compound.get("entry_23"));
-            black_box(compound.get("entry_46"));
-            black_box(compound.get("nonexistent"));
-        });
+    let mut buf = Vec::with_capacity(compound.encoded_size());
+    b.iter(|| {
+        buf.clear();
+        compound.encode(black_box(&mut buf)).unwrap();
     });
 }
 
-criterion_group!(
-    benches,
-    bench_nbt_encode,
-    bench_nbt_decode,
-    bench_nbt_lookup
-);
-criterion_main!(benches);
+#[bench]
+fn nbt_decode_small(b: &mut Bencher) {
+    let mut compound = NbtCompound::new();
+    compound.insert("x", NbtTag::Int(10));
+    compound.insert("y", NbtTag::Int(64));
+    compound.insert("z", NbtTag::Int(-20));
+    let mut buf = Vec::new();
+    compound.encode(&mut buf).unwrap();
+    b.iter(|| {
+        let mut cursor = black_box(buf.as_slice());
+        NbtCompound::decode(&mut cursor).unwrap()
+    });
+}
+
+#[bench]
+fn nbt_decode_registry(b: &mut Bencher) {
+    let compound = build_registry_compound();
+    let mut buf = Vec::new();
+    compound.encode(&mut buf).unwrap();
+    b.iter(|| {
+        let mut cursor = black_box(buf.as_slice());
+        NbtCompound::decode(&mut cursor).unwrap()
+    });
+}
+
+#[bench]
+fn nbt_compound_lookup(b: &mut Bencher) {
+    let compound = build_registry_compound();
+    b.iter(|| {
+        black_box(compound.get("entry_23"));
+        black_box(compound.get("entry_46"));
+        black_box(compound.get("nonexistent"));
+    });
+}
