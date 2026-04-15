@@ -149,6 +149,11 @@ fn derive_encoded_size_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
                                     None => 0,
                                 }
                             }
+                        } else if attr.length_varint && attr.element_varint {
+                            quote! {
+                                basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(#fname.len() as i32))
+                                + #fname.iter().map(|item| basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(*item))).sum::<usize>()
+                            }
                         } else if attr.length_varint {
                             quote! {
                                 basalt_types::EncodedSize::encoded_size(&basalt_types::VarInt(#fname.len() as i32))

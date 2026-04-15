@@ -169,6 +169,13 @@ fn derive_encode_enum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStrea
                                     }
                                 }
                             }
+                        } else if attr.length_varint && attr.element_varint {
+                            quote! {
+                                basalt_types::Encode::encode(&basalt_types::VarInt(#fname.len() as i32), buf)?;
+                                for item in #fname {
+                                    basalt_types::Encode::encode(&basalt_types::VarInt(*item), buf)?;
+                                }
+                            }
                         } else if attr.length_varint {
                             quote! {
                                 basalt_types::Encode::encode(&basalt_types::VarInt(#fname.len() as i32), buf)?;

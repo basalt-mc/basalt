@@ -177,6 +177,19 @@ fn derive_decode_enum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStrea
                                     }
                                 };
                             }
+                        } else if attr.length_varint && attr.element_varint {
+                            quote! {
+                                let #fname = {
+                                    let len: basalt_types::VarInt = basalt_types::Decode::decode(buf)?;
+                                    let len = len.0 as usize;
+                                    let mut items = Vec::with_capacity(len);
+                                    for _ in 0..len {
+                                        let var: basalt_types::VarInt = basalt_types::Decode::decode(buf)?;
+                                        items.push(var.0);
+                                    }
+                                    items
+                                };
+                            }
                         } else if attr.length_varint {
                             quote! {
                                 let #fname = {
