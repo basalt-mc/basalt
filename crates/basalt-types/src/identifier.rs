@@ -54,8 +54,12 @@ impl Identifier {
     }
 
     /// Returns the full identifier string in `namespace:path` format.
+    ///
+    /// Note: this allocates a new `String`. For zero-cost display, use
+    /// the `Display` impl via `format!("{id}")` or `id.to_string()`.
+    #[deprecated(note = "use Display impl via to_string() instead")]
     pub fn as_str(&self) -> String {
-        format!("{}:{}", self.namespace, self.path)
+        self.to_string()
     }
 }
 
@@ -102,7 +106,7 @@ fn parse_identifier(s: &str) -> Result<Identifier> {
 impl Encode for Identifier {
     /// Writes the identifier as a VarInt-prefixed `namespace:path` string.
     fn encode(&self, buf: &mut Vec<u8>) -> Result<()> {
-        self.as_str().encode(buf)
+        self.to_string().encode(buf)
     }
 }
 
@@ -274,9 +278,9 @@ mod tests {
     }
 
     #[test]
-    fn as_str() {
+    fn to_string_format() {
         let id = Identifier::new("mymod", "item").unwrap();
-        assert_eq!(id.as_str(), "mymod:item");
+        assert_eq!(id.to_string(), "mymod:item");
     }
 
     // -- EncodedSize --
