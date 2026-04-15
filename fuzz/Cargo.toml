@@ -51,3 +51,8 @@ doc = false
 name = "fuzz_text_component"
 path = "fuzz_targets/text_component.rs"
 doc = false
+
+[[bin]]
+name = "fuzz_position"
+path = "fuzz_targets/position.rs"
+doc = false
