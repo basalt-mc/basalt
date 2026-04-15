@@ -53,62 +53,7 @@ fn derive_decode_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenS
 
         field_names.push(field_name);
 
-        let decode = if attr.varint {
-            quote! {
-                let #field_name = {
-                    let var: basalt_types::VarInt = basalt_types::Decode::decode(buf)?;
-                    var.0
-                };
-            }
-        } else if attr.optional {
-            quote! {
-                let #field_name = {
-                    let present: bool = basalt_types::Decode::decode(buf)?;
-                    if present {
-                        Some(basalt_types::Decode::decode(buf)?)
-                    } else {
-                        None
-                    }
-                };
-            }
-        } else if attr.length_varint && attr.element_varint {
-            quote! {
-                let #field_name = {
-                    let len: basalt_types::VarInt = basalt_types::Decode::decode(buf)?;
-                    let len = len.0 as usize;
-                    let mut items = Vec::with_capacity(len);
-                    for _ in 0..len {
-                        let var: basalt_types::VarInt = basalt_types::Decode::decode(buf)?;
-                        items.push(var.0);
-                    }
-                    items
-                };
-            }
-        } else if attr.length_varint {
-            quote! {
-                let #field_name = {
-                    let len: basalt_types::VarInt = basalt_types::Decode::decode(buf)?;
-                    let len = len.0 as usize;
-                    let mut items = Vec::with_capacity(len);
-                    for _ in 0..len {
-                        items.push(basalt_types::Decode::decode(buf)?);
-                    }
-                    items
-                };
-            }
-        } else if attr.rest {
-            quote! {
-                let #field_name = {
-                    let rest = buf.to_vec();
-                    *buf = &buf[buf.len()..];
-                    rest
-                };
-            }
-        } else {
-            quote! {
-                let #field_name: #field_type = basalt_types::Decode::decode(buf)?;
-            }
-        };
+        let decode = crate::codegen::field_decode(field_name, field_type, &attr);
 
         field_decodes.push(decode);
     }
@@ -159,62 +104,7 @@ fn derive_decode_enum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStrea
                         let fname = f.ident.as_ref().unwrap();
                         let fty = &f.ty;
                         let attr = parse_field_attr(&f.attrs)?;
-                        Ok(if attr.varint {
-                            quote! {
-                                let #fname = {
-                                    let var: basalt_types::VarInt = basalt_types::Decode::decode(buf)?;
-                                    var.0
-                                };
-                            }
-                        } else if attr.optional {
-                            quote! {
-                                let #fname = {
-                                    let present: bool = basalt_types::Decode::decode(buf)?;
-                                    if present {
-                                        Some(basalt_types::Decode::decode(buf)?)
-                                    } else {
-                                        None
-                                    }
-                                };
-                            }
-                        } else if attr.length_varint && attr.element_varint {
-                            quote! {
-                                let #fname = {
-                                    let len: basalt_types::VarInt = basalt_types::Decode::decode(buf)?;
-                                    let len = len.0 as usize;
-                                    let mut items = Vec::with_capacity(len);
-                                    for _ in 0..len {
-                                        let var: basalt_types::VarInt = basalt_types::Decode::decode(buf)?;
-                                        items.push(var.0);
-                                    }
-                                    items
-                                };
-                            }
-                        } else if attr.length_varint {
-                            quote! {
-                                let #fname = {
-                                    let len: basalt_types::VarInt = basalt_types::Decode::decode(buf)?;
-                                    let len = len.0 as usize;
-                                    let mut items = Vec::with_capacity(len);
-                                    for _ in 0..len {
-                                        items.push(basalt_types::Decode::decode(buf)?);
-                                    }
-                                    items
-                                };
-                            }
-                        } else if attr.rest {
-                            quote! {
-                                let #fname = {
-                                    let rest = buf.to_vec();
-                                    *buf = &buf[buf.len()..];
-                                    rest
-                                };
-                            }
-                        } else {
-                            quote! {
-                                let #fname: #fty = basalt_types::Decode::decode(buf)?;
-                            }
-                        })
+                        Ok(crate::codegen::field_decode(fname, fty, &attr))
                     })
                     .collect::<Result<Vec<_>>>()?;
                 quote! {

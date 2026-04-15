@@ -67,45 +67,8 @@ fn derive_encode_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenS
         let field_name = field.ident.as_ref().unwrap();
         let attr = parse_field_attr(&field.attrs)?;
 
-        let encode = if attr.varint {
-            quote! {
-                basalt_types::Encode::encode(&basalt_types::VarInt(self.#field_name), buf)?;
-            }
-        } else if attr.optional {
-            quote! {
-                match &self.#field_name {
-                    Some(value) => {
-                        basalt_types::Encode::encode(&true, buf)?;
-                        basalt_types::Encode::encode(value, buf)?;
-                    }
-                    None => {
-                        basalt_types::Encode::encode(&false, buf)?;
-                    }
-                }
-            }
-        } else if attr.length_varint && attr.element_varint {
-            quote! {
-                basalt_types::Encode::encode(&basalt_types::VarInt(self.#field_name.len() as i32), buf)?;
-                for item in &self.#field_name {
-                    basalt_types::Encode::encode(&basalt_types::VarInt(*item), buf)?;
-                }
-            }
-        } else if attr.length_varint {
-            quote! {
-                basalt_types::Encode::encode(&basalt_types::VarInt(self.#field_name.len() as i32), buf)?;
-                for item in &self.#field_name {
-                    basalt_types::Encode::encode(item, buf)?;
-                }
-            }
-        } else if attr.rest {
-            quote! {
-                buf.extend_from_slice(&self.#field_name);
-            }
-        } else {
-            quote! {
-                basalt_types::Encode::encode(&self.#field_name, buf)?;
-            }
-        };
+        let val = quote! { &self.#field_name };
+        let encode = crate::codegen::field_encode(&val, &attr);
 
         field_encodes.push(encode);
     }
@@ -155,39 +118,8 @@ fn derive_encode_enum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStrea
                     .map(|f| {
                         let fname = f.ident.as_ref().unwrap();
                         let attr = parse_field_attr(&f.attrs)?;
-                        Ok(if attr.varint {
-                            quote! { basalt_types::Encode::encode(&basalt_types::VarInt(*#fname), buf)?; }
-                        } else if attr.optional {
-                            quote! {
-                                match #fname {
-                                    Some(value) => {
-                                        basalt_types::Encode::encode(&true, buf)?;
-                                        basalt_types::Encode::encode(value, buf)?;
-                                    }
-                                    None => {
-                                        basalt_types::Encode::encode(&false, buf)?;
-                                    }
-                                }
-                            }
-                        } else if attr.length_varint && attr.element_varint {
-                            quote! {
-                                basalt_types::Encode::encode(&basalt_types::VarInt(#fname.len() as i32), buf)?;
-                                for item in #fname {
-                                    basalt_types::Encode::encode(&basalt_types::VarInt(*item), buf)?;
-                                }
-                            }
-                        } else if attr.length_varint {
-                            quote! {
-                                basalt_types::Encode::encode(&basalt_types::VarInt(#fname.len() as i32), buf)?;
-                                for item in #fname {
-                                    basalt_types::Encode::encode(item, buf)?;
-                                }
-                            }
-                        } else if attr.rest {
-                            quote! { buf.extend_from_slice(#fname); }
-                        } else {
-                            quote! { basalt_types::Encode::encode(#fname, buf)?; }
-                        })
+                        let val = quote! { #fname };
+                        Ok(crate::codegen::field_encode(&val, &attr))
                     })
                     .collect::<Result<Vec<_>>>()?;
                 quote! {
