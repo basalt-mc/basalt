@@ -289,6 +289,13 @@ async fn play_loop(
     loop {
         tokio::select! {
             _ = keep_alive.tick() => {
+                // Disconnect if the client hasn't responded to the previous keep-alive
+                if player.last_keep_alive_id > 0
+                    && player.last_keep_alive_sent.elapsed() > std::time::Duration::from_secs(30)
+                {
+                    log::warn!(target: "basalt::play", "[{addr}] {} timed out (no keep-alive response in 30s)", player.username);
+                    break;
+                }
                 player.last_keep_alive_id += 1;
                 player.last_keep_alive_sent = Instant::now();
                 let ka = ClientboundPlayKeepAlive {
@@ -381,6 +388,10 @@ fn packet_to_event(
             None
         }
         ServerboundPlayPacket::Position(p) => {
+            if !is_valid_position(p.x, p.y, p.z) {
+                log::warn!(target: "basalt::play", "[{addr}] {} sent invalid position ({}, {}, {})", player.username, p.x, p.y, p.z);
+                return None;
+            }
             let old_cx = (player.x as i32) >> 4;
             let old_cz = (player.z as i32) >> 4;
             player.update_position(p.x, p.y, p.z);
@@ -398,6 +409,10 @@ fn packet_to_event(
             }))
         }
         ServerboundPlayPacket::PositionLook(p) => {
+            if !is_valid_position(p.x, p.y, p.z) {
+                log::warn!(target: "basalt::play", "[{addr}] {} sent invalid position ({}, {}, {})", player.username, p.x, p.y, p.z);
+                return None;
+            }
             let old_cx = (player.x as i32) >> 4;
             let old_cz = (player.z as i32) >> 4;
             player.update_position(p.x, p.y, p.z);
@@ -437,6 +452,10 @@ fn packet_to_event(
             None
         }
         ServerboundPlayPacket::ChatMessage(msg) => {
+            if msg.message.len() > 256 {
+                log::warn!(target: "basalt::play", "[{addr}] {} sent oversized chat message ({} bytes)", player.username, msg.message.len());
+                return None;
+            }
             log::info!(target: "basalt::play", "[{addr}] <{}> {}", player.username, msg.message);
             Some(Box::new(ChatMessageEvent {
                 username: player.username.clone(),
@@ -516,6 +535,18 @@ fn packet_to_event(
             None
         }
     }
+}
+
+/// Maximum valid coordinate magnitude in Minecraft.
+const MAX_COORDINATE: f64 = 30_000_000.0;
+
+/// Validates that coordinates are finite and within the Minecraft world bounds.
+fn is_valid_position(x: f64, y: f64, z: f64) -> bool {
+    x.is_finite()
+        && y.is_finite()
+        && z.is_finite()
+        && x.abs() <= MAX_COORDINATE
+        && z.abs() <= MAX_COORDINATE
 }
 
 /// Executes queued responses from event handlers.
