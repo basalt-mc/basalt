@@ -9,6 +9,7 @@ repository.workspace = true
 basalt-types = { workspace = true }
 basalt-protocol = { workspace = true }
 basalt-storage = { workspace = true }
+dashmap = { workspace = true }
 noise = { workspace = true }
 
 [dev-dependencies]
