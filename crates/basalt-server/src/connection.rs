@@ -185,10 +185,8 @@ async fn handle_configuration(
         pitch: player.pitch,
         skin_properties: player.skin_properties.clone(),
     };
-    let world: &basalt_world::World = &state.world;
-    let world: &'static basalt_world::World = unsafe { &*(world as *const _) };
     let join_ctx = ServerContext::new(
-        world,
+        Arc::clone(&state.world),
         player.uuid,
         player.entity_id,
         player.username.clone(),
@@ -214,7 +212,12 @@ async fn handle_configuration(
 
     // Unregister and dispatch PlayerLeftEvent
     state.unregister_player(&player_uuid);
-    let leave_ctx = ServerContext::new(world, player_uuid, entity_id, player.username.clone());
+    let leave_ctx = ServerContext::new(
+        Arc::clone(&state.world),
+        player_uuid,
+        entity_id,
+        player.username.clone(),
+    );
     let mut leave_event = PlayerLeftEvent {
         uuid: player_uuid,
         entity_id,
