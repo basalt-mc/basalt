@@ -4,18 +4,23 @@
 //! sets the log target to `basalt::plugin::<name>`, ensuring
 //! consistent, filterable log output across all plugins.
 
+use std::fmt;
+
 /// A logger scoped to a specific plugin.
 ///
 /// Obtained via [`ServerContext::logger()`](crate::ServerContext::logger).
 /// All messages are logged with target `basalt::plugin::<name>`,
 /// making them easy to filter in log output.
 ///
+/// Methods accept `impl Display`, so formatting is deferred until
+/// the log level is checked — no allocation if the level is filtered.
+///
 /// # Example
 ///
 /// ```ignore
 /// registrar.on::<PlayerJoinedEvent>(Stage::Post, 0, |event, ctx| {
 ///     let log = ctx.logger();
-///     log.info(&format!("{} joined", event.info.username));
+///     log.info(format_args!("{} joined", event.info.username));
 ///     log.debug("sending welcome message");
 /// });
 /// ```
@@ -32,27 +37,27 @@ impl PluginLogger {
     }
 
     /// Logs at ERROR level.
-    pub fn error(&self, msg: &str) {
+    pub fn error(&self, msg: impl fmt::Display) {
         log::log!(target: &self.target, log::Level::Error, "{msg}");
     }
 
     /// Logs at WARN level.
-    pub fn warn(&self, msg: &str) {
+    pub fn warn(&self, msg: impl fmt::Display) {
         log::log!(target: &self.target, log::Level::Warn, "{msg}");
     }
 
     /// Logs at INFO level.
-    pub fn info(&self, msg: &str) {
+    pub fn info(&self, msg: impl fmt::Display) {
         log::log!(target: &self.target, log::Level::Info, "{msg}");
     }
 
     /// Logs at DEBUG level.
-    pub fn debug(&self, msg: &str) {
+    pub fn debug(&self, msg: impl fmt::Display) {
         log::log!(target: &self.target, log::Level::Debug, "{msg}");
     }
 
     /// Logs at TRACE level.
-    pub fn trace(&self, msg: &str) {
+    pub fn trace(&self, msg: impl fmt::Display) {
         log::log!(target: &self.target, log::Level::Trace, "{msg}");
     }
 }
