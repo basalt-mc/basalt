@@ -91,21 +91,15 @@ impl Plugin for CommandPlugin {
             )
             .handler(|args, ctx| {
                 let mode_str = args.get_string("mode").unwrap();
-                let mode: u8 = match mode_str {
-                    "survival" => 0,
-                    "creative" => 1,
-                    "adventure" => 2,
-                    _ => 3,
+                let mode = match mode_str {
+                    "survival" => Gamemode::Survival,
+                    "creative" => Gamemode::Creative,
+                    "adventure" => Gamemode::Adventure,
+                    _ => Gamemode::Spectator,
                 };
                 ctx.set_gamemode(mode);
-                let name = match mode {
-                    0 => "Survival",
-                    1 => "Creative",
-                    2 => "Adventure",
-                    _ => "Spectator",
-                };
                 ctx.send_message_component(
-                    &TextComponent::text(format!("Game mode set to {name}"))
+                    &TextComponent::text(format!("Game mode set to {mode}"))
                         .color(TextColor::Named(NamedColor::Green)),
                 );
             });
@@ -148,7 +142,9 @@ impl Plugin for CommandPlugin {
             .handler(|args, ctx| {
                 let target = args.get_string("player").unwrap();
                 let log = ctx.logger();
-                log.info(&format!("Kick issued for {target} — not yet implemented"));
+                log.info(format_args!(
+                    "Kick issued for {target} — not yet implemented"
+                ));
                 ctx.send_message_component(
                     &TextComponent::text(format!("Kick not yet implemented: {target}"))
                         .color(TextColor::Named(NamedColor::Yellow)),

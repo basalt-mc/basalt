@@ -7,6 +7,7 @@
 use basalt_types::{TextComponent, Uuid};
 
 use crate::broadcast::BroadcastMessage;
+use crate::gamemode::Gamemode;
 
 /// Execution context for commands and event handlers.
 ///
@@ -58,7 +59,7 @@ pub trait Context {
     fn teleport(&self, x: f64, y: f64, z: f64, yaw: f32, pitch: f32);
 
     /// Changes the current player's gamemode.
-    fn set_gamemode(&self, mode: u8);
+    fn set_gamemode(&self, mode: Gamemode);
 
     // --- Commands ---
 
