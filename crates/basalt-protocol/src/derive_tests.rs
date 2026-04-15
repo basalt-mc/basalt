@@ -210,6 +210,40 @@ fn element_varint_empty() {
     assert_eq!(decoded, original);
 }
 
+// -- Element VarInt in enum variant --
+
+/// Tests that `element = "varint"` works inside enum variants,
+/// not just structs. Previously this was silently ignored.
+#[derive(Debug, PartialEq, Encode, Decode, EncodedSize)]
+enum VarIntArrayEnum {
+    #[variant(id = 0)]
+    Empty,
+    #[variant(id = 1)]
+    WithIds {
+        #[field(length = "varint", element = "varint")]
+        ids: Vec<i32>,
+    },
+}
+
+#[test]
+fn element_varint_enum_variant_roundtrip() {
+    let original = VarIntArrayEnum::WithIds {
+        ids: vec![1, 128, -1],
+    };
+    let mut buf = Vec::with_capacity(original.encoded_size());
+    original.encode(&mut buf).unwrap();
+    assert_eq!(buf.len(), original.encoded_size());
+
+    // VarInt(1) discriminant + VarInt(3) length + VarInt(1) + VarInt(128) + VarInt(-1)
+    // = 1 + 1 + 1 + 2 + 5 = 10 bytes
+    assert_eq!(buf.len(), 10);
+
+    let mut cursor = buf.as_slice();
+    let decoded = VarIntArrayEnum::decode(&mut cursor).unwrap();
+    assert!(cursor.is_empty());
+    assert_eq!(decoded, original);
+}
+
 // -- Rest field --
 
 #[derive(Debug, PartialEq, Encode, Decode, EncodedSize)]
