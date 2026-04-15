@@ -20,6 +20,7 @@ basalt-api = { path = "crates/basalt-api" }
 basalt-command = { path = "crates/basalt-command" }
 basalt-events = { path = "crates/basalt-events" }
 basalt-storage = { path = "crates/basalt-storage" }
+basalt-test-utils = { path = "crates/basalt-test-utils" }
 
 # Error handling
 thiserror = "2"
