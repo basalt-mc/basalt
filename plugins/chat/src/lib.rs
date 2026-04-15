@@ -39,32 +39,23 @@ pub fn build_chat_component(username: &str, message: &str) -> TextComponent {
 
 #[cfg(test)]
 mod tests {
-    use basalt_api::context::ServerContext;
-    use basalt_api::{EventBus, Response};
-    use basalt_types::Uuid;
+    use basalt_api::Response;
+    use basalt_test_utils::PluginTestHarness;
 
     use super::*;
 
-    fn test_world() -> std::sync::Arc<basalt_world::World> {
-        std::sync::Arc::new(basalt_world::World::new_memory(42))
-    }
-
     #[test]
     fn chat_message_broadcasts() {
-        let ctx = ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into());
+        let mut harness = PluginTestHarness::new();
+        harness.register(ChatPlugin);
+
         let mut event = ChatMessageEvent {
             username: "Steve".into(),
             message: "hello".into(),
             cancelled: false,
         };
 
-        let mut bus = EventBus::new();
-        let mut cmds = Vec::new();
-        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
-        ChatPlugin.on_enable(&mut registrar);
-        bus.dispatch(&mut event, &ctx);
-
-        let responses = ctx.drain_responses();
+        let responses = harness.dispatch(&mut event);
         assert_eq!(responses.len(), 1);
         assert!(matches!(
             responses[0],

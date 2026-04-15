@@ -39,8 +39,7 @@ impl Plugin for StoragePlugin {
 
 #[cfg(test)]
 mod tests {
-    use basalt_api::EventBus;
-    use basalt_api::context::ServerContext;
+    use basalt_test_utils::PluginTestHarness;
     use basalt_types::Uuid;
 
     use super::*;
@@ -50,7 +49,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let world = std::sync::Arc::new(basalt_world::World::new(42, dir.path()));
 
-        let ctx = ServerContext::new(world.clone(), Uuid::default(), 1, "Steve".into());
+        let mut harness = PluginTestHarness::with_world(world);
+        // Block plugin sets the block, storage plugin persists
+        harness.register(basalt_plugin_block::BlockPlugin);
+        harness.register(StoragePlugin);
+
         let mut event = BlockPlacedEvent {
             x: 5,
             y: 100,
@@ -61,13 +64,7 @@ mod tests {
             cancelled: false,
         };
 
-        let mut bus = EventBus::new();
-        let mut cmds = Vec::new();
-        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
-        // Block plugin sets the block, storage plugin persists
-        basalt_plugin_block::BlockPlugin.on_enable(&mut registrar);
-        StoragePlugin.on_enable(&mut registrar);
-        bus.dispatch(&mut event, &ctx);
+        harness.dispatch(&mut event);
 
         // Verify persisted — fresh world should see the block
         let world2 = basalt_world::World::new(42, dir.path());
