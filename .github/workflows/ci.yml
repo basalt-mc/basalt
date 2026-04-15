@@ -74,6 +74,33 @@ jobs:
             exit 1
           fi
 
+  fuzz:
+    name: Fuzz ${{ matrix.target }}
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - fuzz_varint
+          - fuzz_string
+          - fuzz_nbt
+          - fuzz_slot
+          - fuzz_opaque
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz
+          shared-key: fuzz-${{ matrix.target }}
+      - run: cargo install cargo-fuzz
+      - name: Run fuzzer (30s)
+        working-directory: fuzz
+        env:
+          TARGET: ${{ matrix.target }}
+        run: cargo +nightly fuzz run "$TARGET" -- -max_total_time=30
+
   deny:
     name: Cargo Deny
     runs-on: ubuntu-latest
