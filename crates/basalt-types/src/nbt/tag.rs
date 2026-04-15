@@ -1,5 +1,7 @@
 use std::fmt;
 
+use indexmap::IndexMap;
+
 /// NBT tag type IDs as defined by the Minecraft protocol specification.
 ///
 /// Each NBT tag is identified by a single byte indicating its type.
@@ -188,18 +190,18 @@ impl Default for NbtList {
 /// The wire format encodes each entry as: tag type byte + name (u16-prefixed
 /// UTF-8) + payload, terminated by an End tag (type 0, no name, no payload).
 ///
-/// Internally uses a `Vec` of `(String, NbtTag)` pairs to preserve
-/// insertion order, which matters for consistent encoding.
+/// Uses `IndexMap` to preserve insertion order (required for deterministic
+/// wire encoding) while providing O(1) lookups instead of O(n) scans.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NbtCompound {
-    entries: Vec<(String, NbtTag)>,
+    entries: IndexMap<String, NbtTag>,
 }
 
 impl NbtCompound {
     /// Creates a new empty compound.
     pub fn new() -> Self {
         Self {
-            entries: Vec::new(),
+            entries: IndexMap::new(),
         }
     }
 
@@ -208,17 +210,12 @@ impl NbtCompound {
     /// If a tag with the same name already exists, it is replaced.
     /// The insertion order of new keys is preserved.
     pub fn insert(&mut self, name: impl Into<String>, tag: NbtTag) {
-        let name = name.into();
-        if let Some(entry) = self.entries.iter_mut().find(|(n, _)| *n == name) {
-            entry.1 = tag;
-        } else {
-            self.entries.push((name, tag));
-        }
+        self.entries.insert(name.into(), tag);
     }
 
     /// Returns a reference to the tag with the given name, if it exists.
     pub fn get(&self, name: &str) -> Option<&NbtTag> {
-        self.entries.iter().find(|(n, _)| n == name).map(|(_, t)| t)
+        self.entries.get(name)
     }
 
     /// Returns an iterator over all `(name, tag)` pairs in insertion order.
@@ -238,7 +235,7 @@ impl NbtCompound {
 
     /// Returns true if the compound contains a tag with the given name.
     pub fn contains_key(&self, name: &str) -> bool {
-        self.entries.iter().any(|(n, _)| n == name)
+        self.entries.contains_key(name)
     }
 }
 
