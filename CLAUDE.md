@@ -610,3 +610,4 @@ Use SniffCraft (MITM proxy in `sniffcraft/`) to capture and validate packets bet
 12. **Issues before code**: always create a detailed GitHub issue (using templates) before starting implementation.
 13. **Doc on everything**: every fn, struct, enum, trait gets a doc comment. Describe what, why, wire format, error cases.
 14. **IR-based codegen**: the xtask pipeline uses a `ProtocolType` IR — never go directly from JSON to Rust strings.
+15. **README reflects reality**: when a feature ships or a roadmap item is completed, update `README.md`. Move items from "What's missing" to "What works today". Update the Roadmap section when specs are implemented. Don't update for internal refactors unless they change user-facing behavior.
