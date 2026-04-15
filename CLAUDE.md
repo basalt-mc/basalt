@@ -73,15 +73,26 @@ Server features are implemented as plugin handlers registered on the event bus. 
 
 The API crate is the single public interface for all plugins:
 
-- **`Plugin` trait** — `metadata()`, `on_enable(&mut EventRegistrar)`, `on_disable()`
+- **`Plugin` trait** — `metadata()`, `on_enable(&mut PluginRegistrar)`, `on_disable()`
 - **`PluginMetadata`** — name, version, author, dependencies
-- **`EventRegistrar`** — typed wrapper around `EventBus`, locks context to `ServerContext`
-- **`ServerContext`** — high-level handler context with methods: `send_message()`, `broadcast_message()`, `teleport()`, `set_gamemode()`, `world()`, `send_block_ack()`, `stream_chunks()`, player identity getters
+- **`PluginRegistrar`** — registers event handlers via `.on::<E>()` and commands via fluent `.command()` builder
+- **`ServerContext`** — implements `Context` trait. High-level handler methods: `send_message()`, `broadcast_message()`, `teleport()`, `set_gamemode()`, `world()`, `send_block_ack()`, `stream_chunks()`, `registered_commands()`, player identity getters, `logger()`
 - **Events** — `BlockBrokenEvent`, `BlockPlacedEvent`, `PlayerMovedEvent`, `ChatMessageEvent`, `CommandEvent`, `PlayerJoinedEvent`, `PlayerLeftEvent`
 - **Macros** — `cancellable_event!` and `event!` exported for custom event types
-- **Types** — `BroadcastMessage`, `PlayerSnapshot`, `ProfileProperty`
+- **Types** — re-exports from `basalt-core` and `basalt-command`
 
 `Response` and `ResponseQueue` are `pub(crate)` — hidden behind `ServerContext` methods.
+
+### basalt-command (typed argument API)
+
+Provides the command argument system used by the fluent builder:
+
+- **`Arg` enum** — all Minecraft Brigadier parser types: `String`, `Integer`, `Double`, `Boolean`, `Vec3`, `Vec2`, `BlockPos`, `ColumnPos`, `Rotation`, `Entity`, `GameProfile`, `BlockState`, `ItemStack`, `Message`, `Component`, `ResourceLocation`, `Uuid`, `Options(Vec<String>)`, `Player`
+- **`Validation` enum** — `Auto` (default error message), `Custom(String)` (custom message), `Disabled` (no validation, handler manages)
+- **`CommandArgs`** — parsed argument map with typed getters: `get_string()`, `get_integer()`, `get_double()`, `raw()`
+- **Variant support** — `parse_command_args()` tries multiple argument lists, sorted by token count (most specific first)
+- **Multi-token args** — `Vec3`/`BlockPos` consume 3 tokens, `Vec2`/`ColumnPos`/`Rotation` consume 2, `Message` is greedy
+- **`Command` trait** — `name()`, `description()`, `execute(&self, args: &CommandArgs, ctx: &dyn Context)`
 
 ### basalt-server structure
 
@@ -89,9 +100,10 @@ The API crate is the single public interface for all plugins:
 crates/basalt-server/
 ├── src/
 │   ├── lib.rs           # Server struct, public API, accept loop
-│   ├── state.rs         # ServerState: player registry, entity IDs, broadcast, EventBus
+│   ├── state.rs         # ServerState: player registry, EventBus, DeclareCommands, command dispatch
+│   ├── config.rs        # ServerConfig: TOML config, plugin flags, storage mode, world settings
 │   ├── connection.rs    # Per-player lifecycle: handshake → login → config → play
-│   ├── play.rs          # Play loop: packet_to_event → dispatch → execute_responses
+│   ├── play.rs          # Play loop: packet_to_event → dispatch → execute_responses, TabComplete
 │   ├── player.rs        # PlayerState: position, rotation, inventory, keep-alive
 │   ├── chat.rs          # Chat formatting helpers (send_welcome, send_system_message)
 │   ├── skin.rs          # Mojang API skin fetching
@@ -111,13 +123,16 @@ crates/basalt-server/
 | Plugin | Events | Stages |
 |--------|--------|--------|
 | `LifecyclePlugin` | PlayerJoined, PlayerLeft | Post: broadcast |
-| `ChatPlugin` | ChatMessage, Command | Process: execute commands, Post: broadcast chat |
+| `ChatPlugin` | ChatMessage | Post: broadcast chat |
+| `CommandPlugin` | (via PluginRegistrar) | Registers /tp, /gamemode, /say, /stop, /kick, /list, /help |
 | `MovementPlugin` | PlayerMoved | Post: broadcast movement |
 | `WorldPlugin` | PlayerMoved | Process: chunk streaming |
 | `BlockPlugin` | BlockBroken, BlockPlaced | Process: world mutation, Post: ack + broadcast |
 | `StoragePlugin` | BlockBroken, BlockPlaced | Post: persist chunk (priority 10) |
 
-- Plugins are registered at startup via `Plugin::on_enable(&mut EventRegistrar)`
+- Plugins are registered at startup via `Plugin::on_enable(&mut PluginRegistrar)`
+- Commands are registered via the fluent builder: `.command("tp").arg("pos", Arg::Vec3).variant(...).handler(...)`
+- The server collects all commands, builds the DeclareCommands Brigadier tree (with trie merging), and registers a unified CommandEvent dispatch handler
 - Non-event packets (keep-alive, teleport confirm, inventory updates) stay inline in the play loop
 - External plugins use the exact same API as built-in ones — no backdoor
 
