@@ -274,6 +274,44 @@ mod tests {
     }
 
     #[test]
+    fn stop_command() {
+        let responses = dispatch_command("stop");
+        assert_eq!(responses.len(), 1);
+        assert!(matches!(
+            responses[0],
+            Response::Broadcast(basalt_api::BroadcastMessage::Chat { .. })
+        ));
+    }
+
+    #[test]
+    fn kick_command() {
+        let responses = dispatch_command("kick Steve");
+        assert_eq!(responses.len(), 1);
+        assert!(matches!(responses[0], Response::SendSystemChat { .. }));
+    }
+
+    #[test]
+    fn list_command() {
+        let responses = dispatch_command("list");
+        assert_eq!(responses.len(), 1);
+        assert!(matches!(responses[0], Response::SendSystemChat { .. }));
+    }
+
+    #[test]
+    fn tp_invalid_coords() {
+        let responses = dispatch_command("tp abc def ghi");
+        assert_eq!(responses.len(), 1);
+        assert!(matches!(responses[0], Response::SendSystemChat { .. }));
+    }
+
+    #[test]
+    fn gamemode_survival() {
+        let responses = dispatch_command("gamemode survival");
+        assert_eq!(responses.len(), 2);
+        assert!(matches!(responses[0], Response::SendGameStateChange { .. }));
+    }
+
+    #[test]
     fn unknown_command_returns_empty() {
         let responses = dispatch_command("foobar");
         assert!(responses.is_empty());

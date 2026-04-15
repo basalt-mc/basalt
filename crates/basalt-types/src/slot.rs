@@ -235,4 +235,76 @@ mod tests {
         assert_eq!(d2.item_count, 20);
         assert_eq!(d2.item_id, Some(2));
     }
+
+    #[test]
+    fn slot_with_remove_components_roundtrip() {
+        // Build a slot with components-to-remove (0 to add, 2 to remove)
+        let mut component_data = Vec::new();
+        VarInt(0).encode(&mut component_data).unwrap(); // 0 to add
+        VarInt(2).encode(&mut component_data).unwrap(); // 2 to remove
+        VarInt(5).encode(&mut component_data).unwrap(); // remove type 5
+        VarInt(10).encode(&mut component_data).unwrap(); // remove type 10
+
+        let slot = Slot {
+            item_count: 1,
+            item_id: Some(42),
+            component_data,
+        };
+        let mut buf = Vec::with_capacity(slot.encoded_size());
+        slot.encode(&mut buf).unwrap();
+        assert_eq!(buf.len(), slot.encoded_size());
+
+        let mut cursor = buf.as_slice();
+        let decoded = Slot::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(decoded.item_count, 1);
+        assert_eq!(decoded.item_id, Some(42));
+        assert_eq!(decoded.component_data, slot.component_data);
+    }
+
+    #[test]
+    fn slot_with_add_components_consumes_remaining() {
+        // Build a slot with components-to-add (opaque data after counts)
+        let mut component_data = Vec::new();
+        VarInt(1).encode(&mut component_data).unwrap(); // 1 to add
+        VarInt(0).encode(&mut component_data).unwrap(); // 0 to remove
+        component_data.extend_from_slice(&[0xAA, 0xBB, 0xCC]); // opaque
+
+        let slot = Slot {
+            item_count: 1,
+            item_id: Some(7),
+            component_data,
+        };
+        let mut buf = Vec::with_capacity(slot.encoded_size());
+        slot.encode(&mut buf).unwrap();
+
+        let mut cursor = buf.as_slice();
+        let decoded = Slot::decode(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(decoded.item_count, 1);
+        assert_eq!(decoded.item_id, Some(7));
+        assert_eq!(decoded.component_data, slot.component_data);
+    }
+
+    #[test]
+    fn empty_and_nonempty_slots_interleaved() {
+        let slots = vec![
+            Slot::empty(),
+            Slot::new(1, 5),
+            Slot::empty(),
+            Slot::new(2, 3),
+        ];
+        let mut buf = Vec::new();
+        for s in &slots {
+            s.encode(&mut buf).unwrap();
+        }
+
+        let mut cursor = buf.as_slice();
+        for expected in &slots {
+            let decoded = Slot::decode(&mut cursor).unwrap();
+            assert_eq!(decoded.item_count, expected.item_count);
+            assert_eq!(decoded.item_id, expected.item_id);
+        }
+        assert!(cursor.is_empty());
+    }
 }
