@@ -87,7 +87,7 @@ impl Decode for Slot {
     /// Reads a slot from the buffer.
     fn decode(buf: &mut &[u8]) -> Result<Self> {
         let item_count = VarInt::decode(buf)?.0;
-        if item_count == 0 {
+        if item_count <= 0 {
             return Ok(Self::empty());
         }
 
