@@ -61,3 +61,8 @@ doc = false
 name = "fuzz_decompress"
 path = "fuzz_targets/decompress.rs"
 doc = false
+
+[[bin]]
+name = "fuzz_chunk_deserialize"
+path = "fuzz_targets/chunk_deserialize.rs"
+doc = false
