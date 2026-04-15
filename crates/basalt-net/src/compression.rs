@@ -25,7 +25,8 @@ pub fn compress_packet(data: &[u8], threshold: usize) -> Result<Vec<u8>> {
             .encode(&mut result)
             .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
 
-        let mut encoder = ZlibEncoder::new(&mut result, Compression::default());
+        // Level 3 favors speed over ratio — better for game server latency
+        let mut encoder = ZlibEncoder::new(&mut result, Compression::new(3));
         encoder.write_all(data).map_err(Error::Io)?;
         encoder.finish().map_err(Error::Io)?;
     } else {
