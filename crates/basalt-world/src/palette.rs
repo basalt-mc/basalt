@@ -8,7 +8,12 @@
 //! This module handles encoding the paletted container into the
 //! wire format expected by the Minecraft client.
 
+use std::collections::HashMap;
+
 use basalt_types::{Encode, VarInt};
+
+/// Maximum bits per entry for indirect palette. Above this, use direct mode.
+const MAX_INDIRECT_BITS: u8 = 8;
 
 /// A 16×16×16 section of blocks stored as a paletted container.
 ///
@@ -76,16 +81,19 @@ impl PalettedContainer {
 
     /// Encodes this container into the Minecraft wire format.
     ///
-    /// The format is:
-    /// - Bits per entry (u8): 0 for single-value, 4-8 for indirect
-    /// - Palette: VarInt count + VarInt entries (for indirect)
-    ///   or single VarInt entry (for single-value)
-    /// - Data array: VarInt length + packed longs
+    /// The format depends on the number of unique block states:
+    /// - **Single-value** (1 state): bits=0, one VarInt palette entry, no data
+    /// - **Indirect** (2-256 states, bits 4-8): palette + packed indices
+    /// - **Direct** (>256 states, bits=15): no palette, raw global state IDs
+    ///
+    /// Uses a HashMap for O(1) palette index lookups instead of O(n) linear scan.
     pub fn encode_to(&self, buf: &mut Vec<u8>) {
-        // Build palette — collect unique block states
+        // Build palette with O(1) lookup
         let mut palette: Vec<u16> = Vec::new();
+        let mut palette_map: HashMap<u16, usize> = HashMap::new();
         for &state in &self.blocks {
-            if !palette.contains(&state) {
+            if let std::collections::hash_map::Entry::Vacant(e) = palette_map.entry(state) {
+                e.insert(palette.len());
                 palette.push(state);
             }
         }
@@ -98,19 +106,36 @@ impl PalettedContainer {
             return;
         }
 
-        // Indirect palette — compute bits per entry
-        // Minimum is 4 for block states
-        let bits_per_entry = std::cmp::max(4, bits_needed(palette.len() as u32));
+        let raw_bits = bits_needed(palette.len() as u32);
 
-        bits_per_entry.encode(buf).unwrap();
+        if raw_bits <= MAX_INDIRECT_BITS {
+            // Indirect palette — bits 4-8
+            let bits_per_entry = std::cmp::max(4, raw_bits);
+            bits_per_entry.encode(buf).unwrap();
 
-        // Palette entries
-        VarInt(palette.len() as i32).encode(buf).unwrap();
-        for &state in &palette {
-            VarInt(state as i32).encode(buf).unwrap();
+            // Palette entries
+            VarInt(palette.len() as i32).encode(buf).unwrap();
+            for &state in &palette {
+                VarInt(state as i32).encode(buf).unwrap();
+            }
+
+            // Pack palette indices into longs
+            self.encode_packed_longs(buf, bits_per_entry, |state| palette_map[&state] as u64);
+        } else {
+            // Direct mode — 15 bits per entry, no palette
+            let bits_per_entry: u8 = 15;
+            bits_per_entry.encode(buf).unwrap();
+            self.encode_packed_longs(buf, bits_per_entry, |state| state as u64);
         }
+    }
 
-        // Pack blocks into longs
+    /// Packs block values into longs at the given bits-per-entry.
+    fn encode_packed_longs(
+        &self,
+        buf: &mut Vec<u8>,
+        bits_per_entry: u8,
+        value_fn: impl Fn(u16) -> u64,
+    ) {
         let entries_per_long = 64 / bits_per_entry as usize;
         let num_longs = 4096_usize.div_ceil(entries_per_long);
         let mask = (1u64 << bits_per_entry) - 1;
@@ -122,8 +147,7 @@ impl PalettedContainer {
         let mut longs_written = 0;
 
         for &state in &self.blocks {
-            let index = palette.iter().position(|&s| s == state).unwrap() as u64;
-            long_value |= (index & mask) << bit_offset;
+            long_value |= (value_fn(state) & mask) << bit_offset;
             bit_offset += bits_per_entry as usize;
 
             if bit_offset >= 64 {
@@ -134,13 +158,11 @@ impl PalettedContainer {
             }
         }
 
-        // Write remaining partial long
         if bit_offset > 0 {
             (long_value as i64).encode(buf).unwrap();
             longs_written += 1;
         }
 
-        // Pad with zeros if needed (shouldn't happen with correct math)
         for _ in longs_written..num_longs {
             0i64.encode(buf).unwrap();
         }
@@ -197,6 +219,27 @@ mod tests {
         container.set(5, 10, 3, block::BEDROCK);
         assert_eq!(container.get(5, 10, 3), block::BEDROCK);
         assert_eq!(container.get(0, 0, 0), block::AIR);
+    }
+
+    #[test]
+    fn direct_mode_many_unique_states() {
+        // >256 unique states forces direct mode (15 bits, no palette)
+        let mut container = PalettedContainer::filled(0);
+        for i in 0..4096u16 {
+            // Use 300 unique states to exceed the 256 indirect limit
+            container.set(
+                i as usize % 16,
+                i as usize / 256,
+                (i as usize / 16) % 16,
+                i % 300,
+            );
+        }
+        let mut buf = Vec::new();
+        container.encode_to(&mut buf);
+        // First byte should be 15 (direct mode bits per entry)
+        assert_eq!(buf[0], 15);
+        // Should not panic and produce valid output
+        assert!(buf.len() > 100);
     }
 
     #[test]
