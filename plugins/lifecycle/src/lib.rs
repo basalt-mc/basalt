@@ -46,10 +46,8 @@ mod tests {
 
     use super::*;
 
-    fn test_world() -> &'static basalt_world::World {
-        use std::sync::OnceLock;
-        static WORLD: OnceLock<basalt_world::World> = OnceLock::new();
-        WORLD.get_or_init(|| basalt_world::World::new_memory(42))
+    fn test_world() -> std::sync::Arc<basalt_world::World> {
+        std::sync::Arc::new(basalt_world::World::new_memory(42))
     }
 
     #[test]

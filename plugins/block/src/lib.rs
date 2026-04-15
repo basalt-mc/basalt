@@ -64,17 +64,16 @@ mod tests {
 
     use super::*;
 
-    fn test_world() -> &'static basalt_world::World {
-        use std::sync::OnceLock;
-        static WORLD: OnceLock<basalt_world::World> = OnceLock::new();
-        WORLD.get_or_init(|| basalt_world::World::new_memory(42))
+    fn test_world() -> std::sync::Arc<basalt_world::World> {
+        std::sync::Arc::new(basalt_world::World::new_memory(42))
     }
 
     #[test]
     fn block_broken_sets_air_and_queues_responses() {
-        test_world().set_block(5, 64, 3, basalt_world::block::STONE);
+        let world = test_world();
+        world.set_block(5, 64, 3, basalt_world::block::STONE);
 
-        let ctx = ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into());
+        let ctx = ServerContext::new(world.clone(), Uuid::default(), 1, "Steve".into());
         let mut event = BlockBrokenEvent {
             x: 5,
             y: 64,
@@ -90,7 +89,7 @@ mod tests {
         BlockPlugin.on_enable(&mut registrar);
         bus.dispatch(&mut event, &ctx);
 
-        assert_eq!(test_world().get_block(5, 64, 3), basalt_world::block::AIR);
+        assert_eq!(world.get_block(5, 64, 3), basalt_world::block::AIR);
 
         let responses = ctx.drain_responses();
         assert_eq!(responses.len(), 2);
@@ -106,9 +105,10 @@ mod tests {
 
     #[test]
     fn cancelled_block_break_skips_mutation() {
-        test_world().set_block(8, 64, 8, basalt_world::block::STONE);
+        let world = test_world();
+        world.set_block(8, 64, 8, basalt_world::block::STONE);
 
-        let ctx = ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into());
+        let ctx = ServerContext::new(world.clone(), Uuid::default(), 1, "Steve".into());
         let mut event = BlockBrokenEvent {
             x: 8,
             y: 64,
@@ -128,7 +128,7 @@ mod tests {
         BlockPlugin.on_enable(&mut registrar);
         bus.dispatch(&mut event, &ctx);
 
-        assert_eq!(test_world().get_block(8, 64, 8), basalt_world::block::STONE);
+        assert_eq!(world.get_block(8, 64, 8), basalt_world::block::STONE);
         assert!(ctx.drain_responses().is_empty());
     }
 }
