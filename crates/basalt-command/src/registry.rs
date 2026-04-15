@@ -104,7 +104,7 @@ mod tests {
         fn broadcast_message(&self, _text: &str) {}
         fn broadcast_message_component(&self, _component: &basalt_types::TextComponent) {}
         fn teleport(&self, _x: f64, _y: f64, _z: f64, _yaw: f32, _pitch: f32) {}
-        fn set_gamemode(&self, _mode: u8) {}
+        fn set_gamemode(&self, _mode: basalt_core::Gamemode) {}
         fn registered_commands(&self) -> Vec<(String, String)> {
             Vec::new()
         }

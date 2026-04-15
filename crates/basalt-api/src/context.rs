@@ -7,10 +7,19 @@
 
 use std::cell::RefCell;
 
+use std::sync::atomic::{AtomicI32, Ordering};
+
 use basalt_core::broadcast::BroadcastMessage;
+use basalt_core::gamemode::Gamemode;
 use basalt_core::{Context, PluginLogger};
 use basalt_types::nbt::NbtCompound;
 use basalt_types::{TextComponent, Uuid};
+
+/// Game state change reason codes from the Minecraft protocol.
+///
+/// Used in the GameStateChange packet (0x22) to indicate what kind of
+/// state change is being communicated to the client.
+const GAME_STATE_CHANGE_GAMEMODE: u8 = 3;
 
 /// Context available to event handlers during dispatch.
 ///
@@ -32,7 +41,12 @@ pub struct ServerContext {
     plugin_name: RefCell<String>,
     /// Registered command list (name, description) for /help.
     command_list: RefCell<Vec<(String, String)>>,
+    /// Monotonically increasing teleport ID counter shared across dispatches.
+    teleport_counter: &'static AtomicI32,
 }
+
+/// Global teleport ID counter shared across all server contexts.
+static GLOBAL_TELEPORT_COUNTER: AtomicI32 = AtomicI32::new(1);
 
 impl ServerContext {
     /// Creates a new context for a single event dispatch.
@@ -50,6 +64,7 @@ impl ServerContext {
             player_username,
             plugin_name: RefCell::new(String::new()),
             command_list: RefCell::new(Vec::new()),
+            teleport_counter: &GLOBAL_TELEPORT_COUNTER,
         }
     }
 
@@ -128,8 +143,9 @@ impl Context for ServerContext {
     }
 
     fn teleport(&self, x: f64, y: f64, z: f64, yaw: f32, pitch: f32) {
+        let teleport_id = self.teleport_counter.fetch_add(1, Ordering::Relaxed);
         self.responses.push(Response::SendPosition {
-            teleport_id: 2,
+            teleport_id,
             x,
             y,
             z,
@@ -138,10 +154,10 @@ impl Context for ServerContext {
         });
     }
 
-    fn set_gamemode(&self, mode: u8) {
+    fn set_gamemode(&self, mode: Gamemode) {
         self.responses.push(Response::SendGameStateChange {
-            reason: 3,
-            value: mode as f32,
+            reason: GAME_STATE_CHANGE_GAMEMODE,
+            value: mode.id() as f32,
         });
     }
 
@@ -279,12 +295,15 @@ mod tests {
     #[test]
     fn set_gamemode_queues_state_change() {
         let ctx = test_ctx();
-        ctx.set_gamemode(1);
+        ctx.set_gamemode(Gamemode::Creative);
         let responses = ctx.drain_responses();
         assert_eq!(responses.len(), 1);
         assert!(matches!(
             responses[0],
-            Response::SendGameStateChange { reason: 3, .. }
+            Response::SendGameStateChange {
+                reason: GAME_STATE_CHANGE_GAMEMODE,
+                ..
+            }
         ));
     }
 
