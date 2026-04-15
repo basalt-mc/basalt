@@ -37,19 +37,16 @@ impl Plugin for MovementPlugin {
 
 #[cfg(test)]
 mod tests {
-    use basalt_api::context::ServerContext;
-    use basalt_api::{EventBus, Response};
-    use basalt_types::Uuid;
+    use basalt_api::Response;
+    use basalt_test_utils::PluginTestHarness;
 
     use super::*;
 
-    fn test_world() -> std::sync::Arc<basalt_world::World> {
-        std::sync::Arc::new(basalt_world::World::new_memory(42))
-    }
-
     #[test]
     fn movement_broadcasts() {
-        let ctx = ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into());
+        let mut harness = PluginTestHarness::new();
+        harness.register(MovementPlugin);
+
         let mut event = PlayerMovedEvent {
             entity_id: 1,
             x: 10.0,
@@ -62,13 +59,7 @@ mod tests {
             old_cz: 0,
         };
 
-        let mut bus = EventBus::new();
-        let mut cmds = Vec::new();
-        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
-        MovementPlugin.on_enable(&mut registrar);
-        bus.dispatch(&mut event, &ctx);
-
-        let responses = ctx.drain_responses();
+        let responses = harness.dispatch(&mut event);
         assert_eq!(responses.len(), 1);
         assert!(matches!(
             responses[0],

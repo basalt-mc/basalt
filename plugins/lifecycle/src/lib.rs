@@ -40,19 +40,17 @@ impl Plugin for LifecyclePlugin {
 
 #[cfg(test)]
 mod tests {
-    use basalt_api::context::ServerContext;
-    use basalt_api::{EventBus, Response};
+    use basalt_api::Response;
+    use basalt_test_utils::PluginTestHarness;
     use basalt_types::Uuid;
 
     use super::*;
 
-    fn test_world() -> std::sync::Arc<basalt_world::World> {
-        std::sync::Arc::new(basalt_world::World::new_memory(42))
-    }
-
     #[test]
     fn player_joined_broadcasts() {
-        let ctx = ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into());
+        let mut harness = PluginTestHarness::new();
+        harness.register(LifecyclePlugin);
+
         let mut event = PlayerJoinedEvent {
             info: PlayerSnapshot {
                 username: "Steve".into(),
@@ -67,13 +65,7 @@ mod tests {
             },
         };
 
-        let mut bus = EventBus::new();
-        let mut cmds = Vec::new();
-        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
-        LifecyclePlugin.on_enable(&mut registrar);
-        bus.dispatch(&mut event, &ctx);
-
-        let responses = ctx.drain_responses();
+        let responses = harness.dispatch(&mut event);
         assert_eq!(responses.len(), 1);
         assert!(matches!(
             responses[0],
@@ -83,20 +75,16 @@ mod tests {
 
     #[test]
     fn player_left_broadcasts() {
-        let ctx = ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into());
+        let mut harness = PluginTestHarness::new();
+        harness.register(LifecyclePlugin);
+
         let mut event = PlayerLeftEvent {
             uuid: Uuid::default(),
             entity_id: 1,
             username: "Steve".into(),
         };
 
-        let mut bus = EventBus::new();
-        let mut cmds = Vec::new();
-        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
-        LifecyclePlugin.on_enable(&mut registrar);
-        bus.dispatch(&mut event, &ctx);
-
-        let responses = ctx.drain_responses();
+        let responses = harness.dispatch(&mut event);
         assert_eq!(responses.len(), 1);
         assert!(matches!(
             responses[0],

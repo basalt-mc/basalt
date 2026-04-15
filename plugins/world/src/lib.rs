@@ -34,19 +34,16 @@ impl Plugin for WorldPlugin {
 
 #[cfg(test)]
 mod tests {
-    use basalt_api::context::ServerContext;
-    use basalt_api::{EventBus, Response};
-    use basalt_types::Uuid;
+    use basalt_api::Response;
+    use basalt_test_utils::PluginTestHarness;
 
     use super::*;
 
-    fn test_world() -> std::sync::Arc<basalt_world::World> {
-        std::sync::Arc::new(basalt_world::World::new_memory(42))
-    }
-
     #[test]
     fn chunk_boundary_crossing_queues_stream() {
-        let ctx = ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into());
+        let mut harness = PluginTestHarness::new();
+        harness.register(WorldPlugin);
+
         let mut event = PlayerMovedEvent {
             entity_id: 1,
             x: 16.0,
@@ -59,13 +56,7 @@ mod tests {
             old_cz: 0,
         };
 
-        let mut bus = EventBus::new();
-        let mut cmds = Vec::new();
-        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
-        WorldPlugin.on_enable(&mut registrar);
-        bus.dispatch(&mut event, &ctx);
-
-        let responses = ctx.drain_responses();
+        let responses = harness.dispatch(&mut event);
         assert_eq!(responses.len(), 1);
         assert!(matches!(
             responses[0],
@@ -78,7 +69,9 @@ mod tests {
 
     #[test]
     fn negative_coordinate_chunk_boundary() {
-        let ctx = ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into());
+        let mut harness = PluginTestHarness::new();
+        harness.register(WorldPlugin);
+
         // x=-0.5 is in chunk -1, not chunk 0 (floor before shift)
         let mut event = PlayerMovedEvent {
             entity_id: 1,
@@ -92,13 +85,7 @@ mod tests {
             old_cz: 0,
         };
 
-        let mut bus = EventBus::new();
-        let mut cmds = Vec::new();
-        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
-        WorldPlugin.on_enable(&mut registrar);
-        bus.dispatch(&mut event, &ctx);
-
-        let responses = ctx.drain_responses();
+        let responses = harness.dispatch(&mut event);
         assert_eq!(responses.len(), 1);
         assert!(matches!(
             responses[0],
@@ -111,7 +98,9 @@ mod tests {
 
     #[test]
     fn same_chunk_no_streaming() {
-        let ctx = ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into());
+        let mut harness = PluginTestHarness::new();
+        harness.register(WorldPlugin);
+
         let mut event = PlayerMovedEvent {
             entity_id: 1,
             x: 5.0,
@@ -124,12 +113,6 @@ mod tests {
             old_cz: 0,
         };
 
-        let mut bus = EventBus::new();
-        let mut cmds = Vec::new();
-        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
-        WorldPlugin.on_enable(&mut registrar);
-        bus.dispatch(&mut event, &ctx);
-
-        assert!(ctx.drain_responses().is_empty());
+        assert!(harness.dispatch(&mut event).is_empty());
     }
 }

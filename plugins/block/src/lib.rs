@@ -60,20 +60,19 @@ impl Plugin for BlockPlugin {
 mod tests {
     use basalt_api::context::ServerContext;
     use basalt_api::{Event, EventBus, Response};
+    use basalt_test_utils::PluginTestHarness;
     use basalt_types::Uuid;
 
     use super::*;
 
-    fn test_world() -> std::sync::Arc<basalt_world::World> {
-        std::sync::Arc::new(basalt_world::World::new_memory(42))
-    }
-
     #[test]
     fn block_broken_sets_air_and_queues_responses() {
-        let world = test_world();
-        world.set_block(5, 64, 3, basalt_world::block::STONE);
+        let mut harness = PluginTestHarness::new();
+        harness
+            .world()
+            .set_block(5, 64, 3, basalt_world::block::STONE);
+        harness.register(BlockPlugin);
 
-        let ctx = ServerContext::new(world.clone(), Uuid::default(), 1, "Steve".into());
         let mut event = BlockBrokenEvent {
             x: 5,
             y: 64,
@@ -83,15 +82,14 @@ mod tests {
             cancelled: false,
         };
 
-        let mut bus = EventBus::new();
-        let mut cmds = Vec::new();
-        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
-        BlockPlugin.on_enable(&mut registrar);
-        bus.dispatch(&mut event, &ctx);
+        let ctx = harness.context();
+        let responses = harness.dispatch_with(&mut event, &ctx);
 
-        assert_eq!(world.get_block(5, 64, 3), basalt_world::block::AIR);
+        assert_eq!(
+            harness.world().get_block(5, 64, 3),
+            basalt_world::block::AIR
+        );
 
-        let responses = ctx.drain_responses();
         assert_eq!(responses.len(), 2);
         assert!(matches!(
             responses[0],
@@ -105,7 +103,7 @@ mod tests {
 
     #[test]
     fn cancelled_block_break_skips_mutation() {
-        let world = test_world();
+        let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
         world.set_block(8, 64, 8, basalt_world::block::STONE);
 
         let ctx = ServerContext::new(world.clone(), Uuid::default(), 1, "Steve".into());
@@ -119,9 +117,9 @@ mod tests {
         };
 
         let mut bus = EventBus::new();
-        // Validate handler cancels
+        // Validate handler cancels before BlockPlugin runs
         let mut cmds = Vec::new();
-        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
+        let mut registrar = basalt_api::plugin::PluginRegistrar::new(&mut bus, &mut cmds);
         registrar.on::<BlockBrokenEvent>(Stage::Validate, 0, |event, _| {
             event.cancel();
         });
