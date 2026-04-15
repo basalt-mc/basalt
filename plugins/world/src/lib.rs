@@ -23,8 +23,8 @@ impl Plugin for WorldPlugin {
 
     fn on_enable(&self, registrar: &mut PluginRegistrar) {
         registrar.on::<PlayerMovedEvent>(Stage::Process, 0, |event, ctx| {
-            let new_cx = (event.x as i32) >> 4;
-            let new_cz = (event.z as i32) >> 4;
+            let new_cx = (event.x.floor() as i32) >> 4;
+            let new_cz = (event.z.floor() as i32) >> 4;
             if new_cx != event.old_cx || new_cz != event.old_cz {
                 ctx.stream_chunks(new_cx, new_cz);
             }
@@ -74,6 +74,39 @@ mod tests {
             Response::StreamChunks {
                 new_cx: 1,
                 new_cz: 0
+            }
+        ));
+    }
+
+    #[test]
+    fn negative_coordinate_chunk_boundary() {
+        let ctx = ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into());
+        // x=-0.5 is in chunk -1, not chunk 0 (floor before shift)
+        let mut event = PlayerMovedEvent {
+            entity_id: 1,
+            x: -0.5,
+            y: 64.0,
+            z: -0.5,
+            yaw: 0.0,
+            pitch: 0.0,
+            on_ground: true,
+            old_cx: 0,
+            old_cz: 0,
+        };
+
+        let mut bus = EventBus::new();
+        let mut cmds = Vec::new();
+        let mut registrar = PluginRegistrar::new(&mut bus, &mut cmds);
+        WorldPlugin.on_enable(&mut registrar);
+        bus.dispatch(&mut event, &ctx);
+
+        let responses = ctx.drain_responses();
+        assert_eq!(responses.len(), 1);
+        assert!(matches!(
+            responses[0],
+            Response::StreamChunks {
+                new_cx: -1,
+                new_cz: -1
             }
         ));
     }
