@@ -123,7 +123,7 @@ impl Plugin for CommandPlugin {
                     .append(
                         TextComponent::text(message).color(TextColor::Named(NamedColor::White)),
                     );
-                ctx.send_message_component(&msg);
+                ctx.broadcast_message_component(&msg);
             });
 
         // /stop
@@ -263,7 +263,10 @@ mod tests {
     fn say_message() {
         let responses = dispatch_command("say hello world");
         assert_eq!(responses.len(), 1);
-        assert!(matches!(responses[0], Response::SendSystemChat { .. }));
+        assert!(matches!(
+            responses[0],
+            Response::Broadcast(basalt_api::BroadcastMessage::Chat { .. })
+        ));
     }
 
     #[test]
