@@ -317,6 +317,8 @@ async fn play_loop(
                                 player.uuid,
                                 player.entity_id,
                                 player.username.clone(),
+                                player.yaw,
+                                player.pitch,
                             );
                             ctx.set_command_list(
                                 state.command_args.iter()

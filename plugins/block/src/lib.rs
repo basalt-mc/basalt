@@ -106,7 +106,7 @@ mod tests {
         let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
         world.set_block(8, 64, 8, basalt_world::block::STONE);
 
-        let ctx = ServerContext::new(world.clone(), Uuid::default(), 1, "Steve".into());
+        let ctx = ServerContext::new(world.clone(), Uuid::default(), 1, "Steve".into(), 0.0, 0.0);
         let mut event = BlockBrokenEvent {
             x: 8,
             y: 64,

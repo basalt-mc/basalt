@@ -190,6 +190,8 @@ async fn handle_configuration(
         player.uuid,
         player.entity_id,
         player.username.clone(),
+        player.yaw,
+        player.pitch,
     );
     let mut join_event = PlayerJoinedEvent { info: snapshot };
     state.event_bus.dispatch(&mut join_event, &join_ctx);
@@ -217,6 +219,8 @@ async fn handle_configuration(
         player_uuid,
         entity_id,
         player.username.clone(),
+        player.yaw,
+        player.pitch,
     );
     let mut leave_event = PlayerLeftEvent {
         uuid: player_uuid,

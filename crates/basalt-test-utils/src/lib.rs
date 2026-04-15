@@ -69,7 +69,14 @@ impl PluginTestHarness {
 
     /// Creates a default server context for "Steve" with entity ID 1.
     pub fn context(&self) -> ServerContext {
-        ServerContext::new(Arc::clone(&self.world), Uuid::default(), 1, "Steve".into())
+        ServerContext::new(
+            Arc::clone(&self.world),
+            Uuid::default(),
+            1,
+            "Steve".into(),
+            0.0,
+            0.0,
+        )
     }
 
     /// Creates a server context with custom player identity.
@@ -79,6 +86,8 @@ impl PluginTestHarness {
             uuid,
             entity_id,
             username.to_string(),
+            0.0,
+            0.0,
         )
     }
 

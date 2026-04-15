@@ -39,7 +39,7 @@ impl Plugin for CommandPlugin {
             .variant(|v| v.arg("targets", Arg::Entity).arg("location", Arg::Vec3))
             .handler(|args, ctx| {
                 if let Some((x, y, z)) = args.get_vec3("location") {
-                    ctx.teleport(x, y, z, 0.0, 0.0);
+                    ctx.teleport(x, y, z, ctx.player_yaw(), ctx.player_pitch());
                     ctx.send_message_component(
                         &TextComponent::text(format!("Teleported to {x}, {y}, {z}"))
                             .color(TextColor::Named(NamedColor::Green)),
@@ -193,7 +193,7 @@ mod tests {
     }
 
     fn test_ctx() -> ServerContext {
-        ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into())
+        ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into(), 0.0, 0.0)
     }
 
     fn dispatch_command(cmd: &str) -> Vec<Response> {
