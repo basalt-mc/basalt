@@ -248,7 +248,15 @@ impl Connection<Play> {
     pub async fn read_packet(&mut self) -> Result<ServerboundPlayPacket> {
         let raw = self.read_raw().await?;
         let mut cursor = raw.payload.as_slice();
-        Ok(ServerboundPlayPacket::decode_by_id(raw.id, &mut cursor)?)
+        let packet = ServerboundPlayPacket::decode_by_id(raw.id, &mut cursor)?;
+        if !cursor.is_empty() {
+            log::trace!(
+                "Packet 0x{:02x} had {} trailing bytes",
+                raw.id,
+                cursor.len()
+            );
+        }
+        Ok(packet)
     }
 
     /// Writes a clientbound Play packet to the client.
