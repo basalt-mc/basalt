@@ -133,6 +133,96 @@ impl RegionStorage {
         Ok(())
     }
 
+    /// Compacts a region file by rewriting it with only live chunk data.
+    ///
+    /// Over time, `save_raw` appends new data without reclaiming space
+    /// from previous saves of the same chunk. This leaves dead space in
+    /// the file. `compact` rewrites the file with only the current data,
+    /// eliminating all gaps.
+    ///
+    /// Returns the number of bytes reclaimed, or 0 if the region file
+    /// doesn't exist.
+    pub fn compact(&self, region_x: i32, region_z: i32) -> io::Result<u64> {
+        let path = self.region_path(region_x, region_z);
+        if !path.exists() {
+            return Ok(0);
+        }
+
+        let mut file = File::options().read(true).write(true).open(&path)?;
+        if !verify_header(&mut file)? {
+            return Ok(0);
+        }
+
+        let old_size = file.seek(SeekFrom::End(0))?;
+        let table = read_offset_table(&mut file)?;
+
+        // Read all live blobs into memory
+        let mut blobs: Vec<(usize, Vec<u8>)> = Vec::new();
+        for (index, &(offset, size)) in table.iter().enumerate() {
+            if offset == 0 && size == 0 {
+                continue;
+            }
+            file.seek(SeekFrom::Start(offset as u64))?;
+            let mut data = vec![0u8; size as usize];
+            file.read_exact(&mut data)?;
+            blobs.push((index, data));
+        }
+
+        // Rewrite: header + table + packed data
+        file.seek(SeekFrom::Start(0))?;
+        file.set_len(0)?;
+        file.write_all(MAGIC)?;
+        file.write_all(&VERSION.to_le_bytes())?;
+        file.write_all(&[0u8; 2])?;
+
+        let mut new_table = vec![(0u32, 0u32); CHUNKS_PER_REGION];
+
+        // Write empty table placeholder
+        file.write_all(&vec![0u8; TABLE_SIZE as usize])?;
+
+        // Write blobs contiguously
+        for (index, data) in &blobs {
+            let offset = file.stream_position()? as u32;
+            file.write_all(data)?;
+            new_table[*index] = (offset, data.len() as u32);
+        }
+
+        write_offset_table(&mut file, &new_table)?;
+
+        let new_size = file.seek(SeekFrom::End(0))?;
+        Ok(old_size.saturating_sub(new_size))
+    }
+
+    /// Compacts all region files in the storage directory.
+    ///
+    /// Returns the total number of bytes reclaimed across all regions.
+    pub fn compact_all(&self) -> io::Result<u64> {
+        let mut total_reclaimed = 0u64;
+
+        let entries = fs::read_dir(&self.directory)?;
+        for entry in entries {
+            let entry = entry?;
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if !name.starts_with("r.") || !name.ends_with(".bsr") {
+                continue;
+            }
+            // Parse r.X.Z.bsr
+            let parts: Vec<&str> = name
+                .trim_start_matches("r.")
+                .trim_end_matches(".bsr")
+                .split('.')
+                .collect();
+            if parts.len() == 2
+                && let (Ok(rx), Ok(rz)) = (parts[0].parse::<i32>(), parts[1].parse::<i32>())
+            {
+                total_reclaimed += self.compact(rx, rz)?;
+            }
+        }
+
+        Ok(total_reclaimed)
+    }
+
     /// Returns the path for a region file.
     fn region_path(&self, region_x: i32, region_z: i32) -> PathBuf {
         self.directory.join(format!("r.{region_x}.{region_z}.bsr"))
@@ -263,5 +353,74 @@ mod tests {
         assert_eq!(storage.load_raw(0, 0).unwrap().unwrap(), b"a");
         assert_eq!(storage.load_raw(1, 0).unwrap().unwrap(), b"b");
         assert_eq!(storage.load_raw(2, 0).unwrap().unwrap(), b"c");
+    }
+
+    #[test]
+    fn compact_reclaims_dead_space() {
+        let dir = tempfile::tempdir().unwrap();
+        let storage = RegionStorage::new(dir.path()).unwrap();
+
+        // Save the same chunk 5 times — each appends, leaving dead data
+        for i in 0..5u8 {
+            storage.save_raw(0, 0, &[i; 1024]).unwrap();
+        }
+
+        let path = storage.region_path(0, 0);
+        let size_before = std::fs::metadata(&path).unwrap().len();
+
+        let reclaimed = storage.compact(0, 0).unwrap();
+        let size_after = std::fs::metadata(&path).unwrap().len();
+
+        assert!(reclaimed > 0, "should reclaim dead space");
+        assert!(size_after < size_before, "file should be smaller");
+
+        // Data should still be readable
+        let loaded = storage.load_raw(0, 0).unwrap().unwrap();
+        assert_eq!(loaded, vec![4u8; 1024]); // last save wins
+    }
+
+    #[test]
+    fn compact_preserves_all_chunks() {
+        let dir = tempfile::tempdir().unwrap();
+        let storage = RegionStorage::new(dir.path()).unwrap();
+
+        storage.save_raw(0, 0, b"aaa").unwrap();
+        storage.save_raw(1, 0, b"bbb").unwrap();
+        storage.save_raw(2, 0, b"ccc").unwrap();
+
+        // Overwrite one to create dead space
+        storage.save_raw(1, 0, b"bbb_new").unwrap();
+
+        storage.compact(0, 0).unwrap();
+
+        assert_eq!(storage.load_raw(0, 0).unwrap().unwrap(), b"aaa");
+        assert_eq!(storage.load_raw(1, 0).unwrap().unwrap(), b"bbb_new");
+        assert_eq!(storage.load_raw(2, 0).unwrap().unwrap(), b"ccc");
+    }
+
+    #[test]
+    fn compact_nonexistent_returns_zero() {
+        let dir = tempfile::tempdir().unwrap();
+        let storage = RegionStorage::new(dir.path()).unwrap();
+        assert_eq!(storage.compact(99, 99).unwrap(), 0);
+    }
+
+    #[test]
+    fn compact_all_reclaims_across_regions() {
+        let dir = tempfile::tempdir().unwrap();
+        let storage = RegionStorage::new(dir.path()).unwrap();
+
+        // Two different regions: (0,0) in r.0.0 and (32,0) in r.1.0
+        storage.save_raw(0, 0, b"first").unwrap();
+        storage.save_raw(0, 0, b"second").unwrap(); // dead space in r.0.0
+        storage.save_raw(32, 0, b"first").unwrap();
+        storage.save_raw(32, 0, b"second").unwrap(); // dead space in r.1.0
+
+        let reclaimed = storage.compact_all().unwrap();
+        assert!(reclaimed > 0);
+
+        // Both still readable
+        assert_eq!(storage.load_raw(0, 0).unwrap().unwrap(), b"second");
+        assert_eq!(storage.load_raw(32, 0).unwrap().unwrap(), b"second");
     }
 }
