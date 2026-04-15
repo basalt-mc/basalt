@@ -10,6 +10,9 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 basalt-types = { path = "../crates/basalt-types" }
+basalt-protocol = { path = "../crates/basalt-protocol" }
+basalt-net = { path = "../crates/basalt-net" }
+basalt-world = { path = "../crates/basalt-world" }
 
 # Prevent this from interfering with workspaces
 [workspace]
@@ -37,4 +40,9 @@ doc = false
 [[bin]]
 name = "fuzz_opaque"
 path = "fuzz_targets/opaque.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_packet_play"
+path = "fuzz_targets/packet_play.rs"
 doc = false
