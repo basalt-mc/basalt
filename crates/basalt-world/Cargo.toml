@@ -12,4 +12,9 @@ basalt-storage = { workspace = true }
 noise = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
 tempfile = "3"
+
+[[bench]]
+name = "chunk"
+harness = false
