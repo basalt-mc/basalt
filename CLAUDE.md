@@ -548,6 +548,11 @@ Fuzz targets live in `fuzz/fuzz_targets/`, one per decoder. The `fuzz/` director
 | `fuzz_nbt` | `NbtCompound::decode` | Recursive, nested compounds/lists |
 | `fuzz_slot` | `Slot::decode` | Component count parsing |
 | `fuzz_opaque` | `OpaqueBytes::decode` | Length-prefixed buffer |
+| `fuzz_packet_play` | `ServerboundPlayPacket::decode_by_id` | All 180+ serverbound Play packets |
+| `fuzz_text_component` | `TextComponent::decode` | Recursive NBT text (chat, titles) |
+| `fuzz_position` | `Position::decode` | Packed i64 signed bit extraction |
+| `fuzz_decompress` | `decompress_packet` | Zlib with untrusted size field |
+| `fuzz_chunk_deserialize` | `deserialize_chunk` | BSR on-disk format from region files |
 
 **Running locally:**
 

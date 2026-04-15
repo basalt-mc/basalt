@@ -28,6 +28,11 @@ jobs:
           - fuzz_nbt
           - fuzz_slot
           - fuzz_opaque
+          - fuzz_packet_play
+          - fuzz_text_component
+          - fuzz_position
+          - fuzz_decompress
+          - fuzz_chunk_deserialize
 
     steps:
       - uses: actions/checkout@v4
