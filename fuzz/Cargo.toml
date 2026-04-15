@@ -46,3 +46,8 @@ doc = false
 name = "fuzz_packet_play"
 path = "fuzz_targets/packet_play.rs"
 doc = false
+
+[[bin]]
+name = "fuzz_text_component"
+path = "fuzz_targets/text_component.rs"
+doc = false
