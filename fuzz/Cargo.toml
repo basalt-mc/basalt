@@ -1,0 +1,40 @@
+[package]
+name = "basalt-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+basalt-types = { path = "../crates/basalt-types" }
+
+# Prevent this from interfering with workspaces
+[workspace]
+
+[[bin]]
+name = "fuzz_varint"
+path = "fuzz_targets/varint.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_string"
+path = "fuzz_targets/string.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_nbt"
+path = "fuzz_targets/nbt.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_slot"
+path = "fuzz_targets/slot.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_opaque"
+path = "fuzz_targets/opaque.rs"
+doc = false

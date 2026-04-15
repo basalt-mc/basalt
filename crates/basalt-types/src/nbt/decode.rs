@@ -59,7 +59,9 @@ fn decode_tag_payload(tag_type: u8, buf: &mut &[u8]) -> Result<NbtTag> {
                 return Err(Error::Nbt(format!("negative list length: {len}")));
             }
             let len = len as usize;
-            let mut elements = Vec::with_capacity(len);
+            // Cap allocation to remaining buffer size to prevent OOM from
+            // malicious length fields (each element is at least 1 byte)
+            let mut elements = Vec::with_capacity(len.min(buf.len()));
             for _ in 0..len {
                 elements.push(decode_tag_payload(element_type, buf)?);
             }
@@ -78,7 +80,8 @@ fn decode_tag_payload(tag_type: u8, buf: &mut &[u8]) -> Result<NbtTag> {
                 return Err(Error::Nbt(format!("negative int array length: {len}")));
             }
             let len = len as usize;
-            let mut data = Vec::with_capacity(len);
+            // Each i32 is 4 bytes — cap allocation to prevent OOM
+            let mut data = Vec::with_capacity(len.min(buf.len() / 4));
             for _ in 0..len {
                 data.push(i32::decode(buf)?);
             }
@@ -90,7 +93,8 @@ fn decode_tag_payload(tag_type: u8, buf: &mut &[u8]) -> Result<NbtTag> {
                 return Err(Error::Nbt(format!("negative long array length: {len}")));
             }
             let len = len as usize;
-            let mut data = Vec::with_capacity(len);
+            // Each i64 is 8 bytes — cap allocation to prevent OOM
+            let mut data = Vec::with_capacity(len.min(buf.len() / 8));
             for _ in 0..len {
                 data.push(i64::decode(buf)?);
             }
