@@ -61,6 +61,17 @@ pub fn decompress_packet(data: &[u8]) -> Result<Vec<u8>> {
 
     let uncompressed_size = data_length.0 as usize;
 
+    // Cap pre-allocation to prevent OOM from malicious size fields.
+    // Minecraft max packet size is ~32 MB after compression.
+    const MAX_DECOMPRESSED: usize = 32 * 1024 * 1024;
+    if uncompressed_size > MAX_DECOMPRESSED {
+        return Err(Error::Protocol(basalt_protocol::Error::Type(
+            basalt_types::Error::InvalidData(format!(
+                "decompressed size {uncompressed_size} exceeds max {MAX_DECOMPRESSED}"
+            )),
+        )));
+    }
+
     // Decompress using zlib
     let mut decompressed = Vec::with_capacity(uncompressed_size);
     let mut decoder = ZlibDecoder::new(cursor);
