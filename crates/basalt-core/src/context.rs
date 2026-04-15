@@ -26,6 +26,12 @@ pub trait Context {
     /// Returns the username of the player.
     fn player_username(&self) -> &str;
 
+    /// Returns the player's current yaw rotation (horizontal, degrees).
+    fn player_yaw(&self) -> f32;
+
+    /// Returns the player's current pitch rotation (vertical, degrees).
+    fn player_pitch(&self) -> f32;
+
     // --- Logger ---
 
     /// Returns a logger scoped to the current plugin.

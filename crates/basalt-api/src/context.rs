@@ -37,6 +37,10 @@ pub struct ServerContext {
     player_entity_id: i32,
     /// Username of the player who triggered this event.
     player_username: String,
+    /// Current yaw rotation of the player (horizontal, degrees).
+    player_yaw: f32,
+    /// Current pitch rotation of the player (vertical, degrees).
+    player_pitch: f32,
     /// Name of the plugin currently being dispatched.
     plugin_name: RefCell<String>,
     /// Registered command list (name, description) for /help.
@@ -55,6 +59,8 @@ impl ServerContext {
         player_uuid: Uuid,
         player_entity_id: i32,
         player_username: String,
+        player_yaw: f32,
+        player_pitch: f32,
     ) -> Self {
         Self {
             world,
@@ -62,6 +68,8 @@ impl ServerContext {
             player_uuid,
             player_entity_id,
             player_username,
+            player_yaw,
+            player_pitch,
             plugin_name: RefCell::new(String::new()),
             command_list: RefCell::new(Vec::new()),
             teleport_counter: &GLOBAL_TELEPORT_COUNTER,
@@ -100,6 +108,14 @@ impl Context for ServerContext {
 
     fn player_username(&self) -> &str {
         &self.player_username
+    }
+
+    fn player_yaw(&self) -> f32 {
+        self.player_yaw
+    }
+
+    fn player_pitch(&self) -> f32 {
+        self.player_pitch
     }
 
     fn logger(&self) -> PluginLogger {
@@ -255,7 +271,7 @@ mod tests {
     }
 
     fn test_ctx() -> ServerContext {
-        ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into())
+        ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into(), 0.0, 0.0)
     }
 
     #[test]

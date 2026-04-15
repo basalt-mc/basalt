@@ -90,6 +90,12 @@ mod tests {
         fn player_username(&self) -> &str {
             "Steve"
         }
+        fn player_yaw(&self) -> f32 {
+            0.0
+        }
+        fn player_pitch(&self) -> f32 {
+            0.0
+        }
         fn logger(&self) -> PluginLogger {
             PluginLogger::new("test")
         }
