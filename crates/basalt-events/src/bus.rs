@@ -147,6 +147,7 @@ impl Default for EventBus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::BusKind;
 
     // -- Test event types --
 
@@ -168,6 +169,9 @@ mod tests {
         fn as_any_mut(&mut self) -> &mut dyn Any {
             self
         }
+        fn bus_kind(&self) -> BusKind {
+            BusKind::Network
+        }
     }
 
     struct OtherEvent {
@@ -184,6 +188,9 @@ mod tests {
         }
         fn as_any_mut(&mut self) -> &mut dyn Any {
             self
+        }
+        fn bus_kind(&self) -> BusKind {
+            BusKind::Game
         }
     }
 

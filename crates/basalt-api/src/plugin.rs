@@ -6,7 +6,7 @@
 
 use basalt_command::{Arg, CommandArg, CommandArgs, Validation};
 use basalt_core::Context;
-use basalt_events::{Event, EventBus, Stage};
+use basalt_events::{BusKind, Event, EventBus, EventRouting, Stage};
 
 use crate::context::ServerContext;
 
@@ -54,27 +54,55 @@ pub struct CommandEntry {
 }
 
 /// Plugin registration interface for events and commands.
+///
+/// Holds mutable references to both the network and game event buses.
+/// Handler registration is routed automatically based on the event
+/// type's [`EventRouting::BUS`] constant — plugins do not specify
+/// which loop handles their events.
 pub struct PluginRegistrar<'a> {
-    bus: &'a mut EventBus,
+    /// Event bus for the network loop (movement, chat, commands).
+    network_bus: &'a mut EventBus,
+    /// Event bus for the game loop (blocks, world mutations).
+    game_bus: &'a mut EventBus,
+    /// Collected command entries.
     commands: &'a mut Vec<CommandEntry>,
 }
 
 impl<'a> PluginRegistrar<'a> {
-    /// Creates a new registrar.
-    pub fn new(bus: &'a mut EventBus, commands: &'a mut Vec<CommandEntry>) -> Self {
-        Self { bus, commands }
+    /// Creates a new registrar with dual event buses.
+    pub fn new(
+        network_bus: &'a mut EventBus,
+        game_bus: &'a mut EventBus,
+        commands: &'a mut Vec<CommandEntry>,
+    ) -> Self {
+        Self {
+            network_bus,
+            game_bus,
+            commands,
+        }
     }
 
-    /// Registers an event handler.
+    /// Registers an event handler on the correct bus.
+    ///
+    /// The target bus is determined at compile time by `E::BUS`:
+    /// - [`BusKind::Network`] → network loop bus
+    /// - [`BusKind::Game`] → game loop bus
     pub fn on<E>(
         &mut self,
         stage: Stage,
         priority: i32,
         handler: impl Fn(&mut E, &ServerContext) + Send + Sync + 'static,
     ) where
-        E: Event + 'static,
+        E: Event + EventRouting + 'static,
     {
-        self.bus.on::<E, ServerContext>(stage, priority, handler);
+        match E::BUS {
+            BusKind::Network => self
+                .network_bus
+                .on::<E, ServerContext>(stage, priority, handler),
+            BusKind::Game => self
+                .game_bus
+                .on::<E, ServerContext>(stage, priority, handler),
+        }
     }
 
     /// Starts building a command with typed arguments.
@@ -220,24 +248,30 @@ mod tests {
     }
 
     #[test]
-    fn registrar_registers_handler() {
-        use crate::events::ChatMessageEvent;
+    fn registrar_routes_to_correct_bus() {
+        use crate::events::{BlockBrokenEvent, ChatMessageEvent};
 
-        let mut bus = EventBus::new();
+        let mut network_bus = EventBus::new();
+        let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         {
-            let mut registrar = PluginRegistrar::new(&mut bus, &mut commands);
+            let mut registrar =
+                PluginRegistrar::new(&mut network_bus, &mut game_bus, &mut commands);
             registrar.on::<ChatMessageEvent>(Stage::Post, 0, |_event, _ctx| {});
+            registrar.on::<BlockBrokenEvent>(Stage::Process, 0, |_event, _ctx| {});
         }
-        assert_eq!(bus.handler_count(), 1);
+        assert_eq!(network_bus.handler_count(), 1);
+        assert_eq!(game_bus.handler_count(), 1);
     }
 
     #[test]
     fn command_builder_with_args() {
-        let mut bus = EventBus::new();
+        let mut network_bus = EventBus::new();
+        let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         {
-            let mut registrar = PluginRegistrar::new(&mut bus, &mut commands);
+            let mut registrar =
+                PluginRegistrar::new(&mut network_bus, &mut game_bus, &mut commands);
             registrar
                 .command("tp")
                 .description("Teleport")
@@ -254,10 +288,12 @@ mod tests {
 
     #[test]
     fn command_builder_with_variants() {
-        let mut bus = EventBus::new();
+        let mut network_bus = EventBus::new();
+        let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         {
-            let mut registrar = PluginRegistrar::new(&mut bus, &mut commands);
+            let mut registrar =
+                PluginRegistrar::new(&mut network_bus, &mut game_bus, &mut commands);
             registrar
                 .command("tp")
                 .description("Teleport")
@@ -277,10 +313,12 @@ mod tests {
 
     #[test]
     fn command_no_args() {
-        let mut bus = EventBus::new();
+        let mut network_bus = EventBus::new();
+        let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         {
-            let mut registrar = PluginRegistrar::new(&mut bus, &mut commands);
+            let mut registrar =
+                PluginRegistrar::new(&mut network_bus, &mut game_bus, &mut commands);
             registrar
                 .command("help")
                 .description("Show help")

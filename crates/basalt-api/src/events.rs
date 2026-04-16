@@ -11,23 +11,44 @@ use basalt_types::Uuid;
 
 use crate::broadcast::PlayerSnapshot;
 
-/// Implements [`Event`](basalt_events::Event) for a cancellable event struct.
+/// Implements [`Event`](basalt_events::Event) and
+/// [`EventRouting`](basalt_events::EventRouting) for a non-cancellable
+/// event dispatched on the **network** loop's bus.
 ///
-/// The struct must have a `cancelled: bool` field. Validate handlers
-/// can call `event.cancel()` to prevent Process and Post handlers
-/// from running.
-///
-/// # Example
-///
-/// ```ignore
-/// pub struct MyEvent {
-///     pub data: String,
-///     pub cancelled: bool,
-/// }
-/// basalt_api::cancellable_event!(MyEvent);
-/// ```
+/// `cancel()` is a no-op and `is_cancelled()` always returns `false`.
+/// Use for events triggered by player input that the network loop
+/// handles directly: movement, chat, commands, join/leave.
 #[macro_export]
-macro_rules! cancellable_event {
+macro_rules! network_event {
+    ($name:ident) => {
+        impl basalt_events::Event for $name {
+            fn is_cancelled(&self) -> bool {
+                false
+            }
+            fn cancel(&mut self) {}
+            fn as_any(&self) -> &dyn std::any::Any {
+                self
+            }
+            fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+                self
+            }
+            fn bus_kind(&self) -> basalt_events::BusKind {
+                basalt_events::BusKind::Network
+            }
+        }
+        impl basalt_events::EventRouting for $name {
+            const BUS: basalt_events::BusKind = basalt_events::BusKind::Network;
+        }
+    };
+}
+
+/// Implements [`Event`](basalt_events::Event) and
+/// [`EventRouting`](basalt_events::EventRouting) for a cancellable
+/// event dispatched on the **network** loop's bus.
+///
+/// The struct must have a `cancelled: bool` field.
+#[macro_export]
+macro_rules! network_cancellable_event {
     ($name:ident) => {
         impl basalt_events::Event for $name {
             fn is_cancelled(&self) -> bool {
@@ -42,24 +63,24 @@ macro_rules! cancellable_event {
             fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
                 self
             }
+            fn bus_kind(&self) -> basalt_events::BusKind {
+                basalt_events::BusKind::Network
+            }
+        }
+        impl basalt_events::EventRouting for $name {
+            const BUS: basalt_events::BusKind = basalt_events::BusKind::Network;
         }
     };
 }
 
-/// Implements [`Event`](basalt_events::Event) for a non-cancellable event struct.
+/// Implements [`Event`](basalt_events::Event) and
+/// [`EventRouting`](basalt_events::EventRouting) for a non-cancellable
+/// event dispatched on the **game** loop's bus.
 ///
-/// `cancel()` is a no-op and `is_cancelled()` always returns `false`.
-///
-/// # Example
-///
-/// ```ignore
-/// pub struct MyEvent {
-///     pub data: String,
-/// }
-/// basalt_api::event!(MyEvent);
-/// ```
+/// Use for events that require world state mutation or game logic:
+/// block changes, entity events, inventory operations.
 #[macro_export]
-macro_rules! event {
+macro_rules! game_event {
     ($name:ident) => {
         impl basalt_events::Event for $name {
             fn is_cancelled(&self) -> bool {
@@ -72,6 +93,43 @@ macro_rules! event {
             fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
                 self
             }
+            fn bus_kind(&self) -> basalt_events::BusKind {
+                basalt_events::BusKind::Game
+            }
+        }
+        impl basalt_events::EventRouting for $name {
+            const BUS: basalt_events::BusKind = basalt_events::BusKind::Game;
+        }
+    };
+}
+
+/// Implements [`Event`](basalt_events::Event) and
+/// [`EventRouting`](basalt_events::EventRouting) for a cancellable
+/// event dispatched on the **game** loop's bus.
+///
+/// The struct must have a `cancelled: bool` field.
+#[macro_export]
+macro_rules! game_cancellable_event {
+    ($name:ident) => {
+        impl basalt_events::Event for $name {
+            fn is_cancelled(&self) -> bool {
+                self.cancelled
+            }
+            fn cancel(&mut self) {
+                self.cancelled = true;
+            }
+            fn as_any(&self) -> &dyn std::any::Any {
+                self
+            }
+            fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+                self
+            }
+            fn bus_kind(&self) -> basalt_events::BusKind {
+                basalt_events::BusKind::Game
+            }
+        }
+        impl basalt_events::EventRouting for $name {
+            const BUS: basalt_events::BusKind = basalt_events::BusKind::Game;
         }
     };
 }
@@ -96,7 +154,7 @@ pub struct BlockBrokenEvent {
     /// Whether this event has been cancelled by a Validate handler.
     pub cancelled: bool,
 }
-cancellable_event!(BlockBrokenEvent);
+game_cancellable_event!(BlockBrokenEvent);
 
 /// A player placed a block.
 ///
@@ -120,7 +178,7 @@ pub struct BlockPlacedEvent {
     /// Whether this event has been cancelled by a Validate handler.
     pub cancelled: bool,
 }
-cancellable_event!(BlockPlacedEvent);
+game_cancellable_event!(BlockPlacedEvent);
 
 /// A player moved or changed look direction.
 ///
@@ -149,7 +207,7 @@ pub struct PlayerMovedEvent {
     /// Previous chunk Z before the movement.
     pub old_cz: i32,
 }
-event!(PlayerMovedEvent);
+network_event!(PlayerMovedEvent);
 
 /// A player sent a chat message.
 ///
@@ -163,7 +221,7 @@ pub struct ChatMessageEvent {
     /// Whether this event has been cancelled by a Validate handler.
     pub cancelled: bool,
 }
-cancellable_event!(ChatMessageEvent);
+network_cancellable_event!(ChatMessageEvent);
 
 /// A player issued a command (e.g., `/tp 0 64 0`).
 ///
@@ -177,7 +235,7 @@ pub struct CommandEvent {
     /// Whether this event has been cancelled by a Validate handler.
     pub cancelled: bool,
 }
-cancellable_event!(CommandEvent);
+network_cancellable_event!(CommandEvent);
 
 /// A new player has joined the server and entered the Play state.
 ///
@@ -187,7 +245,7 @@ pub struct PlayerJoinedEvent {
     /// Snapshot of the joining player's state.
     pub info: PlayerSnapshot,
 }
-event!(PlayerJoinedEvent);
+network_event!(PlayerJoinedEvent);
 
 /// A player has disconnected from the server.
 ///
@@ -201,7 +259,7 @@ pub struct PlayerLeftEvent {
     /// The leaving player's username.
     pub username: String,
 }
-event!(PlayerLeftEvent);
+network_event!(PlayerLeftEvent);
 
 #[cfg(test)]
 mod tests {
@@ -239,6 +297,23 @@ mod tests {
         };
         event.cancel(); // no-op
         assert!(!event.is_cancelled());
+    }
+
+    #[test]
+    fn event_routing_network_events() {
+        use basalt_events::{BusKind, EventRouting};
+        assert_eq!(PlayerMovedEvent::BUS, BusKind::Network);
+        assert_eq!(ChatMessageEvent::BUS, BusKind::Network);
+        assert_eq!(CommandEvent::BUS, BusKind::Network);
+        assert_eq!(PlayerJoinedEvent::BUS, BusKind::Network);
+        assert_eq!(PlayerLeftEvent::BUS, BusKind::Network);
+    }
+
+    #[test]
+    fn event_routing_game_events() {
+        use basalt_events::{BusKind, EventRouting};
+        assert_eq!(BlockBrokenEvent::BUS, BusKind::Game);
+        assert_eq!(BlockPlacedEvent::BUS, BusKind::Game);
     }
 
     #[test]
