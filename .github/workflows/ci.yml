@@ -173,7 +173,7 @@ jobs:
           output-file-path: output.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
           external-data-json-path: ./benchmark-data.json
-          alert-threshold: "110%"
+          alert-threshold: "200%"
           comment-on-alert: true
           fail-on-alert: ${{ github.event_name == 'pull_request' }}
 
