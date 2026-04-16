@@ -126,6 +126,15 @@ impl GameLoop {
                         self.ecs.despawn(eid);
                     }
                 }
+                GameInput::PlayerPosition { uuid, x, y, z } => {
+                    if let Some(eid) = self.ecs.find_by_uuid(uuid)
+                        && let Some(pos) = self.ecs.get_mut::<basalt_ecs::Position>(eid)
+                    {
+                        pos.x = x;
+                        pos.y = y;
+                        pos.z = z;
+                    }
+                }
                 GameInput::BlockDig {
                     uuid,
                     status,
