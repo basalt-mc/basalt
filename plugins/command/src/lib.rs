@@ -203,8 +203,16 @@ mod tests {
         let mut network_bus = EventBus::new();
         let mut game_bus = EventBus::new();
         let mut cmds = Vec::new();
+        let mut systems = Vec::new();
+        let mut components = Vec::new();
         {
-            let mut registrar = PluginRegistrar::new(&mut network_bus, &mut game_bus, &mut cmds);
+            let mut registrar = PluginRegistrar::new(
+                &mut network_bus,
+                &mut game_bus,
+                &mut cmds,
+                &mut systems,
+                &mut components,
+            );
             plugin.on_enable(&mut registrar);
         }
 

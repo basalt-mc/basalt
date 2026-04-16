@@ -8,6 +8,7 @@ repository.workspace = true
 [dependencies]
 basalt-core = { workspace = true }
 basalt-command = { workspace = true }
+basalt-ecs = { workspace = true }
 basalt-events = { workspace = true }
 basalt-types = { workspace = true }
 basalt-world = { workspace = true }

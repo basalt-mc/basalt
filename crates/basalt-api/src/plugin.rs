@@ -59,6 +59,20 @@ pub struct CommandEntry {
 /// Handler registration is routed automatically based on the event
 /// type's [`EventRouting::BUS`] constant — plugins do not specify
 /// which loop handles their events.
+/// A registered component type for deferred ECS registration.
+pub struct ComponentRegistration {
+    /// The TypeId of the component.
+    pub type_id: std::any::TypeId,
+    /// A function that registers the component on the Ecs.
+    pub register_fn: fn(&mut basalt_ecs::Ecs),
+}
+
+/// Plugin registration interface for events, commands, systems, and components.
+///
+/// Holds mutable references to both the network and game event buses.
+/// Handler registration is routed automatically based on the event
+/// type's [`EventRouting::BUS`] constant — plugins do not specify
+/// which loop handles their events.
 pub struct PluginRegistrar<'a> {
     /// Event bus for the network loop (movement, chat, commands).
     network_bus: &'a mut EventBus,
@@ -66,6 +80,10 @@ pub struct PluginRegistrar<'a> {
     game_bus: &'a mut EventBus,
     /// Collected command entries.
     commands: &'a mut Vec<CommandEntry>,
+    /// Collected ECS system descriptors.
+    systems: &'a mut Vec<basalt_ecs::SystemDescriptor>,
+    /// Collected component registrations.
+    components: &'a mut Vec<ComponentRegistration>,
 }
 
 impl<'a> PluginRegistrar<'a> {
@@ -74,11 +92,15 @@ impl<'a> PluginRegistrar<'a> {
         network_bus: &'a mut EventBus,
         game_bus: &'a mut EventBus,
         commands: &'a mut Vec<CommandEntry>,
+        systems: &'a mut Vec<basalt_ecs::SystemDescriptor>,
+        components: &'a mut Vec<ComponentRegistration>,
     ) -> Self {
         Self {
             network_bus,
             game_bus,
             commands,
+            systems,
+            components,
         }
     }
 
@@ -105,6 +127,46 @@ impl<'a> PluginRegistrar<'a> {
         }
     }
 
+    /// Starts building an ECS system for the game loop.
+    ///
+    /// Returns a [`SystemBuilder`](basalt_ecs::SystemBuilder) for
+    /// fluent configuration of phase, frequency, component access,
+    /// and the system runner function.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// registrar.system("gravity")
+    ///     .phase(Phase::Simulate)
+    ///     .every(1)
+    ///     .writes::<Position>()
+    ///     .writes::<Velocity>()
+    ///     .run(|ecs| { /* apply gravity */ });
+    /// ```
+    pub fn system(&mut self, name: &str) -> PluginSystemBuilder<'_, 'a> {
+        PluginSystemBuilder {
+            registrar: self,
+            builder: basalt_ecs::SystemBuilder::new(name),
+        }
+    }
+
+    /// Registers a custom component type in the ECS.
+    ///
+    /// The component is registered on the Ecs after all plugins
+    /// are enabled. Core components (Position, Velocity, etc.) are
+    /// registered automatically — only call this for plugin-specific
+    /// component types.
+    pub fn component<T: basalt_ecs::Component>(&mut self) {
+        let type_id = std::any::TypeId::of::<T>();
+        // Avoid duplicates
+        if !self.components.iter().any(|c| c.type_id == type_id) {
+            self.components.push(ComponentRegistration {
+                type_id,
+                register_fn: |ecs| ecs.register_component::<T>(),
+            });
+        }
+    }
+
     /// Starts building a command with typed arguments.
     pub fn command(&mut self, name: &str) -> CommandBuilder<'_, 'a> {
         CommandBuilder {
@@ -114,6 +176,47 @@ impl<'a> PluginRegistrar<'a> {
             args: Vec::new(),
             variants: Vec::new(),
         }
+    }
+}
+
+/// Fluent builder for registering an ECS system via a plugin.
+///
+/// Wraps [`SystemBuilder`](basalt_ecs::SystemBuilder) and pushes the
+/// resulting descriptor into the registrar's system list on `run()`.
+pub struct PluginSystemBuilder<'r, 'a> {
+    registrar: &'r mut PluginRegistrar<'a>,
+    builder: basalt_ecs::SystemBuilder,
+}
+
+impl<'r, 'a> PluginSystemBuilder<'r, 'a> {
+    /// Sets which tick phase this system runs in.
+    pub fn phase(mut self, phase: basalt_ecs::Phase) -> Self {
+        self.builder = self.builder.phase(phase);
+        self
+    }
+
+    /// Sets the frequency divisor (runs when `tick % every == 0`).
+    pub fn every(mut self, every: u64) -> Self {
+        self.builder = self.builder.every(every);
+        self
+    }
+
+    /// Declares that this system reads a component type.
+    pub fn reads<T: basalt_ecs::Component>(mut self) -> Self {
+        self.builder = self.builder.reads::<T>();
+        self
+    }
+
+    /// Declares that this system writes a component type.
+    pub fn writes<T: basalt_ecs::Component>(mut self) -> Self {
+        self.builder = self.builder.writes::<T>();
+        self
+    }
+
+    /// Sets the system runner and registers the system.
+    pub fn run<F: FnMut(&mut basalt_ecs::Ecs) + Send + 'static>(self, runner: F) {
+        let descriptor = self.builder.run(runner);
+        self.registrar.systems.push(descriptor);
     }
 }
 
@@ -254,9 +357,16 @@ mod tests {
         let mut network_bus = EventBus::new();
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
+        let mut systems = Vec::new();
+        let mut components = Vec::new();
         {
-            let mut registrar =
-                PluginRegistrar::new(&mut network_bus, &mut game_bus, &mut commands);
+            let mut registrar = PluginRegistrar::new(
+                &mut network_bus,
+                &mut game_bus,
+                &mut commands,
+                &mut systems,
+                &mut components,
+            );
             registrar.on::<ChatMessageEvent>(Stage::Post, 0, |_event, _ctx| {});
             registrar.on::<BlockBrokenEvent>(Stage::Process, 0, |_event, _ctx| {});
         }
@@ -269,9 +379,16 @@ mod tests {
         let mut network_bus = EventBus::new();
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
+        let mut systems = Vec::new();
+        let mut components = Vec::new();
         {
-            let mut registrar =
-                PluginRegistrar::new(&mut network_bus, &mut game_bus, &mut commands);
+            let mut registrar = PluginRegistrar::new(
+                &mut network_bus,
+                &mut game_bus,
+                &mut commands,
+                &mut systems,
+                &mut components,
+            );
             registrar
                 .command("tp")
                 .description("Teleport")
@@ -291,9 +408,16 @@ mod tests {
         let mut network_bus = EventBus::new();
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
+        let mut systems = Vec::new();
+        let mut components = Vec::new();
         {
-            let mut registrar =
-                PluginRegistrar::new(&mut network_bus, &mut game_bus, &mut commands);
+            let mut registrar = PluginRegistrar::new(
+                &mut network_bus,
+                &mut game_bus,
+                &mut commands,
+                &mut systems,
+                &mut components,
+            );
             registrar
                 .command("tp")
                 .description("Teleport")
@@ -316,9 +440,16 @@ mod tests {
         let mut network_bus = EventBus::new();
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
+        let mut systems = Vec::new();
+        let mut components = Vec::new();
         {
-            let mut registrar =
-                PluginRegistrar::new(&mut network_bus, &mut game_bus, &mut commands);
+            let mut registrar = PluginRegistrar::new(
+                &mut network_bus,
+                &mut game_bus,
+                &mut commands,
+                &mut systems,
+                &mut components,
+            );
             registrar
                 .command("help")
                 .description("Show help")
