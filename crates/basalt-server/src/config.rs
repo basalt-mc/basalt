@@ -346,6 +346,8 @@ mod tests {
     fn default_config() {
         let config = ServerConfig::default();
         assert_eq!(config.server.bind, "0.0.0.0:25565");
+        assert_eq!(config.server.tick_rate, 20);
+        assert!(config.server.crash_on_plugin_panic);
         assert_eq!(config.world.seed, 42);
         assert_eq!(config.world.storage, StorageMode::ReadWrite);
         assert!(config.plugins.chat);
@@ -442,6 +444,18 @@ storage = "none"
         config.plugins.movement = false;
         let plugins = config.create_plugins();
         assert!(plugins.is_empty());
+    }
+
+    #[test]
+    fn parse_tick_rate_and_crash_config() {
+        let toml = r#"
+[server]
+tick_rate = 10
+crash_on_plugin_panic = false
+"#;
+        let config: ServerConfig = toml::from_str(toml).unwrap();
+        assert_eq!(config.server.tick_rate, 10);
+        assert!(!config.server.crash_on_plugin_panic);
     }
 
     #[test]

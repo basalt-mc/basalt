@@ -193,6 +193,10 @@ impl Context for ServerContext {
         });
     }
 
+    fn persist_chunk(&self, cx: i32, cz: i32) {
+        self.responses.push(Response::PersistChunk { cx, cz });
+    }
+
     fn broadcast(&self, msg: BroadcastMessage) {
         self.responses.push(Response::Broadcast(msg));
     }
@@ -259,6 +263,13 @@ pub enum Response {
         reason: u8,
         /// Associated value.
         value: f32,
+    },
+    /// Schedule a chunk for asynchronous persistence on the I/O thread.
+    PersistChunk {
+        /// Chunk X coordinate.
+        cx: i32,
+        /// Chunk Z coordinate.
+        cz: i32,
     },
 }
 

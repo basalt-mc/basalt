@@ -82,6 +82,14 @@ pub trait Context {
     /// Streams chunks around the given chunk coordinates.
     fn stream_chunks(&self, cx: i32, cz: i32);
 
+    // --- Persistence ---
+
+    /// Schedules a chunk for asynchronous persistence on the I/O thread.
+    ///
+    /// The chunk is serialized and written to disk without blocking the
+    /// game loop. This replaces direct `world().persist_chunk()` calls.
+    fn persist_chunk(&self, cx: i32, cz: i32);
+
     // --- Raw broadcast ---
 
     /// Sends a raw broadcast message to all connected players.
