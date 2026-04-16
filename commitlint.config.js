@@ -286,6 +286,24 @@ const storage = [
   'storage/region',
 ];
 
+const ecs = [
+  // Cross-module changes within basalt-ecs.
+  // Example: "feat(ecs): add in-house Entity Component System"
+  'ecs',
+
+  // ECS core: EntityId, Component trait, Ecs struct, component stores.
+  // Example: "feat(ecs/core): add typed component iteration"
+  'ecs/core',
+
+  // System scheduler: phases, dependency graph, system builder.
+  // Example: "feat(ecs/system): add parallel system dispatch"
+  'ecs/system',
+
+  // Core components: Position, Velocity, Health, etc.
+  // Example: "feat(ecs/components): add BoundingBox component"
+  'ecs/components',
+];
+
 const keywords = [
   // Root workspace configuration: Cargo.toml workspace settings, workspace-wide
   // dependency versions, cross-crate build configuration.
@@ -346,7 +364,7 @@ const keywords = [
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...keywords]],
+    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...ecs, ...keywords]],
     'scope-empty': [2, 'never'],
   },
 };
