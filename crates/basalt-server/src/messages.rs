@@ -116,6 +116,8 @@ pub enum GameInput {
         uuid: Uuid,
         /// Player display name.
         username: String,
+        /// Initial spawn position.
+        position: (f64, f64, f64),
         /// Channel for sending output packets back to this player.
         output_tx: mpsc::Sender<ServerOutput>,
     },
