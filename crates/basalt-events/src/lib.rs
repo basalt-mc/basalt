@@ -25,4 +25,4 @@ mod bus;
 mod event;
 
 pub use bus::EventBus;
-pub use event::{Event, Stage};
+pub use event::{BusKind, Event, EventRouting, Stage};

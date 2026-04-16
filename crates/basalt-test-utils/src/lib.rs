@@ -31,8 +31,10 @@ use basalt_world::World;
 pub struct PluginTestHarness {
     /// Shared world instance for the test.
     world: Arc<World>,
-    /// Event bus with registered handlers.
-    bus: EventBus,
+    /// Event bus for network events (movement, chat, commands).
+    network_bus: EventBus,
+    /// Event bus for game events (blocks, world mutations).
+    game_bus: EventBus,
     /// Collected command entries (not used in most tests, but needed for registration).
     commands: Vec<basalt_api::CommandEntry>,
 }
@@ -42,7 +44,8 @@ impl PluginTestHarness {
     pub fn new() -> Self {
         Self {
             world: Arc::new(World::new_memory(42)),
-            bus: EventBus::new(),
+            network_bus: EventBus::new(),
+            game_bus: EventBus::new(),
             commands: Vec::new(),
         }
     }
@@ -51,7 +54,8 @@ impl PluginTestHarness {
     pub fn with_world(world: Arc<World>) -> Self {
         Self {
             world,
-            bus: EventBus::new(),
+            network_bus: EventBus::new(),
+            game_bus: EventBus::new(),
             commands: Vec::new(),
         }
     }
@@ -63,7 +67,11 @@ impl PluginTestHarness {
 
     /// Registers a plugin's event handlers and commands.
     pub fn register(&mut self, plugin: impl Plugin) {
-        let mut registrar = PluginRegistrar::new(&mut self.bus, &mut self.commands);
+        let mut registrar = PluginRegistrar::new(
+            &mut self.network_bus,
+            &mut self.game_bus,
+            &mut self.commands,
+        );
         plugin.on_enable(&mut registrar);
     }
 
@@ -91,20 +99,35 @@ impl PluginTestHarness {
         )
     }
 
-    /// Dispatches an event and returns the queued responses.
+    /// Dispatches an event to the correct bus and returns queued responses.
     ///
-    /// Creates a default context, dispatches the event through the bus,
-    /// and drains the response queue.
+    /// Routes game events (BlockBroken, BlockPlaced) to the game bus
+    /// and all other events to the network bus.
     pub fn dispatch(&self, event: &mut dyn Event) -> Vec<Response> {
         let ctx = self.context();
-        self.bus.dispatch_dyn(event, &ctx);
-        ctx.drain_responses()
+        self.dispatch_routed(event, &ctx);
+        let responses = ctx.drain_responses();
+        // Execute PersistChunk responses synchronously in tests
+        for response in &responses {
+            if let Response::PersistChunk { cx, cz } = response {
+                self.world.persist_chunk(*cx, *cz);
+            }
+        }
+        responses
     }
 
     /// Dispatches an event with a specific context and returns responses.
     pub fn dispatch_with(&self, event: &mut dyn Event, ctx: &ServerContext) -> Vec<Response> {
-        self.bus.dispatch_dyn(event, ctx);
+        self.dispatch_routed(event, ctx);
         ctx.drain_responses()
+    }
+
+    /// Routes a type-erased event to the correct bus using [`Event::bus_kind()`].
+    fn dispatch_routed(&self, event: &mut dyn Event, ctx: &ServerContext) {
+        match event.bus_kind() {
+            basalt_events::BusKind::Network => self.network_bus.dispatch_dyn(event, ctx),
+            basalt_events::BusKind::Game => self.game_bus.dispatch_dyn(event, ctx),
+        }
     }
 
     /// Returns a reference to the collected command entries.

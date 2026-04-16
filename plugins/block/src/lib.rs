@@ -116,15 +116,17 @@ mod tests {
             cancelled: false,
         };
 
-        let mut bus = EventBus::new();
+        let mut network_bus = EventBus::new();
+        let mut game_bus = EventBus::new();
         // Validate handler cancels before BlockPlugin runs
         let mut cmds = Vec::new();
-        let mut registrar = basalt_api::plugin::PluginRegistrar::new(&mut bus, &mut cmds);
+        let mut registrar =
+            basalt_api::plugin::PluginRegistrar::new(&mut network_bus, &mut game_bus, &mut cmds);
         registrar.on::<BlockBrokenEvent>(Stage::Validate, 0, |event, _| {
             event.cancel();
         });
         BlockPlugin.on_enable(&mut registrar);
-        bus.dispatch(&mut event, &ctx);
+        game_bus.dispatch(&mut event, &ctx);
 
         assert_eq!(world.get_block(8, 64, 8), basalt_world::block::STONE);
         assert!(ctx.drain_responses().is_empty());
