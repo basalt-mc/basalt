@@ -396,9 +396,16 @@ mod tests {
         let mut bus = EventBus::new();
         let mut network_bus = EventBus::new();
         let mut commands = Vec::new();
+        let mut systems = Vec::new();
+        let mut components = Vec::new();
         {
-            let mut registrar =
-                basalt_api::PluginRegistrar::new(&mut network_bus, &mut bus, &mut commands);
+            let mut registrar = basalt_api::PluginRegistrar::new(
+                &mut network_bus,
+                &mut bus,
+                &mut commands,
+                &mut systems,
+                &mut components,
+            );
             basalt_plugin_block::BlockPlugin.on_enable(&mut registrar);
         }
 

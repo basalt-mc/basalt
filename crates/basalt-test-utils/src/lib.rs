@@ -67,10 +67,14 @@ impl PluginTestHarness {
 
     /// Registers a plugin's event handlers and commands.
     pub fn register(&mut self, plugin: impl Plugin) {
+        let mut systems = Vec::new();
+        let mut components = Vec::new();
         let mut registrar = PluginRegistrar::new(
             &mut self.network_bus,
             &mut self.game_bus,
             &mut self.commands,
+            &mut systems,
+            &mut components,
         );
         plugin.on_enable(&mut registrar);
     }

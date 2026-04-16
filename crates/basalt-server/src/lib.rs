@@ -99,7 +99,7 @@ impl Server {
     async fn run_with_listener(&self, listener: TcpListener) {
         let world = Arc::new(self.config.create_world());
         let plugins = self.config.create_plugins();
-        let (state, network_bus, game_bus) =
+        let (state, network_bus, game_bus, plugin_systems, plugin_components) =
             ServerState::build_for_loops(Arc::clone(&world), plugins);
 
         let channels = LoopChannels::new();
@@ -133,6 +133,7 @@ impl Server {
         // Game loop — dedicated OS thread, 20 TPS target
         // ECS with core components registered
         let mut ecs = basalt_ecs::Ecs::new();
+        // Core components
         ecs.register_component::<basalt_ecs::Position>();
         ecs.register_component::<basalt_ecs::Rotation>();
         ecs.register_component::<basalt_ecs::Velocity>();
@@ -141,6 +142,15 @@ impl Server {
         ecs.register_component::<basalt_ecs::Health>();
         ecs.register_component::<basalt_ecs::Lifetime>();
         ecs.register_component::<basalt_ecs::PlayerRef>();
+        ecs.register_component::<basalt_ecs::Inventory>();
+        // Plugin-registered components
+        for reg in &plugin_components {
+            (reg.register_fn)(&mut ecs);
+        }
+        // Plugin-registered systems
+        for system in plugin_systems {
+            ecs.add_system(system);
+        }
 
         let mut game_loop_inst = game_loop::GameLoop::new(
             game_bus,

@@ -108,6 +108,7 @@ version = "0.1.0"
 dependencies = [
  "basalt-command",
  "basalt-core",
+ "basalt-ecs",
  "basalt-events",
  "basalt-types",
  "basalt-world",
