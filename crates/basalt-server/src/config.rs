@@ -33,6 +33,21 @@ pub struct ServerSection {
     pub log_level: LogLevel,
     /// Log format: pretty (human-readable) or json (structured).
     pub log_format: LogFormat,
+    /// Global tick rate in ticks per second.
+    ///
+    /// Both the network loop and game loop run at this rate.
+    /// Sub-systems can run at lower frequencies via divisors.
+    /// Default: 20 TPS (50ms per tick).
+    pub tick_rate: u32,
+    /// Whether to crash the server on a plugin panic.
+    ///
+    /// - `true` (default): any panic in a plugin or system crashes
+    ///   the server. This is the safe default — a crashed security
+    ///   plugin should not be silently disabled.
+    /// - `false`: panicking handlers are caught and disabled. The
+    ///   server continues operating. The network loop is unaffected
+    ///   regardless of this setting.
+    pub crash_on_plugin_panic: bool,
     /// Performance tuning.
     pub performance: PerformanceSection,
 }
@@ -161,6 +176,8 @@ impl Default for ServerSection {
             bind: "0.0.0.0:25565".into(),
             log_level: LogLevel::Info,
             log_format: LogFormat::Pretty,
+            tick_rate: 20,
+            crash_on_plugin_panic: true,
             performance: PerformanceSection::default(),
         }
     }
