@@ -12,6 +12,7 @@ basalt-events = { workspace = true }
 basalt-core = { workspace = true }
 basalt-command = { workspace = true }
 basalt-api = { workspace = true }
+basalt-ecs = { workspace = true }
 basalt-net = { workspace = true }
 basalt-world = { workspace = true }
 
