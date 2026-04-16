@@ -304,6 +304,12 @@ const ecs = [
   'ecs/components',
 ];
 
+const physics = [
+  // Physics plugin: gravity, AABB collision, movement resolution.
+  // Example: "feat(physics): add AABB-vs-block collision"
+  'physics',
+];
+
 const keywords = [
   // Root workspace configuration: Cargo.toml workspace settings, workspace-wide
   // dependency versions, cross-crate build configuration.
@@ -364,7 +370,7 @@ const keywords = [
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...ecs, ...keywords]],
+    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...ecs, ...physics, ...keywords]],
     'scope-empty': [2, 'never'],
   },
 };
