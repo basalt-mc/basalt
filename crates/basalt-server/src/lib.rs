@@ -1,8 +1,10 @@
 //! Basalt Minecraft server.
 //!
 //! A lightweight Minecraft 1.21.4 server built on the Basalt protocol
-//! library. Handles the full client lifecycle from handshake through
-//! play, with plugin-based game logic loaded from `basalt.toml`.
+//! library. Uses a two-loop architecture: a network loop (movement,
+//! chat, commands) and a game loop (blocks, world mutations) on
+//! dedicated OS threads, connected by MPSC channels. Each incoming
+//! TCP connection spawns a net task that fans packets out to the loops.
 //!
 //! # Usage
 //!
@@ -16,21 +18,26 @@
 //! }
 //! ```
 
-mod chat;
+mod channels;
 pub mod config;
 mod connection;
 pub mod error;
+mod game_loop;
 mod helpers;
-mod play;
-mod player;
+mod io_thread;
+mod messages;
+mod net_task;
+mod network_loop;
 mod skin;
 mod state;
+mod tick;
 
 use std::sync::Arc;
 
 use config::ServerConfig;
 use tokio::net::TcpListener;
 
+use channels::LoopChannels;
 use state::ServerState;
 
 /// A Basalt Minecraft server instance.
@@ -60,7 +67,8 @@ impl Server {
 
     /// Starts the server and listens for connections indefinitely.
     ///
-    /// Each incoming connection is handled in its own Tokio task.
+    /// Creates the two-loop architecture with dedicated OS threads,
+    /// an I/O thread for async persistence, and crash isolation.
     /// This method never returns under normal operation.
     pub async fn run(&self) {
         self.config.init_logger();
@@ -74,11 +82,7 @@ impl Server {
         };
         log::info!(target: "basalt::server", "Listening on {}", self.config.server.bind);
 
-        let world = Arc::new(self.config.create_world());
-        let plugins = self.config.create_plugins();
-        let state = ServerState::with_world_and_plugins(world, plugins);
-
-        Self::accept_loop_with_state(listener, state).await;
+        self.run_with_listener(listener).await;
     }
 
     /// Accepts connections on the given listener with default config.
@@ -87,15 +91,69 @@ impl Server {
     /// listener directly, avoiding port conflicts.
     pub async fn accept_loop(listener: TcpListener) {
         let config = ServerConfig::default();
-        let world = Arc::new(config.create_world());
-        let plugins = config.create_plugins();
-        let state = ServerState::with_world_and_plugins(world, plugins);
-
-        Self::accept_loop_with_state(listener, state).await;
+        let server = Server::with_config(config);
+        server.run_with_listener(listener).await;
     }
 
-    /// Accepts connections with an existing server state.
-    async fn accept_loop_with_state(listener: TcpListener, state: Arc<ServerState>) {
+    /// Core server loop: creates loops, I/O thread, and accepts connections.
+    async fn run_with_listener(&self, listener: TcpListener) {
+        let world = Arc::new(self.config.create_world());
+        let plugins = self.config.create_plugins();
+        let (state, network_bus, game_bus) =
+            ServerState::build_for_loops(Arc::clone(&world), plugins);
+
+        let channels = LoopChannels::new();
+        let tps = self.config.server.tick_rate;
+        let crash_on_panic = self.config.server.crash_on_plugin_panic;
+
+        // Network loop — dedicated OS thread, guaranteed 20 TPS
+        let mut net_loop = network_loop::NetworkLoop::new(
+            network_bus,
+            Arc::clone(&world),
+            state.declare_commands.clone(),
+            state.command_args.clone(),
+            channels.network_rx,
+        );
+        // Tick loops are stopped by their Drop impl when this function returns.
+        let _network_loop = tick::TickLoop::start("network-loop", tps, move |tick| {
+            if crash_on_panic {
+                net_loop.tick(tick);
+            } else if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                net_loop.tick(tick);
+            }))
+            .is_err()
+            {
+                log::error!(target: "basalt::server", "Network loop tick {tick} panicked — continuing (crash_on_plugin_panic = false)");
+            }
+        });
+
+        // I/O thread — dedicated OS thread for async chunk persistence
+        let io_thread = io_thread::IoThread::start(Arc::clone(&world));
+
+        // Game loop — dedicated OS thread, 20 TPS target
+        let mut game_loop_inst = game_loop::GameLoop::new(
+            game_bus,
+            Arc::clone(&world),
+            channels.game_rx,
+            io_thread.sender(),
+        );
+        let _game_loop = tick::TickLoop::start("game-loop", tps, move |tick| {
+            if crash_on_panic {
+                game_loop_inst.tick(tick);
+            } else if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                game_loop_inst.tick(tick);
+            }))
+            .is_err()
+            {
+                log::error!(target: "basalt::server", "Game loop tick {tick} panicked — continuing (crash_on_plugin_panic = false)");
+            }
+        });
+
+        log::info!(target: "basalt::server", "Network loop, game loop, and I/O thread started at {tps} TPS");
+
+        // Accept connections and spawn net tasks
+        let network_tx = channels.network_tx;
+        let game_tx = channels.game_tx;
         loop {
             let (stream, addr) = match listener.accept().await {
                 Ok(conn) => conn,
@@ -107,8 +165,12 @@ impl Server {
             log::debug!(target: "basalt::connection", "[{addr}] Accepted");
 
             let state = Arc::clone(&state);
+            let network_tx = network_tx.clone();
+            let game_tx = game_tx.clone();
             tokio::spawn(async move {
-                if let Err(e) = connection::handle_connection(stream, addr, state).await {
+                if let Err(e) =
+                    connection::handle_connection(stream, addr, state, network_tx, game_tx).await
+                {
                     log::error!(target: "basalt::connection", "[{addr}] {e}");
                 }
                 log::debug!(target: "basalt::connection", "[{addr}] Closed");

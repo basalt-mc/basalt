@@ -116,6 +116,7 @@ mod tests {
         }
         fn send_block_ack(&self, _sequence: i32) {}
         fn stream_chunks(&self, _cx: i32, _cz: i32) {}
+        fn persist_chunk(&self, _cx: i32, _cz: i32) {}
         fn broadcast(&self, _msg: basalt_core::BroadcastMessage) {}
     }
 

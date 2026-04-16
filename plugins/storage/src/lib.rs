@@ -28,11 +28,11 @@ impl Plugin for StoragePlugin {
 
     fn on_enable(&self, registrar: &mut PluginRegistrar) {
         registrar.on::<BlockBrokenEvent>(Stage::Post, 10, |event, ctx| {
-            ctx.world().persist_chunk(event.x >> 4, event.z >> 4);
+            ctx.persist_chunk(event.x >> 4, event.z >> 4);
         });
 
         registrar.on::<BlockPlacedEvent>(Stage::Post, 10, |event, ctx| {
-            ctx.world().persist_chunk(event.x >> 4, event.z >> 4);
+            ctx.persist_chunk(event.x >> 4, event.z >> 4);
         });
     }
 }
