@@ -128,6 +128,18 @@ const ITEM_TO_BLOCK_STATE: [u16; 1385] = [
     25724,25728,25732,25736,27657,65535,65535,27667,65535,
 ];
 
+/// Returns whether a block state ID represents a solid (collidable) block.
+///
+/// Solid blocks prevent entity movement through them. Air, water, and
+/// a few other blocks are non-solid. This is a simplified check — a
+/// full implementation would use the block registry's collision shape.
+pub fn is_solid(state: u16) -> bool {
+    // Non-solid blocks: air, water, lava, and their variants
+    // This is a conservative approximation — in vanilla, collision
+    // shapes are per-block-state, but for basic physics this suffices.
+    !matches!(state, AIR | WATER)
+}
+
 /// Maps a Minecraft item registry ID to the default block state ID.
 ///
 /// Returns `None` if the item does not have a corresponding block

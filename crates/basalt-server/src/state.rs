@@ -69,6 +69,7 @@ impl ServerState {
                 &mut commands,
                 &mut systems,
                 &mut components,
+                std::sync::Arc::clone(&world),
             );
             for plugin in &plugins {
                 log::info!(target: "basalt::plugin", "Enabling {} v{}", plugin.metadata().name, plugin.metadata().version);

@@ -22,6 +22,7 @@ basalt-plugin-command = { path = "../../plugins/command" }
 basalt-plugin-block = { path = "../../plugins/block" }
 basalt-plugin-world = { path = "../../plugins/world" }
 basalt-plugin-storage = { path = "../../plugins/storage" }
+basalt-plugin-physics = { path = "../../plugins/physics" }
 basalt-plugin-lifecycle = { path = "../../plugins/lifecycle" }
 basalt-plugin-movement = { path = "../../plugins/movement" }
 

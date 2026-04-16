@@ -128,6 +128,7 @@ mod tests {
             &mut cmds,
             &mut systems,
             &mut components,
+            std::sync::Arc::new(basalt_world::World::new_memory(42)),
         );
         registrar.on::<BlockBrokenEvent>(Stage::Validate, 0, |event, _| {
             event.cancel();
