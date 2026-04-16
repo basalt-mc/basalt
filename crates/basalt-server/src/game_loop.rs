@@ -96,11 +96,27 @@ impl GameLoop {
                     entity_id,
                     uuid,
                     username,
+                    position,
                     output_tx,
                 } => {
                     let eid = entity_id as basalt_ecs::EntityId;
                     self.ecs.spawn_with_id(eid);
                     self.ecs.set(eid, basalt_ecs::PlayerRef { uuid, username });
+                    self.ecs.set(
+                        eid,
+                        basalt_ecs::Position {
+                            x: position.0,
+                            y: position.1,
+                            z: position.2,
+                        },
+                    );
+                    self.ecs.set(
+                        eid,
+                        basalt_ecs::BoundingBox {
+                            width: 0.6,
+                            height: 1.8,
+                        },
+                    );
                     self.ecs.set(eid, basalt_ecs::Inventory::empty());
                     self.ecs.set(eid, OutputHandle { tx: output_tx });
                     self.ecs.index_uuid(uuid, eid);
@@ -427,6 +443,7 @@ mod tests {
             entity_id,
             uuid,
             username: "Steve".into(),
+            position: (0.0, -60.0, 0.0),
             output_tx,
         });
         game_loop.tick(0);

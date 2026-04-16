@@ -183,6 +183,7 @@ async fn handle_configuration(
         entity_id,
         uuid: player_uuid,
         username: username_owned.clone(),
+        position,
         output_tx: output_tx.clone(),
     });
 
