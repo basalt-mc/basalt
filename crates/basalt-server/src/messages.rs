@@ -126,6 +126,17 @@ pub enum GameInput {
         /// UUID of the leaving player.
         uuid: Uuid,
     },
+    /// Player position update (synced from network loop for ECS).
+    PlayerPosition {
+        /// UUID of the moving player.
+        uuid: Uuid,
+        /// New X coordinate.
+        x: f64,
+        /// New Y coordinate.
+        y: f64,
+        /// New Z coordinate.
+        z: f64,
+    },
     /// Block dig (status 0 = started digging / instant break in creative).
     ///
     /// The game loop validates the action, mutates the world, and

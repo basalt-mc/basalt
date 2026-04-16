@@ -173,6 +173,12 @@ fn fan_out(
                     z: p.z,
                     on_ground: p.flags & 1 != 0,
                 });
+                let _ = game_tx.send(GameInput::PlayerPosition {
+                    uuid,
+                    x: p.x,
+                    y: p.y,
+                    z: p.z,
+                });
             }
         }
         ServerboundPlayPacket::PositionLook(p) => {
@@ -185,6 +191,12 @@ fn fan_out(
                     yaw: p.yaw,
                     pitch: p.pitch,
                     on_ground: p.flags & 1 != 0,
+                });
+                let _ = game_tx.send(GameInput::PlayerPosition {
+                    uuid,
+                    x: p.x,
+                    y: p.y,
+                    z: p.z,
                 });
             }
         }
@@ -414,7 +426,10 @@ mod tests {
         );
 
         assert!(nrx.try_recv().is_ok(), "position should go to network_tx");
-        assert!(grx.try_recv().is_err(), "position should not go to game_tx");
+        assert!(
+            grx.try_recv().is_ok(),
+            "position should go to game_tx for ECS sync"
+        );
     }
 
     #[test]
@@ -467,7 +482,7 @@ mod tests {
         );
 
         assert!(nrx.try_recv().is_ok());
-        assert!(grx.try_recv().is_err());
+        assert!(grx.try_recv().is_ok());
     }
 
     #[test]
