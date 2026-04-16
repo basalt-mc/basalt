@@ -131,11 +131,23 @@ impl Server {
         let io_thread = io_thread::IoThread::start(Arc::clone(&world));
 
         // Game loop — dedicated OS thread, 20 TPS target
+        // ECS with core components registered
+        let mut ecs = basalt_ecs::Ecs::new();
+        ecs.register_component::<basalt_ecs::Position>();
+        ecs.register_component::<basalt_ecs::Rotation>();
+        ecs.register_component::<basalt_ecs::Velocity>();
+        ecs.register_component::<basalt_ecs::BoundingBox>();
+        ecs.register_component::<basalt_ecs::EntityKind>();
+        ecs.register_component::<basalt_ecs::Health>();
+        ecs.register_component::<basalt_ecs::Lifetime>();
+        ecs.register_component::<basalt_ecs::PlayerRef>();
+
         let mut game_loop_inst = game_loop::GameLoop::new(
             game_bus,
             Arc::clone(&world),
             channels.game_rx,
             io_thread.sender(),
+            ecs,
         );
         let _game_loop = tick::TickLoop::start("game-loop", tps, move |tick| {
             if crash_on_panic {
