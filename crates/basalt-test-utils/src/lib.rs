@@ -75,6 +75,7 @@ impl PluginTestHarness {
             &mut self.commands,
             &mut systems,
             &mut components,
+            std::sync::Arc::clone(&self.world),
         );
         plugin.on_enable(&mut registrar);
     }

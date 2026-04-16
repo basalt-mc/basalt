@@ -84,6 +84,8 @@ pub struct PluginRegistrar<'a> {
     systems: &'a mut Vec<basalt_ecs::SystemDescriptor>,
     /// Collected component registrations.
     components: &'a mut Vec<ComponentRegistration>,
+    /// Shared world reference, available to all plugins.
+    world: std::sync::Arc<basalt_world::World>,
 }
 
 impl<'a> PluginRegistrar<'a> {
@@ -94,6 +96,7 @@ impl<'a> PluginRegistrar<'a> {
         commands: &'a mut Vec<CommandEntry>,
         systems: &'a mut Vec<basalt_ecs::SystemDescriptor>,
         components: &'a mut Vec<ComponentRegistration>,
+        world: std::sync::Arc<basalt_world::World>,
     ) -> Self {
         Self {
             network_bus,
@@ -101,7 +104,16 @@ impl<'a> PluginRegistrar<'a> {
             commands,
             systems,
             components,
+            world,
         }
+    }
+
+    /// Returns a shared reference to the world.
+    ///
+    /// Available to all plugins — use this to capture the world
+    /// in system closures for block access, collision checks, etc.
+    pub fn world(&self) -> std::sync::Arc<basalt_world::World> {
+        std::sync::Arc::clone(&self.world)
     }
 
     /// Registers an event handler on the correct bus.
@@ -366,6 +378,7 @@ mod tests {
                 &mut commands,
                 &mut systems,
                 &mut components,
+                std::sync::Arc::new(basalt_world::World::new_memory(42)),
             );
             registrar.on::<ChatMessageEvent>(Stage::Post, 0, |_event, _ctx| {});
             registrar.on::<BlockBrokenEvent>(Stage::Process, 0, |_event, _ctx| {});
@@ -388,6 +401,7 @@ mod tests {
                 &mut commands,
                 &mut systems,
                 &mut components,
+                std::sync::Arc::new(basalt_world::World::new_memory(42)),
             );
             registrar
                 .command("tp")
@@ -417,6 +431,7 @@ mod tests {
                 &mut commands,
                 &mut systems,
                 &mut components,
+                std::sync::Arc::new(basalt_world::World::new_memory(42)),
             );
             registrar
                 .command("tp")
@@ -449,6 +464,7 @@ mod tests {
                 &mut commands,
                 &mut systems,
                 &mut components,
+                std::sync::Arc::new(basalt_world::World::new_memory(42)),
             );
             registrar
                 .command("help")

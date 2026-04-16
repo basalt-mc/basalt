@@ -405,6 +405,7 @@ mod tests {
                 &mut commands,
                 &mut systems,
                 &mut components,
+                std::sync::Arc::clone(&world),
             );
             basalt_plugin_block::BlockPlugin.on_enable(&mut registrar);
         }

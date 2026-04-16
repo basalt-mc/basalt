@@ -168,6 +168,8 @@ pub struct PluginsSection {
     pub lifecycle: bool,
     /// Player movement broadcasts.
     pub movement: bool,
+    /// Physics simulation (gravity, AABB collision).
+    pub physics: bool,
 }
 
 impl Default for ServerSection {
@@ -209,6 +211,7 @@ impl Default for PluginsSection {
             world: true,
             lifecycle: true,
             movement: true,
+            physics: true,
         }
     }
 }
@@ -333,6 +336,9 @@ impl ServerConfig {
         if self.plugins.block && self.world.storage == StorageMode::ReadWrite {
             plugins.push(Box::new(basalt_plugin_storage::StoragePlugin));
         }
+        if self.plugins.physics {
+            plugins.push(Box::new(basalt_plugin_physics::PhysicsPlugin));
+        }
 
         plugins
     }
@@ -419,8 +425,8 @@ storage = "none"
     fn create_plugins_all_enabled() {
         let config = ServerConfig::default();
         let plugins = config.create_plugins();
-        // 7 plugins: lifecycle, chat, command, movement, world, block, storage
-        assert_eq!(plugins.len(), 7);
+        // 8 built-in plugins
+        assert_eq!(plugins.len(), 8);
     }
 
     #[test]
@@ -428,8 +434,8 @@ storage = "none"
         let mut config = ServerConfig::default();
         config.world.storage = StorageMode::ReadOnly;
         let plugins = config.create_plugins();
-        // 6 plugins: no StoragePlugin
-        assert_eq!(plugins.len(), 6);
+        // 7 plugins: no StoragePlugin (physics still enabled)
+        assert_eq!(plugins.len(), 7);
         assert!(plugins.iter().all(|p| p.metadata().name != "storage"));
     }
 
@@ -442,6 +448,7 @@ storage = "none"
         config.plugins.world = false;
         config.plugins.lifecycle = false;
         config.plugins.movement = false;
+        config.plugins.physics = false;
         let plugins = config.create_plugins();
         assert!(plugins.is_empty());
     }

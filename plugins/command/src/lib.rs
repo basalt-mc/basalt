@@ -212,6 +212,7 @@ mod tests {
                 &mut cmds,
                 &mut systems,
                 &mut components,
+                std::sync::Arc::new(basalt_world::World::new_memory(42)),
             );
             plugin.on_enable(&mut registrar);
         }

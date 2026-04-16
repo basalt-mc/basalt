@@ -11,6 +11,7 @@
 
 pub mod block;
 pub mod chunk;
+pub mod collision;
 pub mod format;
 mod generator;
 mod noise_gen;
