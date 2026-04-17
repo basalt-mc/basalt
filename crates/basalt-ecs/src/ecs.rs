@@ -512,4 +512,32 @@ mod tests {
         );
         assert_eq!(ecs.get::<Health>(e).unwrap().current, 5.0);
     }
+
+    #[test]
+    fn find_by_uuid_returns_entity() {
+        let mut ecs = Ecs::new();
+        let uuid = basalt_types::Uuid::from_bytes([1; 16]);
+        let e = ecs.spawn();
+        ecs.index_uuid(uuid, e);
+        assert_eq!(ecs.find_by_uuid(uuid), Some(e));
+    }
+
+    #[test]
+    fn find_by_uuid_returns_none_for_unknown() {
+        let ecs = Ecs::new();
+        let uuid = basalt_types::Uuid::from_bytes([1; 16]);
+        assert_eq!(ecs.find_by_uuid(uuid), None);
+    }
+
+    #[test]
+    fn despawn_cleans_uuid_index() {
+        let mut ecs = Ecs::new();
+        let uuid = basalt_types::Uuid::from_bytes([1; 16]);
+        let e = ecs.spawn();
+        ecs.index_uuid(uuid, e);
+        assert!(ecs.find_by_uuid(uuid).is_some());
+
+        ecs.despawn(e);
+        assert!(ecs.find_by_uuid(uuid).is_none());
+    }
 }

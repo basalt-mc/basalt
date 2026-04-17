@@ -40,7 +40,7 @@ pub fn build_chat_component(username: &str, message: &str) -> TextComponent {
 #[cfg(test)]
 mod tests {
     use basalt_api::Response;
-    use basalt_test_utils::PluginTestHarness;
+    use basalt_testkit::PluginTestHarness;
 
     use super::*;
 
@@ -61,5 +61,38 @@ mod tests {
             responses[0],
             Response::Broadcast(BroadcastMessage::Chat { .. })
         ));
+    }
+
+    #[test]
+    fn cancelled_chat_produces_no_response() {
+        let mut harness = PluginTestHarness::new();
+        harness.on::<ChatMessageEvent>(Stage::Validate, 0, |event, _ctx| {
+            event.cancel();
+        });
+        harness.register(ChatPlugin);
+
+        let mut event = ChatMessageEvent {
+            username: "Steve".into(),
+            message: "spam".into(),
+            cancelled: false,
+        };
+
+        let responses = harness.dispatch(&mut event);
+        assert!(responses.is_empty());
+    }
+
+    #[test]
+    fn empty_message_still_broadcasts() {
+        let mut harness = PluginTestHarness::new();
+        harness.register(ChatPlugin);
+
+        let mut event = ChatMessageEvent {
+            username: "Steve".into(),
+            message: String::new(),
+            cancelled: false,
+        };
+
+        let responses = harness.dispatch(&mut event);
+        assert_eq!(responses.len(), 1);
     }
 }
