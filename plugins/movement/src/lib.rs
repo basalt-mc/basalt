@@ -38,7 +38,7 @@ impl Plugin for MovementPlugin {
 #[cfg(test)]
 mod tests {
     use basalt_api::Response;
-    use basalt_test_utils::PluginTestHarness;
+    use basalt_testkit::PluginTestHarness;
 
     use super::*;
 

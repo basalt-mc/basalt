@@ -101,22 +101,29 @@ Provides the command argument system used by the fluent builder:
 ```
 crates/basalt-server/
 ├── src/
-│   ├── lib.rs           # Server struct, accept loop, game loop + I/O thread startup
-│   ├── state.rs         # ServerState: entity ID counter, command dispatch, DeclareCommands
-│   ├── config.rs        # ServerConfig: TOML config, plugin flags, tick_rate, crash_on_plugin_panic
-│   ├── connection.rs    # Per-player lifecycle: handshake → login → config → net task
-│   ├── game_loop.rs     # Game loop (20 TPS): movement, blocks, chunks, ECS systems, lifecycle
-│   ├── net_task.rs      # Per-player net task: TCP I/O, instant chat/commands, game loop forwarding
-│   ├── channels.rs      # SharedState: game channel, broadcast, player registry
-│   ├── messages.rs      # GameInput, ServerOutput enums
-│   ├── io_thread.rs     # Dedicated I/O thread for async chunk persistence
-│   ├── tick.rs          # TickLoop: fixed-rate OS thread with drift correction
-│   ├── skin.rs          # Mojang API skin fetching
-│   └── helpers.rs       # angle_to_byte, RawPayload wrapper
+│   ├── lib.rs               # Server struct, startup orchestration
+│   ├── config.rs            # ServerConfig: TOML, plugin flags, tick_rate, crash_on_plugin_panic
+│   ├── error.rs             # Error type
+│   ├── messages.rs          # GameInput, ServerOutput enums (shared between net/ and game/)
+│   ├── helpers.rs           # angle_to_byte, RawPayload
+│   ├── state.rs             # ServerState: entity ID counter, DeclareCommands builder
+│   ├── net/
+│   │   ├── mod.rs
+│   │   ├── connection.rs    # Handshake → Login → Config → net task
+│   │   ├── task.rs          # Per-player net task: TCP I/O, instant chat/commands
+│   │   ├── channels.rs      # SharedState: game channel, broadcast, player registry
+│   │   └── skin.rs          # Mojang API skin fetching
+│   ├── game/
+│   │   ├── mod.rs
+│   │   └── tick.rs          # Game loop (20 TPS): movement, blocks, chunks, ECS, lifecycle
+│   └── runtime/
+│       ├── mod.rs
+│       ├── tick.rs          # TickLoop: fixed-rate OS thread with drift correction
+│       └── io_thread.rs     # Dedicated I/O thread for async chunk persistence
 ├── examples/
-│   └── server.rs        # 14-line launcher: Server::new("0.0.0.0:25565").run().await
+│   └── server.rs            # 14-line launcher
 └── tests/
-    └── e2e.rs           # End-to-end tests: status, login, chat, commands, multi-player
+    └── e2e.rs               # End-to-end tests: status, login, chat, commands, blocks, multi-player
 ```
 
 ### Server architecture
@@ -159,11 +166,15 @@ crates/basalt-server/
 ```
 crates/basalt-world/
 ├── src/
-│   ├── lib.rs           # World: chunk cache (HashMap behind Mutex) + generator
+│   ├── lib.rs           # Module declarations, re-exports
+│   ├── world.rs         # World: DashMap chunk cache, LRU eviction, lazy generation
 │   ├── chunk.rs         # ChunkColumn: 24 sections, set/get block, to_packet()
 │   ├── palette.rs       # PalettedContainer: single-value + indirect palette encoding
+│   ├── collision.rs     # AABB collision, ray_cast, resolve_movement
+│   ├── block.rs         # Block state IDs, is_solid()
+│   ├── format.rs        # BSR chunk serialization (bitmap + sections)
 │   ├── generator.rs     # FlatWorldGenerator: bedrock/dirt/grass layers
-│   └── block.rs         # Block state IDs (AIR, STONE, DIRT, GRASS_BLOCK, BEDROCK)
+│   └── noise_gen.rs     # NoiseTerrainGenerator: Perlin noise terrain
 ```
 
 - `World::get_chunk_packet(cx, cz)` generates on first access, caches in memory
