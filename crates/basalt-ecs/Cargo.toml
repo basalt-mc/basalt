@@ -7,5 +7,7 @@ repository.workspace = true
 
 [dependencies]
 basalt-types = { workspace = true }
-basalt-core = { workspace = true }
 log = { workspace = true }
+
+[[bench]]
+name = "ecs"

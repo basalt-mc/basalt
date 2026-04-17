@@ -142,6 +142,8 @@ jobs:
             crate: basalt-types
           - bench: chunk
             crate: basalt-world
+          - bench: ecs
+            crate: basalt-ecs
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
