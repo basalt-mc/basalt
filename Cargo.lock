@@ -146,7 +146,6 @@ dependencies = [
 name = "basalt-ecs"
 version = "0.1.0"
 dependencies = [
- "basalt-core",
  "basalt-types",
  "log",
 ]
@@ -173,7 +172,7 @@ name = "basalt-plugin-block"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-test-utils",
+ "basalt-testkit",
  "basalt-types",
  "basalt-world",
 ]
@@ -183,7 +182,7 @@ name = "basalt-plugin-chat"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-test-utils",
+ "basalt-testkit",
  "basalt-types",
 ]
 
@@ -192,7 +191,7 @@ name = "basalt-plugin-command"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-test-utils",
+ "basalt-testkit",
  "basalt-types",
 ]
 
@@ -201,7 +200,7 @@ name = "basalt-plugin-lifecycle"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-test-utils",
+ "basalt-testkit",
  "basalt-types",
 ]
 
@@ -210,7 +209,7 @@ name = "basalt-plugin-movement"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-test-utils",
+ "basalt-testkit",
 ]
 
 [[package]]
@@ -229,7 +228,7 @@ version = "0.1.0"
 dependencies = [
  "basalt-api",
  "basalt-plugin-block",
- "basalt-test-utils",
+ "basalt-testkit",
  "basalt-types",
  "basalt-world",
  "tempfile",
@@ -240,7 +239,7 @@ name = "basalt-plugin-world"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-test-utils",
+ "basalt-testkit",
  "basalt-world",
 ]
 
@@ -296,7 +295,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "basalt-test-utils"
+name = "basalt-testkit"
 version = "0.1.0"
 dependencies = [
  "basalt-api",

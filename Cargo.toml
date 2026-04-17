@@ -22,7 +22,7 @@ basalt-command = { path = "crates/basalt-command" }
 basalt-events = { path = "crates/basalt-events" }
 basalt-storage = { path = "crates/basalt-storage" }
 basalt-ecs = { path = "crates/basalt-ecs" }
-basalt-test-utils = { path = "crates/basalt-test-utils" }
+basalt-testkit = { path = "crates/basalt-testkit" }
 
 # Error handling
 thiserror = "2"
