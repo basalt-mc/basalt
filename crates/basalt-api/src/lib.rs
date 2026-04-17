@@ -26,11 +26,13 @@ pub mod prelude {
     pub use basalt_command::{Arg, CommandArgs, Validation};
     pub use basalt_core::{BroadcastMessage, Context, Gamemode, PlayerSnapshot};
 
-    pub use crate::context::ServerContext;
+    pub use basalt_types::Uuid;
+
+    pub use crate::context::{Response, ServerContext};
     pub use crate::events::{
         BlockBrokenEvent, BlockPlacedEvent, ChatMessageEvent, CommandEvent, PlayerJoinedEvent,
         PlayerLeftEvent, PlayerMovedEvent,
     };
     pub use crate::plugin::{Plugin, PluginMetadata, PluginRegistrar};
-    pub use basalt_events::Stage;
+    pub use basalt_events::{Event, Stage};
 }

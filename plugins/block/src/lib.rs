@@ -6,9 +6,6 @@
 use basalt_api::prelude::*;
 
 /// Handles block breaking and placing in the world.
-///
-/// - **Process**: sets the block in the world (AIR for break, block_state for place)
-/// - **Post**: sends acknowledgement and broadcasts the change
 pub struct BlockPlugin;
 
 impl Plugin for BlockPlugin {
@@ -58,10 +55,7 @@ impl Plugin for BlockPlugin {
 
 #[cfg(test)]
 mod tests {
-    use basalt_api::context::ServerContext;
-    use basalt_api::{Event, EventBus, Response};
     use basalt_test_utils::PluginTestHarness;
-    use basalt_types::Uuid;
 
     use super::*;
 
@@ -82,14 +76,12 @@ mod tests {
             cancelled: false,
         };
 
-        let ctx = harness.context();
-        let responses = harness.dispatch_with(&mut event, &ctx);
+        let responses = harness.dispatch(&mut event);
 
         assert_eq!(
             harness.world().get_block(5, 64, 3),
             basalt_world::block::AIR
         );
-
         assert_eq!(responses.len(), 2);
         assert!(matches!(
             responses[0],
@@ -103,10 +95,17 @@ mod tests {
 
     #[test]
     fn cancelled_block_break_skips_mutation() {
-        let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
-        world.set_block(8, 64, 8, basalt_world::block::STONE);
+        let mut harness = PluginTestHarness::new();
+        harness
+            .world()
+            .set_block(8, 64, 8, basalt_world::block::STONE);
 
-        let ctx = ServerContext::new(world.clone(), Uuid::default(), 1, "Steve".into(), 0.0, 0.0);
+        // Register a Validate handler that cancels before BlockPlugin runs
+        harness.on::<BlockBrokenEvent>(Stage::Validate, 0, |event, _ctx| {
+            event.cancel();
+        });
+        harness.register(BlockPlugin);
+
         let mut event = BlockBrokenEvent {
             x: 8,
             y: 64,
@@ -116,27 +115,12 @@ mod tests {
             cancelled: false,
         };
 
-        let mut instant_bus = EventBus::new();
-        let mut game_bus = EventBus::new();
-        // Validate handler cancels before BlockPlugin runs
-        let mut cmds = Vec::new();
-        let mut systems = Vec::new();
-        let mut components = Vec::new();
-        let mut registrar = basalt_api::plugin::PluginRegistrar::new(
-            &mut instant_bus,
-            &mut game_bus,
-            &mut cmds,
-            &mut systems,
-            &mut components,
-            std::sync::Arc::new(basalt_world::World::new_memory(42)),
-        );
-        registrar.on::<BlockBrokenEvent>(Stage::Validate, 0, |event, _| {
-            event.cancel();
-        });
-        BlockPlugin.on_enable(&mut registrar);
-        game_bus.dispatch(&mut event, &ctx);
+        let responses = harness.dispatch(&mut event);
 
-        assert_eq!(world.get_block(8, 64, 8), basalt_world::block::STONE);
-        assert!(ctx.drain_responses().is_empty());
+        assert_eq!(
+            harness.world().get_block(8, 64, 8),
+            basalt_world::block::STONE
+        );
+        assert!(responses.is_empty());
     }
 }
