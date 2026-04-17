@@ -35,7 +35,8 @@ basalt-derive → basalt-protocol → basalt-net → basalt-server → plugins/*
 | `basalt-api` | Public plugin API: `Plugin` trait, `ServerContext` (impl Context), events, `PluginRegistrar` | `basalt-core`, `basalt-command`, `basalt-events` |
 | `basalt-world` | World generation, chunk storage, paletted containers, block state registry | `basalt-types`, `basalt-protocol`, `basalt-storage` |
 | `basalt-storage` | BSR region file format with LZ4 compression for chunk persistence | `lz4_flex` |
-| `basalt-server` | Server runtime: connection lifecycle, play loop, plugin registration, DeclareCommands | `basalt-api`, `basalt-net`, all plugin crates |
+| `basalt-ecs` | In-house Entity Component System: entities, components, systems, UUID index | `basalt-types` |
+| `basalt-server` | Server runtime: game loop, net tasks, I/O thread, plugin registration | `basalt-api`, `basalt-ecs`, `basalt-net`, all plugin crates |
 | `xtask` | Code generation from minecraft-data JSON → Rust packet structs | `serde_json` |
 
 Plugin crates under `plugins/`:
@@ -49,6 +50,7 @@ Plugin crates under `plugins/`:
 | `basalt-plugin-storage` | Chunk persistence to disk after block changes |
 | `basalt-plugin-lifecycle` | Player join/leave broadcast |
 | `basalt-plugin-movement` | Player position/look broadcast |
+| `basalt-plugin-physics` | Gravity, AABB collision, movement resolution (ECS system) |
 
 - `basalt-core` provides the `Context` trait (shared abstraction for in-game and future console contexts) and shared types (`BroadcastMessage`, `PlayerSnapshot`, `PluginLogger`).
 - `basalt-command` provides typed argument API (`Arg`, `Validation`, `CommandArg`, `CommandArgs`, parsing with variant support) and the `Command` trait. Depends on `basalt-core`, NOT on `basalt-api` (no circular dependency).
@@ -99,13 +101,16 @@ Provides the command argument system used by the fluent builder:
 ```
 crates/basalt-server/
 ├── src/
-│   ├── lib.rs           # Server struct, public API, accept loop
-│   ├── state.rs         # ServerState: player registry, EventBus, DeclareCommands, command dispatch
-│   ├── config.rs        # ServerConfig: TOML config, plugin flags, storage mode, world settings
-│   ├── connection.rs    # Per-player lifecycle: handshake → login → config → play
-│   ├── play.rs          # Play loop: packet_to_event → dispatch → execute_responses, TabComplete
-│   ├── player.rs        # PlayerState: position, rotation, inventory, keep-alive
-│   ├── chat.rs          # Chat formatting helpers (send_welcome, send_system_message)
+│   ├── lib.rs           # Server struct, accept loop, game loop + I/O thread startup
+│   ├── state.rs         # ServerState: entity ID counter, command dispatch, DeclareCommands
+│   ├── config.rs        # ServerConfig: TOML config, plugin flags, tick_rate, crash_on_plugin_panic
+│   ├── connection.rs    # Per-player lifecycle: handshake → login → config → net task
+│   ├── game_loop.rs     # Game loop (20 TPS): movement, blocks, chunks, ECS systems, lifecycle
+│   ├── net_task.rs      # Per-player net task: TCP I/O, instant chat/commands, game loop forwarding
+│   ├── channels.rs      # SharedState: game channel, broadcast, player registry
+│   ├── messages.rs      # GameInput, ServerOutput enums
+│   ├── io_thread.rs     # Dedicated I/O thread for async chunk persistence
+│   ├── tick.rs          # TickLoop: fixed-rate OS thread with drift correction
 │   ├── skin.rs          # Mojang API skin fetching
 │   └── helpers.rs       # angle_to_byte, RawPayload wrapper
 ├── examples/
@@ -114,11 +119,14 @@ crates/basalt-server/
     └── e2e.rs           # End-to-end tests: status, login, chat, commands, multi-player
 ```
 
-### Event-driven architecture
+### Server architecture
 
-- Packets are converted to typed events via `packet_to_event()`, dispatched through staged handlers, and responses executed asynchronously via `execute_responses()`
-- Handlers are sync. They interact with the server through `ServerContext` methods which queue deferred responses
-- 6 built-in plugins under `plugins/`, each implementing `Plugin`:
+- **Game loop** (single dedicated OS thread, 20 TPS): handles all tick-based simulation — movement broadcasting, block operations, chunk streaming, player lifecycle, ECS systems (physics, AI). Owns the ECS and world.
+- **Net tasks** (one tokio task per player): handle TCP I/O, keep-alive, tab-complete. Instant events (chat, commands) are dispatched directly in the net task via `Arc<EventBus>` for zero latency. Game-relevant packets are forwarded to the game loop via channel.
+- **I/O thread** (dedicated OS thread): receives chunk persist requests via channel, writes BSR region files without blocking the game loop.
+- Two event buses: **instant bus** (chat, commands — dispatched in net tasks) and **game bus** (blocks, movement, lifecycle — dispatched in game loop).
+- Handlers are sync. They interact with the server through `ServerContext` methods which queue deferred responses.
+- 8 built-in plugins under `plugins/`, each implementing `Plugin`:
 
 | Plugin | Events | Stages |
 |--------|--------|--------|
@@ -129,19 +137,22 @@ crates/basalt-server/
 | `WorldPlugin` | PlayerMoved | Process: chunk streaming |
 | `BlockPlugin` | BlockBroken, BlockPlaced | Process: world mutation, Post: ack + broadcast |
 | `StoragePlugin` | BlockBroken, BlockPlaced | Post: persist chunk (priority 10) |
+| `PhysicsPlugin` | (ECS system) | Simulate: gravity, AABB collision, movement resolution |
 
 - Plugins are registered at startup via `Plugin::on_enable(&mut PluginRegistrar)`
 - Commands are registered via the fluent builder: `.command("tp").arg("pos", Arg::Vec3).variant(...).handler(...)`
+- ECS systems are registered via: `registrar.system("physics").phase(Phase::Simulate).writes::<Position>().run(fn)`
 - The server collects all commands, builds the DeclareCommands Brigadier tree (with trie merging), and registers a unified CommandEvent dispatch handler
-- Non-event packets (keep-alive, teleport confirm, inventory updates) stay inline in the play loop
+- Non-event packets (keep-alive, teleport confirm, inventory updates) stay inline in the net task
 - External plugins use the exact same API as built-in ones — no backdoor
 
 ### Multi-player architecture
 
-- `ServerState` holds a `DashMap` player registry (lock-free), an atomic entity ID counter, a `tokio::sync::broadcast` channel, the `World`, and the `EventBus`
-- Each player subscribes to the broadcast channel on join and polls it in the play loop's third `select!` branch
-- `broadcast()` is O(1) fan-out — receivers filter their own messages (join, movement)
-- Join/leave lifecycle is dispatched through the event bus; plugins queue broadcast responses
+- The game loop owns the ECS with all player entities (Position, Rotation, BoundingBox, Inventory, PlayerRef, SkinData, ChunkView, OutputHandle)
+- Player lifecycle (connect, disconnect) is handled by the game loop: entity spawn/despawn, initial world data, join/leave broadcasts
+- Movement is tick-based: net task forwards Position packets → game loop updates ECS + broadcasts to other players
+- Instant events (chat, commands) bypass the game loop entirely — dispatched in the net task via `Arc<EventBus>` with broadcast channel for fan-out
+- `SharedState` holds: game channel, broadcast sender, player registry (`DashMap<Uuid, Sender>`) for targeted sending
 
 ### basalt-world architecture
 
