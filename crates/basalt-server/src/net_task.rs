@@ -1,58 +1,74 @@
-//! Per-player net task — TCP I/O, packet fan-out, and output relay.
+//! Per-player net task — TCP I/O, instant events, and game loop forwarding.
 //!
 //! Each connected player has one net task running as a tokio task.
 //! The net task:
 //! 1. Reads packets from the TCP connection
-//! 2. Classifies each packet and fans out to the network and/or game channels
-//! 3. Relays output packets from the loops back to the TCP connection
-//! 4. Handles keep-alive probes inline (not routed to any loop)
-//!
-//! The net task is the only code that touches the TCP socket. The loops
-//! communicate with it exclusively through MPSC channels.
+//! 2. Handles instant events (chat, commands) via `Arc<EventBus>` dispatch
+//! 3. Forwards game-relevant packets (movement, blocks, inventory) to the game loop
+//! 4. Relays output packets from the game loop + broadcast channel to TCP
+//! 5. Handles keep-alive and tab-complete inline
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::Instant;
 
+use basalt_api::context::{Response, ServerContext};
+use basalt_api::events::{ChatMessageEvent, CommandEvent};
+use basalt_events::EventBus;
 use basalt_net::connection::{Connection, Play};
 use basalt_protocol::packets::play::ServerboundPlayPacket;
 use basalt_protocol::packets::play::chat::{
-    ClientboundPlayTabComplete, ClientboundPlayTabCompleteMatches, ServerboundPlayTabComplete,
+    ClientboundPlaySystemChat, ClientboundPlayTabComplete, ClientboundPlayTabCompleteMatches,
+    ServerboundPlayTabComplete,
 };
 use basalt_protocol::packets::play::misc::ClientboundPlayKeepAlive;
-use basalt_types::Uuid;
-use tokio::sync::mpsc;
+use basalt_types::{Encode, EncodedSize, Uuid};
+use dashmap::DashMap;
+use tokio::sync::{broadcast, mpsc};
 
-use crate::messages::{GameInput, NetworkInput, ServerOutput};
+use crate::messages::{GameInput, ServerOutput};
 use crate::state::CommandMeta;
 
-/// Runs the per-player net task until disconnect.
-///
 /// Per-player net task configuration.
 pub(crate) struct NetTaskConfig {
     /// Player UUID.
     pub uuid: Uuid,
     /// Player display name.
     pub username: String,
-    /// Sender for the network loop.
-    pub network_tx: mpsc::UnboundedSender<NetworkInput>,
+    /// Player entity ID (for context creation).
+    pub entity_id: i32,
     /// Sender for the game loop.
     pub game_tx: mpsc::UnboundedSender<GameInput>,
+    /// Instant event bus (chat, commands). Shared across all net tasks.
+    pub instant_bus: Arc<EventBus>,
+    /// Broadcast sender for instant fan-out.
+    pub broadcast_tx: broadcast::Sender<ServerOutput>,
+    /// Player registry for targeted sending.
+    pub player_registry: Arc<DashMap<Uuid, mpsc::Sender<ServerOutput>>>,
+    /// Shared world reference for context creation.
+    pub world: Arc<basalt_world::World>,
+    /// Command metadata for tab-complete and /help.
+    pub command_args: Vec<CommandMeta>,
 }
 
-/// This function is spawned as a tokio task for each player that
-/// reaches the Play state. It handles TCP I/O, packet classification
-/// (fan-out), keep-alive supervision, and output relay.
+/// Runs the per-player net task until disconnect.
 pub(crate) async fn run_net_task(
     mut conn: Connection<Play>,
     addr: SocketAddr,
     config: NetTaskConfig,
     mut output_rx: mpsc::Receiver<ServerOutput>,
-    command_args: &[CommandMeta],
 ) -> crate::error::Result<()> {
     let uuid = config.uuid;
     let username = config.username;
-    let network_tx = config.network_tx;
+    let entity_id = config.entity_id;
     let game_tx = config.game_tx;
+    let instant_bus = config.instant_bus;
+    let broadcast_tx = config.broadcast_tx;
+    let player_registry = config.player_registry;
+    let world = config.world;
+    let command_args = config.command_args;
+
+    let mut broadcast_rx = broadcast_tx.subscribe();
     let mut keep_alive = tokio::time::interval(std::time::Duration::from_secs(15));
     keep_alive.tick().await;
 
@@ -77,25 +93,20 @@ pub(crate) async fn run_net_task(
                 conn.write_packet_typed(ClientboundPlayKeepAlive::PACKET_ID, &ka).await?;
             }
 
-            // Branch 2: Read packets from TCP and fan out
+            // Branch 2: Read packets from TCP
             result = conn.read_packet() => {
                 match result {
                     Ok(packet) => {
-                        // TabComplete is handled inline (not routed)
                         if let ServerboundPlayPacket::TabComplete(tc) = &packet {
-                            handle_tab_complete(&mut conn, command_args, tc).await?;
+                            handle_tab_complete(&mut conn, &command_args, tc).await?;
                             continue;
                         }
-                        fan_out(
-                            addr,
-                            uuid,
-                            &username,
-                            packet,
-                            &network_tx,
-                            &game_tx,
-                            &mut last_keep_alive_id,
-                            &last_keep_alive_sent,
-                        );
+                        handle_packet(
+                            addr, uuid, &username, entity_id, packet,
+                            &game_tx, &instant_bus, &broadcast_tx,
+                            &player_registry, &world, &command_args,
+                            &mut conn, &mut last_keep_alive_id, &last_keep_alive_sent,
+                        ).await?;
                     }
                     Err(basalt_net::Error::Protocol(
                         basalt_protocol::Error::UnknownPacket { id, .. }
@@ -109,17 +120,29 @@ pub(crate) async fn run_net_task(
                 }
             }
 
-            // Branch 3: Relay output from loops to TCP
+            // Branch 3: Relay output from game loop
             output = output_rx.recv() => {
                 match output {
                     Some(ServerOutput::SendPacket { id, data }) => {
                         conn.write_packet_typed(id, &crate::helpers::RawPayload(data)).await?;
                     }
                     None => {
-                        // Both loops dropped their senders — server shutting down
                         log::debug!(target: "basalt::net_task", "[{addr}] {username} output channel closed");
                         break;
                     }
+                }
+            }
+
+            // Branch 4: Receive instant broadcasts (chat)
+            result = broadcast_rx.recv() => {
+                match result {
+                    Ok(ServerOutput::SendPacket { id, data }) => {
+                        conn.write_packet_typed(id, &crate::helpers::RawPayload(data)).await?;
+                    }
+                    Err(broadcast::error::RecvError::Lagged(n)) => {
+                        log::warn!(target: "basalt::net_task", "[{addr}] {username} missed {n} broadcast messages");
+                    }
+                    Err(broadcast::error::RecvError::Closed) => break,
                 }
             }
         }
@@ -128,32 +151,26 @@ pub(crate) async fn run_net_task(
     Ok(())
 }
 
-/// Classifies a serverbound packet and sends it to the correct channel(s).
-///
-/// **Fan-out table:**
-///
-/// | Packet | Destination |
-/// |--------|------------|
-/// | Position, Look, PositionLook | network_tx |
-/// | ChatMessage, ChatCommand | network_tx |
-/// | BlockDig, BlockPlace | network_tx AND game_tx |
-/// | HeldItemSlot, SetCreativeSlot | game_tx |
-/// | TeleportConfirm | game_tx |
-/// | KeepAlive | inline (not routed) |
-/// | Flying, CustomPayload, etc. | dropped |
+/// Handles a single serverbound packet — instant or forwarded.
 #[allow(clippy::too_many_arguments)]
-fn fan_out(
+async fn handle_packet(
     addr: SocketAddr,
     uuid: Uuid,
     username: &str,
+    entity_id: i32,
     packet: ServerboundPlayPacket,
-    network_tx: &mpsc::UnboundedSender<NetworkInput>,
     game_tx: &mpsc::UnboundedSender<GameInput>,
+    instant_bus: &EventBus,
+    broadcast_tx: &broadcast::Sender<ServerOutput>,
+    player_registry: &DashMap<Uuid, mpsc::Sender<ServerOutput>>,
+    world: &Arc<basalt_world::World>,
+    command_args: &[CommandMeta],
+    conn: &mut Connection<Play>,
     last_keep_alive_id: &mut i64,
     last_keep_alive_sent: &Instant,
-) {
+) -> crate::error::Result<()> {
     match packet {
-        // -- Keep-alive: handled inline --
+        // -- Keep-alive: inline --
         ServerboundPlayPacket::KeepAlive(ka) => {
             if ka.keep_alive_id == *last_keep_alive_id {
                 let rtt = last_keep_alive_sent.elapsed();
@@ -163,27 +180,84 @@ fn fan_out(
             }
         }
 
-        // -- Network loop only: movement --
+        // -- Instant: chat --
+        ServerboundPlayPacket::ChatMessage(msg) => {
+            if msg.message.len() > 256 {
+                return Ok(());
+            }
+            log::info!(target: "basalt::net_task", "[{addr}] <{username}> {}", msg.message);
+            let ctx = ServerContext::new(
+                Arc::clone(world),
+                uuid,
+                entity_id,
+                username.to_string(),
+                0.0,
+                0.0,
+            );
+            let mut event = ChatMessageEvent {
+                username: username.to_string(),
+                message: msg.message,
+                cancelled: false,
+            };
+            instant_bus.dispatch(&mut event, &ctx);
+            process_instant_responses(
+                &ctx.drain_responses(),
+                broadcast_tx,
+                player_registry,
+                uuid,
+                conn,
+            )
+            .await?;
+        }
+
+        // -- Instant: commands --
+        ServerboundPlayPacket::ChatCommand(cmd) => {
+            log::info!(target: "basalt::net_task", "[{addr}] {username} issued /{}", cmd.command);
+            let ctx = ServerContext::new(
+                Arc::clone(world),
+                uuid,
+                entity_id,
+                username.to_string(),
+                0.0,
+                0.0,
+            );
+            ctx.set_command_list(
+                command_args
+                    .iter()
+                    .map(|c| (c.name.clone(), c.description.clone()))
+                    .collect(),
+            );
+            let mut event = CommandEvent {
+                command: cmd.command,
+                player_uuid: uuid,
+                cancelled: false,
+            };
+            instant_bus.dispatch(&mut event, &ctx);
+            process_instant_responses(
+                &ctx.drain_responses(),
+                broadcast_tx,
+                player_registry,
+                uuid,
+                conn,
+            )
+            .await?;
+        }
+
+        // -- Game loop: movement --
         ServerboundPlayPacket::Position(p) => {
             if is_valid_position(p.x, p.y, p.z) {
-                let _ = network_tx.send(NetworkInput::Position {
+                let _ = game_tx.send(GameInput::Position {
                     uuid,
                     x: p.x,
                     y: p.y,
                     z: p.z,
                     on_ground: p.flags & 1 != 0,
                 });
-                let _ = game_tx.send(GameInput::PlayerPosition {
-                    uuid,
-                    x: p.x,
-                    y: p.y,
-                    z: p.z,
-                });
             }
         }
         ServerboundPlayPacket::PositionLook(p) => {
             if is_valid_position(p.x, p.y, p.z) {
-                let _ = network_tx.send(NetworkInput::PositionLook {
+                let _ = game_tx.send(GameInput::PositionLook {
                     uuid,
                     x: p.x,
                     y: p.y,
@@ -192,16 +266,10 @@ fn fan_out(
                     pitch: p.pitch,
                     on_ground: p.flags & 1 != 0,
                 });
-                let _ = game_tx.send(GameInput::PlayerPosition {
-                    uuid,
-                    x: p.x,
-                    y: p.y,
-                    z: p.z,
-                });
             }
         }
         ServerboundPlayPacket::Look(p) => {
-            let _ = network_tx.send(NetworkInput::Look {
+            let _ = game_tx.send(GameInput::Look {
                 uuid,
                 yaw: p.yaw,
                 pitch: p.pitch,
@@ -209,25 +277,7 @@ fn fan_out(
             });
         }
 
-        // -- Network loop only: chat --
-        ServerboundPlayPacket::ChatMessage(msg) => {
-            let _ = network_tx.send(NetworkInput::ChatMessage {
-                uuid,
-                username: username.to_string(),
-                message: msg.message,
-            });
-        }
-        ServerboundPlayPacket::ChatCommand(cmd) => {
-            let _ = network_tx.send(NetworkInput::ChatCommand {
-                uuid,
-                command: cmd.command,
-            });
-        }
-
-        // -- Game loop only: blocks --
-        // No fan-out to network loop — the Minecraft client needs the ack
-        // and BlockChanged to arrive in the same tick. Splitting them across
-        // loops causes flicker. The game loop handles ack + broadcast together.
+        // -- Game loop: blocks --
         ServerboundPlayPacket::BlockDig(dig) => {
             let pos = dig.location;
             let _ = game_tx.send(GameInput::BlockDig {
@@ -250,7 +300,7 @@ fn fan_out(
             });
         }
 
-        // -- Game loop only: inventory --
+        // -- Game loop: inventory --
         ServerboundPlayPacket::HeldItemSlot(slot) => {
             let _ = game_tx.send(GameInput::HeldItemSlot {
                 uuid,
@@ -265,12 +315,12 @@ fn fan_out(
             });
         }
 
-        // -- Inline state updates (no routing) --
+        // -- Inline (no routing) --
         ServerboundPlayPacket::TeleportConfirm(_)
         | ServerboundPlayPacket::Flying(_)
         | ServerboundPlayPacket::PlayerLoaded(_) => {}
 
-        // -- Ignored packets --
+        // -- Ignored --
         ServerboundPlayPacket::CustomPayload(_)
         | ServerboundPlayPacket::PlayerInput(_)
         | ServerboundPlayPacket::TickEnd(_)
@@ -284,6 +334,94 @@ fn fan_out(
         other => {
             log::trace!(target: "basalt::net_task", "[{addr}] {username} unhandled: {:?}", std::mem::discriminant(&other));
         }
+    }
+    Ok(())
+}
+
+/// Processes responses from instant event handlers.
+///
+/// Broadcasts go to the broadcast channel (all players). Targeted
+/// messages (SendSystemChat, etc.) go directly to the player's TCP.
+async fn process_instant_responses(
+    responses: &[Response],
+    broadcast_tx: &broadcast::Sender<ServerOutput>,
+    _player_registry: &DashMap<Uuid, mpsc::Sender<ServerOutput>>,
+    _source_uuid: Uuid,
+    conn: &mut Connection<Play>,
+) -> crate::error::Result<()> {
+    for response in responses {
+        match response {
+            Response::Broadcast(basalt_api::BroadcastMessage::Chat { content }) => {
+                let data = encode_packet(
+                    ClientboundPlaySystemChat::PACKET_ID,
+                    &ClientboundPlaySystemChat {
+                        content: content.clone(),
+                        is_action_bar: false,
+                    },
+                );
+                let _ = broadcast_tx.send(data);
+            }
+            Response::SendSystemChat {
+                content,
+                action_bar,
+            } => {
+                let packet = ClientboundPlaySystemChat {
+                    content: content.clone(),
+                    is_action_bar: *action_bar,
+                };
+                conn.write_packet_typed(ClientboundPlaySystemChat::PACKET_ID, &packet)
+                    .await?;
+            }
+            Response::SendPosition {
+                teleport_id,
+                x,
+                y,
+                z,
+                yaw,
+                pitch,
+            } => {
+                use basalt_protocol::packets::play::player::ClientboundPlayPosition;
+                let packet = ClientboundPlayPosition {
+                    teleport_id: *teleport_id,
+                    x: *x,
+                    y: *y,
+                    z: *z,
+                    dx: 0.0,
+                    dy: 0.0,
+                    dz: 0.0,
+                    yaw: *yaw,
+                    pitch: *pitch,
+                    flags: 0,
+                };
+                conn.write_packet_typed(ClientboundPlayPosition::PACKET_ID, &packet)
+                    .await?;
+            }
+            Response::SendGameStateChange { reason, value } => {
+                use basalt_protocol::packets::play::player::ClientboundPlayGameStateChange;
+                let packet = ClientboundPlayGameStateChange {
+                    reason: *reason,
+                    game_mode: *value,
+                };
+                conn.write_packet_typed(ClientboundPlayGameStateChange::PACKET_ID, &packet)
+                    .await?;
+            }
+            // Game-loop concerns — not handled in instant context
+            Response::Broadcast(_)
+            | Response::SendBlockAck { .. }
+            | Response::StreamChunks { .. }
+            | Response::PersistChunk { .. } => {}
+        }
+    }
+    Ok(())
+}
+
+/// Encodes a packet struct into a [`ServerOutput::SendPacket`].
+fn encode_packet<P: Encode + EncodedSize>(packet_id: i32, packet: &P) -> ServerOutput {
+    let mut data = Vec::with_capacity(packet.encoded_size());
+    packet.encode(&mut data).expect("packet encoding failed");
+    ServerOutput::SendPacket {
+        id: packet_id,
+        data,
     }
 }
 
@@ -378,260 +516,6 @@ fn is_valid_position(x: f64, y: f64, z: f64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use basalt_protocol::packets::play::misc::ServerboundPlayKeepAlive;
-    use basalt_protocol::packets::play::player::{
-        ServerboundPlayLook, ServerboundPlayPosition, ServerboundPlayPositionLook,
-    };
-    use basalt_protocol::packets::play::world::{
-        ServerboundPlayBlockDig, ServerboundPlayBlockPlace,
-    };
-    use std::time::Instant;
-
-    fn test_channels() -> (
-        mpsc::UnboundedSender<NetworkInput>,
-        mpsc::UnboundedReceiver<NetworkInput>,
-        mpsc::UnboundedSender<GameInput>,
-        mpsc::UnboundedReceiver<GameInput>,
-    ) {
-        let (ntx, nrx) = mpsc::unbounded_channel();
-        let (gtx, grx) = mpsc::unbounded_channel();
-        (ntx, nrx, gtx, grx)
-    }
-
-    fn test_addr() -> SocketAddr {
-        "127.0.0.1:12345".parse().unwrap()
-    }
-
-    #[test]
-    fn fan_out_position_goes_to_network() {
-        let (ntx, mut nrx, gtx, mut grx) = test_channels();
-        let mut ka_id = 0i64;
-        let ka_sent = Instant::now();
-        let uuid = Uuid::default();
-
-        fan_out(
-            test_addr(),
-            uuid,
-            "Steve",
-            ServerboundPlayPacket::Position(ServerboundPlayPosition {
-                x: 1.0,
-                y: 64.0,
-                z: -3.0,
-                flags: 1,
-            }),
-            &ntx,
-            &gtx,
-            &mut ka_id,
-            &ka_sent,
-        );
-
-        assert!(nrx.try_recv().is_ok(), "position should go to network_tx");
-        assert!(
-            grx.try_recv().is_ok(),
-            "position should go to game_tx for ECS sync"
-        );
-    }
-
-    #[test]
-    fn fan_out_look_goes_to_network() {
-        let (ntx, mut nrx, gtx, mut grx) = test_channels();
-        let mut ka_id = 0i64;
-        let ka_sent = Instant::now();
-
-        fan_out(
-            test_addr(),
-            Uuid::default(),
-            "Steve",
-            ServerboundPlayPacket::Look(ServerboundPlayLook {
-                yaw: 90.0,
-                pitch: 0.0,
-                flags: 0,
-            }),
-            &ntx,
-            &gtx,
-            &mut ka_id,
-            &ka_sent,
-        );
-
-        assert!(nrx.try_recv().is_ok());
-        assert!(grx.try_recv().is_err());
-    }
-
-    #[test]
-    fn fan_out_position_look_goes_to_network() {
-        let (ntx, mut nrx, gtx, mut grx) = test_channels();
-        let mut ka_id = 0i64;
-        let ka_sent = Instant::now();
-
-        fan_out(
-            test_addr(),
-            Uuid::default(),
-            "Steve",
-            ServerboundPlayPacket::PositionLook(ServerboundPlayPositionLook {
-                x: 1.0,
-                y: 64.0,
-                z: -3.0,
-                yaw: 45.0,
-                pitch: 10.0,
-                flags: 0,
-            }),
-            &ntx,
-            &gtx,
-            &mut ka_id,
-            &ka_sent,
-        );
-
-        assert!(nrx.try_recv().is_ok());
-        assert!(grx.try_recv().is_ok());
-    }
-
-    #[test]
-    fn fan_out_chat_goes_to_network() {
-        let (ntx, mut nrx, gtx, mut grx) = test_channels();
-        let mut ka_id = 0i64;
-        let ka_sent = Instant::now();
-
-        fan_out(
-            test_addr(),
-            Uuid::default(),
-            "Steve",
-            ServerboundPlayPacket::ChatMessage(
-                basalt_protocol::packets::play::chat::ServerboundPlayChatMessage {
-                    message: "hello".into(),
-                    timestamp: 0,
-                    salt: 0,
-                    signature: None,
-                    offset: 0,
-                    acknowledged: vec![],
-                },
-            ),
-            &ntx,
-            &gtx,
-            &mut ka_id,
-            &ka_sent,
-        );
-
-        assert!(nrx.try_recv().is_ok());
-        assert!(grx.try_recv().is_err());
-    }
-
-    #[test]
-    fn fan_out_block_dig_goes_to_game_only() {
-        let (ntx, mut nrx, gtx, mut grx) = test_channels();
-        let mut ka_id = 0i64;
-        let ka_sent = Instant::now();
-
-        fan_out(
-            test_addr(),
-            Uuid::default(),
-            "Steve",
-            ServerboundPlayPacket::BlockDig(ServerboundPlayBlockDig {
-                status: 0,
-                location: basalt_types::Position::new(5, 64, 3),
-                face: 1,
-                sequence: 42,
-            }),
-            &ntx,
-            &gtx,
-            &mut ka_id,
-            &ka_sent,
-        );
-
-        assert!(
-            nrx.try_recv().is_err(),
-            "block dig should NOT go to network"
-        );
-        assert!(grx.try_recv().is_ok(), "block dig should go to game");
-    }
-
-    #[test]
-    fn fan_out_block_place_goes_to_game_only() {
-        let (ntx, mut nrx, gtx, mut grx) = test_channels();
-        let mut ka_id = 0i64;
-        let ka_sent = Instant::now();
-
-        fan_out(
-            test_addr(),
-            Uuid::default(),
-            "Steve",
-            ServerboundPlayPacket::BlockPlace(ServerboundPlayBlockPlace {
-                hand: 0,
-                location: basalt_types::Position::new(5, 63, 3),
-                direction: 1,
-                cursor_x: 0.5,
-                cursor_y: 1.0,
-                cursor_z: 0.5,
-                inside_block: false,
-                world_border_hit: false,
-                sequence: 10,
-            }),
-            &ntx,
-            &gtx,
-            &mut ka_id,
-            &ka_sent,
-        );
-
-        assert!(
-            nrx.try_recv().is_err(),
-            "block place should NOT go to network"
-        );
-        assert!(grx.try_recv().is_ok(), "block place should go to game");
-    }
-
-    #[test]
-    fn fan_out_keep_alive_handled_inline() {
-        let (ntx, mut nrx, gtx, mut grx) = test_channels();
-        let mut ka_id = 5i64;
-        let ka_sent = Instant::now();
-
-        fan_out(
-            test_addr(),
-            Uuid::default(),
-            "Steve",
-            ServerboundPlayPacket::KeepAlive(ServerboundPlayKeepAlive { keep_alive_id: 5 }),
-            &ntx,
-            &gtx,
-            &mut ka_id,
-            &ka_sent,
-        );
-
-        assert!(
-            nrx.try_recv().is_err(),
-            "keep-alive should not go to any channel"
-        );
-        assert!(
-            grx.try_recv().is_err(),
-            "keep-alive should not go to any channel"
-        );
-    }
-
-    #[test]
-    fn fan_out_invalid_position_dropped() {
-        let (ntx, mut nrx, gtx, _grx) = test_channels();
-        let mut ka_id = 0i64;
-        let ka_sent = Instant::now();
-
-        fan_out(
-            test_addr(),
-            Uuid::default(),
-            "Steve",
-            ServerboundPlayPacket::Position(ServerboundPlayPosition {
-                x: f64::NAN,
-                y: 64.0,
-                z: 0.0,
-                flags: 0,
-            }),
-            &ntx,
-            &gtx,
-            &mut ka_id,
-            &ka_sent,
-        );
-
-        assert!(
-            nrx.try_recv().is_err(),
-            "invalid position should be dropped"
-        );
-    }
 
     #[test]
     fn is_valid_position_checks() {
