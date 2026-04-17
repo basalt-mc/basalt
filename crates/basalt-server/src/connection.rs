@@ -2,12 +2,13 @@
 //!
 //! Manages the full lifecycle of a client connection: Handshake →
 //! Status or Login → Configuration → Play. After reaching Play state,
-//! creates per-player channels, notifies both loops, and starts the
-//! net task for packet fan-out and output relay.
+//! creates per-player channels, notifies the game loop, registers in
+//! the player registry, and starts the net task.
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use basalt_events::EventBus;
 use basalt_net::connection::{Connection, Handshake, HandshakeResult};
 use basalt_protocol::packets::configuration::ClientboundConfigurationRegistryData;
 use basalt_protocol::packets::login::{ClientboundLoginSuccess, ServerboundLoginPacket};
@@ -15,10 +16,12 @@ use basalt_protocol::packets::status::{
     ClientboundStatusPing, ClientboundStatusServerInfo, ServerboundStatusPacket,
 };
 use basalt_protocol::registry_data::build_default_registries;
-use tokio::sync::mpsc;
+use basalt_types::Uuid;
+use dashmap::DashMap;
+use tokio::sync::{broadcast, mpsc};
 
 use crate::channels::player_output_channel;
-use crate::messages::{GameInput, NetworkInput};
+use crate::messages::{GameInput, ServerOutput};
 use crate::state::ServerState;
 
 /// JSON response for the server list ping.
@@ -39,17 +42,16 @@ const SERVER_STATUS: &str = r#"{
 }"#;
 
 /// Handles a new TCP connection from start to finish.
-///
-/// Reads the handshake to determine whether this is a status ping or
-/// a login attempt, then delegates to the appropriate handler. Login
-/// connections proceed through Configuration and into a net task wired
-/// to the network and game loops.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn handle_connection(
     stream: tokio::net::TcpStream,
     addr: SocketAddr,
     state: Arc<ServerState>,
-    network_tx: mpsc::UnboundedSender<NetworkInput>,
     game_tx: mpsc::UnboundedSender<GameInput>,
+    instant_bus: Arc<EventBus>,
+    broadcast_tx: broadcast::Sender<ServerOutput>,
+    player_registry: Arc<DashMap<Uuid, mpsc::Sender<ServerOutput>>>,
+    world: Arc<basalt_world::World>,
 ) -> crate::error::Result<()> {
     let conn = Connection::<Handshake>::accept(stream);
 
@@ -60,7 +62,17 @@ pub(crate) async fn handle_connection(
         }
         HandshakeResult::Login(conn, handshake) => {
             log::info!(target: "basalt::connection", "[{addr}] Login (protocol {})", handshake.protocol_version);
-            handle_login(conn, addr, state, network_tx, game_tx).await
+            handle_login(
+                conn,
+                addr,
+                state,
+                game_tx,
+                instant_bus,
+                broadcast_tx,
+                player_registry,
+                world,
+            )
+            .await
         }
     }
 }
@@ -93,12 +105,16 @@ async fn handle_status(
 }
 
 /// Handles Login → Configuration → Play, then starts the net task.
+#[allow(clippy::too_many_arguments)]
 async fn handle_login(
     mut conn: Connection<basalt_net::connection::Login>,
     addr: SocketAddr,
     state: Arc<ServerState>,
-    network_tx: mpsc::UnboundedSender<NetworkInput>,
     game_tx: mpsc::UnboundedSender<GameInput>,
+    instant_bus: Arc<EventBus>,
+    broadcast_tx: broadcast::Sender<ServerOutput>,
+    player_registry: Arc<DashMap<Uuid, mpsc::Sender<ServerOutput>>>,
+    world: Arc<basalt_world::World>,
 ) -> crate::error::Result<()> {
     let (username, player_uuid) = match conn.read_packet().await? {
         ServerboundLoginPacket::LoginStart(login) => {
@@ -126,23 +142,29 @@ async fn handle_login(
         &username,
         player_uuid,
         state,
-        network_tx,
         game_tx,
+        instant_bus,
+        broadcast_tx,
+        player_registry,
+        world,
     )
     .await
 }
 
 /// Handles Configuration, then creates channels and starts the net task.
+#[allow(clippy::too_many_arguments)]
 async fn handle_configuration(
     mut conn: Connection<basalt_net::connection::Configuration>,
     addr: SocketAddr,
     username: &str,
-    player_uuid: basalt_types::Uuid,
+    player_uuid: Uuid,
     state: Arc<ServerState>,
-    network_tx: mpsc::UnboundedSender<NetworkInput>,
     game_tx: mpsc::UnboundedSender<GameInput>,
+    instant_bus: Arc<EventBus>,
+    broadcast_tx: broadcast::Sender<ServerOutput>,
+    player_registry: Arc<DashMap<Uuid, mpsc::Sender<ServerOutput>>>,
+    world: Arc<basalt_world::World>,
 ) -> crate::error::Result<()> {
-    // Fetch skin in parallel with registry exchange
     let skin_username = username.to_string();
     let skin_task =
         tokio::spawn(async move { crate::skin::fetch_skin_properties(&skin_username).await });
@@ -160,56 +182,47 @@ async fn handle_configuration(
     let entity_id = state.next_entity_id();
     let spawn_y = state.world.spawn_y();
 
-    // Create per-player output channel
     let (output_tx, output_rx) = player_output_channel();
-
     let position = (0.0, spawn_y, 0.0);
     let username_owned = username.to_string();
 
-    // Notify the network loop
-    let _ = network_tx.send(NetworkInput::PlayerConnected {
+    // Register in the player registry (for instant targeted sending)
+    player_registry.insert(player_uuid, output_tx.clone());
+
+    // Notify the game loop — it spawns the ECS entity and sends initial world
+    let _ = game_tx.send(GameInput::PlayerConnected {
         entity_id,
         uuid: player_uuid,
         username: username_owned.clone(),
-        skin_properties: skin_properties.clone(),
+        skin_properties,
         position,
         yaw: 0.0,
         pitch: 0.0,
         output_tx: output_tx.clone(),
     });
 
-    // Notify the game loop
-    let _ = game_tx.send(GameInput::PlayerConnected {
-        entity_id,
-        uuid: player_uuid,
-        username: username_owned.clone(),
-        position,
-        output_tx: output_tx.clone(),
-    });
-
     log::info!(target: "basalt::connection", "[{addr}] {username} joined (entity {entity_id}), starting net task");
 
-    // Run the net task — blocks until disconnect
     let result = crate::net_task::run_net_task(
         conn,
         addr,
         crate::net_task::NetTaskConfig {
             uuid: player_uuid,
-            username: username_owned.clone(),
-            network_tx: network_tx.clone(),
+            username: username_owned,
+            entity_id,
             game_tx: game_tx.clone(),
+            instant_bus,
+            broadcast_tx,
+            player_registry: Arc::clone(&player_registry),
+            world,
+            command_args: state.command_args.clone(),
         },
         output_rx,
-        &state.command_args,
     )
     .await;
 
-    // Notify both loops of disconnection
-    let _ = network_tx.send(NetworkInput::PlayerDisconnected {
-        uuid: player_uuid,
-        entity_id,
-        username: username_owned,
-    });
+    // Cleanup
+    player_registry.remove(&player_uuid);
     let _ = game_tx.send(GameInput::PlayerDisconnected { uuid: player_uuid });
 
     result
