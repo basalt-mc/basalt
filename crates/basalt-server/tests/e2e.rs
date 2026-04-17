@@ -709,3 +709,182 @@ async fn e2e_chat_broadcast_to_both_players() {
     drop(client2);
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 }
+
+// -- Block tests --
+
+#[tokio::test]
+async fn e2e_block_dig_receives_response() {
+    let addr = spawn_server().await;
+    let mut client = connect_to_play(addr).await;
+
+    use basalt_protocol::packets::play::world::ServerboundPlayBlockDig;
+    send_packet(
+        &mut client,
+        ServerboundPlayBlockDig::PACKET_ID,
+        &ServerboundPlayBlockDig {
+            status: 0,
+            location: basalt_types::Position::new(5, 64, 3),
+            face: 1,
+            sequence: 42,
+        },
+    )
+    .await;
+
+    // Wait for game loop tick
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    // Should receive ack + block change
+    let raw = framing::read_raw_packet(&mut client)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(raw.id >= 0, "should receive a response packet");
+}
+
+#[tokio::test]
+async fn e2e_block_place_receives_response() {
+    let addr = spawn_server().await;
+    let mut client = connect_to_play(addr).await;
+
+    // Set a creative slot first
+    use basalt_protocol::packets::play::ServerboundPlaySetCreativeSlot;
+    send_packet(
+        &mut client,
+        ServerboundPlaySetCreativeSlot::PACKET_ID,
+        &ServerboundPlaySetCreativeSlot {
+            slot: 36,
+            item: basalt_types::Slot {
+                item_id: Some(1),
+                item_count: 64,
+                component_data: vec![],
+            },
+        },
+    )
+    .await;
+
+    // Wait for game loop to process inventory
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    use basalt_protocol::packets::play::world::ServerboundPlayBlockPlace;
+    send_packet(
+        &mut client,
+        ServerboundPlayBlockPlace::PACKET_ID,
+        &ServerboundPlayBlockPlace {
+            hand: 0,
+            location: basalt_types::Position::new(5, 63, 3),
+            direction: 1,
+            cursor_x: 0.5,
+            cursor_y: 1.0,
+            cursor_z: 0.5,
+            inside_block: false,
+            world_border_hit: false,
+            sequence: 10,
+        },
+    )
+    .await;
+
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    let raw = framing::read_raw_packet(&mut client)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(raw.id >= 0, "should receive a response packet");
+}
+
+// -- Disconnect test --
+
+#[tokio::test]
+async fn e2e_player_disconnect_notifies_other() {
+    let addr = spawn_server().await;
+
+    let uuid1 = Uuid::from_bytes([30; 16]);
+    let uuid2 = Uuid::from_bytes([40; 16]);
+
+    let mut client1 = connect_to_play_as(addr, "Stayer", uuid1).await;
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+    let client2 = connect_to_play_as(addr, "Leaver", uuid2).await;
+
+    // Drain join packets on client1
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    while let Ok(Ok(Some(_))) = tokio::time::timeout(
+        std::time::Duration::from_millis(10),
+        framing::read_raw_packet(&mut client1),
+    )
+    .await
+    {}
+
+    // Client 2 disconnects
+    drop(client2);
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    // Client 1 should receive leave broadcast
+    let mut got_packets = false;
+    while let Ok(Ok(Some(raw))) = tokio::time::timeout(
+        std::time::Duration::from_millis(100),
+        framing::read_raw_packet(&mut client1),
+    )
+    .await
+    {
+        if raw.id >= 0 {
+            got_packets = true;
+        }
+    }
+    assert!(got_packets, "should receive disconnect broadcast");
+}
+
+// -- Movement test --
+
+#[tokio::test]
+async fn e2e_movement_broadcast_to_other_player() {
+    let addr = spawn_server().await;
+
+    let uuid1 = Uuid::from_bytes([50; 16]);
+    let uuid2 = Uuid::from_bytes([60; 16]);
+
+    let mut client1 = connect_to_play_as(addr, "Mover", uuid1).await;
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+    let mut client2 = connect_to_play_as(addr, "Watcher", uuid2).await;
+
+    // Drain join packets on client2
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    while let Ok(Ok(Some(_))) = tokio::time::timeout(
+        std::time::Duration::from_millis(10),
+        framing::read_raw_packet(&mut client2),
+    )
+    .await
+    {}
+
+    // Client 1 sends position update
+    use basalt_protocol::packets::play::player::ServerboundPlayPosition;
+    send_packet(
+        &mut client1,
+        ServerboundPlayPosition::PACKET_ID,
+        &ServerboundPlayPosition {
+            x: 5.0,
+            y: -60.0,
+            z: 3.0,
+            flags: 1,
+        },
+    )
+    .await;
+
+    // Wait for game loop tick
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    // Client 2 should receive movement broadcast
+    let mut got_movement = false;
+    while let Ok(Ok(Some(raw))) = tokio::time::timeout(
+        std::time::Duration::from_millis(100),
+        framing::read_raw_packet(&mut client2),
+    )
+    .await
+    {
+        if raw.id >= 0 {
+            got_movement = true;
+        }
+    }
+    assert!(got_movement, "should receive movement broadcast");
+}

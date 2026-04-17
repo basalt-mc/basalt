@@ -284,4 +284,51 @@ mod tests {
         assert!((pos.x - 1.0).abs() < f64::EPSILON);
         assert!((pos.z - 0.5).abs() < f64::EPSILON);
     }
+
+    #[test]
+    fn entity_falls_and_lands_after_multiple_ticks() {
+        let world = test_world();
+        let mut ecs = Ecs::new();
+        let e = ecs.spawn();
+        // Start 2 blocks above ground
+        ecs.set(
+            e,
+            Position {
+                x: 0.5,
+                y: -58.0,
+                z: 0.5,
+            },
+        );
+        ecs.set(
+            e,
+            Velocity {
+                dx: 0.0,
+                dy: 0.0,
+                dz: 0.0,
+            },
+        );
+        ecs.set(
+            e,
+            BoundingBox {
+                width: 0.6,
+                height: 1.8,
+            },
+        );
+
+        // Run enough ticks for the entity to fall and land
+        for _ in 0..100 {
+            physics_tick(&mut ecs, &world);
+        }
+
+        let pos = ecs.get::<Position>(e).unwrap();
+        // Should have landed on ground at y=-60
+        assert!(
+            (pos.y - (-60.0)).abs() < 0.01,
+            "entity should have landed at y=-60, got y={}",
+            pos.y
+        );
+
+        let vel = ecs.get::<Velocity>(e).unwrap();
+        assert_eq!(vel.dy, 0.0, "velocity should be zero after landing");
+    }
 }

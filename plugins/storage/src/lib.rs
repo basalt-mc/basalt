@@ -39,7 +39,7 @@ impl Plugin for StoragePlugin {
 
 #[cfg(test)]
 mod tests {
-    use basalt_test_utils::PluginTestHarness;
+    use basalt_testkit::PluginTestHarness;
     use basalt_types::Uuid;
 
     use super::*;
@@ -69,5 +69,30 @@ mod tests {
         // Verify persisted — fresh world should see the block
         let world2 = basalt_world::World::new(42, dir.path());
         assert_eq!(world2.get_block(5, 100, 3), basalt_world::block::STONE);
+    }
+
+    #[test]
+    fn storage_with_memory_world_does_not_panic() {
+        // Memory-only world (no disk) — persist_chunk is a no-op
+        let mut harness = PluginTestHarness::new();
+        harness.register(basalt_plugin_block::BlockPlugin);
+        harness.register(StoragePlugin);
+
+        let mut event = BlockPlacedEvent {
+            x: 5,
+            y: 100,
+            z: 3,
+            block_state: basalt_world::block::STONE,
+            sequence: 1,
+            player_uuid: Uuid::default(),
+            cancelled: false,
+        };
+
+        // Should not panic even though there's no disk storage
+        harness.dispatch(&mut event);
+        assert_eq!(
+            harness.world().get_block(5, 100, 3),
+            basalt_world::block::STONE
+        );
     }
 }
