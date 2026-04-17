@@ -1,49 +1,46 @@
-//! Message types for inter-loop communication.
+//! Message types for net task → game loop communication.
 //!
-//! The server's two-loop architecture uses MPSC channels to pass
-//! messages between net tasks (TCP I/O), the network loop (movement,
-//! chat, commands), and the game loop (blocks, world mutations).
-//! Each enum represents the message vocabulary for one channel.
+//! Net tasks forward game-relevant packets to the game loop via a
+//! shared MPSC channel. Instant events (chat, commands) are handled
+//! directly in the net task and never reach the game loop.
 
 use basalt_core::broadcast::ProfileProperty;
 use basalt_types::{Slot, Uuid};
 use tokio::sync::mpsc;
 
-/// Messages from net tasks to the network loop.
+/// Messages from net tasks to the game loop.
 ///
-/// All net tasks share a single unbounded sender. The network loop
+/// All net tasks share a single unbounded sender. The game loop
 /// drains its receiver each tick via `try_recv()`.
-pub enum NetworkInput {
-    /// A new player has entered the Play state and needs network
-    /// state initialization (position tracking, loaded chunks, etc.).
+pub enum GameInput {
+    /// A new player has entered the Play state.
+    ///
+    /// The game loop spawns an ECS entity with all player components
+    /// and sends the initial world data (Login, chunks, position).
     PlayerConnected {
         /// Server-assigned entity ID.
         entity_id: i32,
-        /// Player UUID (from Mojang or offline-mode).
+        /// Player UUID.
         uuid: Uuid,
         /// Player display name.
         username: String,
         /// Mojang skin texture data.
         skin_properties: Vec<ProfileProperty>,
-        /// Initial world position.
+        /// Initial spawn position.
         position: (f64, f64, f64),
-        /// Initial yaw rotation (horizontal, degrees).
+        /// Initial yaw rotation.
         yaw: f32,
-        /// Initial pitch rotation (vertical, degrees).
+        /// Initial pitch rotation.
         pitch: f32,
-        /// Channel for sending output packets back to this player.
+        /// Channel for sending output packets to this player's net task.
         output_tx: mpsc::Sender<ServerOutput>,
     },
-    /// A player has disconnected (timeout, error, or quit packet).
+    /// A player has disconnected.
     PlayerDisconnected {
         /// UUID of the leaving player.
         uuid: Uuid,
-        /// Entity ID of the leaving player.
-        entity_id: i32,
-        /// Username of the leaving player.
-        username: String,
     },
-    /// Player position update (from Position packet).
+    /// Player position update.
     Position {
         /// UUID of the moving player.
         uuid: Uuid,
@@ -56,7 +53,7 @@ pub enum NetworkInput {
         /// Whether the player is on the ground.
         on_ground: bool,
     },
-    /// Player look update (from Look packet).
+    /// Player look update.
     Look {
         /// UUID of the looking player.
         uuid: Uuid,
@@ -67,7 +64,7 @@ pub enum NetworkInput {
         /// Whether the player is on the ground.
         on_ground: bool,
     },
-    /// Player position and look update (from PositionLook packet).
+    /// Player position and look update.
     PositionLook {
         /// UUID of the moving player.
         uuid: Uuid,
@@ -84,67 +81,11 @@ pub enum NetworkInput {
         /// Whether the player is on the ground.
         on_ground: bool,
     },
-    /// Chat message from a player.
-    ChatMessage {
-        /// UUID of the sender.
-        uuid: Uuid,
-        /// Sender's username (for display formatting).
-        username: String,
-        /// The message text.
-        message: String,
-    },
-    /// Slash command from a player (without the leading `/`).
-    ChatCommand {
-        /// UUID of the command issuer.
-        uuid: Uuid,
-        /// The command string (e.g., `"tp 0 64 0"`).
-        command: String,
-    },
-}
-
-/// Messages from net tasks to the game loop.
-///
-/// All net tasks share a single unbounded sender. The game loop
-/// drains its receiver each tick via `try_recv()`.
-pub enum GameInput {
-    /// A new player has entered the Play state and needs game
-    /// state initialization (inventory, held item, etc.).
-    PlayerConnected {
-        /// Server-assigned entity ID.
-        entity_id: i32,
-        /// Player UUID.
-        uuid: Uuid,
-        /// Player display name.
-        username: String,
-        /// Initial spawn position.
-        position: (f64, f64, f64),
-        /// Channel for sending output packets back to this player.
-        output_tx: mpsc::Sender<ServerOutput>,
-    },
-    /// A player has disconnected.
-    PlayerDisconnected {
-        /// UUID of the leaving player.
-        uuid: Uuid,
-    },
-    /// Player position update (synced from network loop for ECS).
-    PlayerPosition {
-        /// UUID of the moving player.
-        uuid: Uuid,
-        /// New X coordinate.
-        x: f64,
-        /// New Y coordinate.
-        y: f64,
-        /// New Z coordinate.
-        z: f64,
-    },
-    /// Block dig (status 0 = started digging / instant break in creative).
-    ///
-    /// The game loop validates the action, mutates the world, and
-    /// broadcasts the block change to all players.
+    /// Block dig (status 0 = instant break in creative).
     BlockDig {
         /// UUID of the digging player.
         uuid: Uuid,
-        /// Dig status (0 = started/instant break in creative).
+        /// Dig status.
         status: i32,
         /// Block X coordinate.
         x: i32,
@@ -155,10 +96,7 @@ pub enum GameInput {
         /// Sequence number for client acknowledgement.
         sequence: i32,
     },
-    /// Block place with full placement data.
-    ///
-    /// The game loop validates, computes the block state from the
-    /// player's held item, mutates the world, and broadcasts.
+    /// Block place.
     BlockPlace {
         /// UUID of the placing player.
         uuid: Uuid,
@@ -191,18 +129,13 @@ pub enum GameInput {
     },
 }
 
-/// Output from the loops to a player's net task.
+/// Output from the game loop to a player's net task.
 ///
-/// Each player has a dedicated bounded channel. Both the network
-/// loop and game loop hold a clone of the sender. The net task
-/// reads from the receiver and writes to the TCP connection.
-#[derive(Clone)]
+/// Each player has a dedicated bounded channel. The net task reads
+/// from it and writes the encoded packets to the TCP connection.
+#[derive(Clone, Debug)]
 pub enum ServerOutput {
     /// A pre-encoded packet to send to the client.
-    ///
-    /// The packet ID and payload have been encoded by the loop.
-    /// The net task writes them through the [`Connection`]'s framing
-    /// layer (length prefix, compression, encryption).
     SendPacket {
         /// Minecraft packet ID.
         id: i32,
@@ -216,15 +149,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn network_input_position_construction() {
-        let msg = NetworkInput::Position {
+    fn game_input_position_construction() {
+        let msg = GameInput::Position {
             uuid: Uuid::default(),
             x: 1.0,
             y: 64.0,
             z: -3.0,
             on_ground: true,
         };
-        assert!(matches!(msg, NetworkInput::Position { x, .. } if x == 1.0));
+        assert!(matches!(msg, GameInput::Position { x, .. } if x == 1.0));
     }
 
     #[test]
