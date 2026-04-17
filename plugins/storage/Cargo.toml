@@ -11,7 +11,7 @@ basalt-world = { workspace = true }
 
 [dev-dependencies]
 basalt-plugin-block = { path = "../block" }
-basalt-test-utils = { workspace = true }
+basalt-testkit = { workspace = true }
 basalt-types = { workspace = true }
 basalt-world = { workspace = true }
 tempfile = "3"
