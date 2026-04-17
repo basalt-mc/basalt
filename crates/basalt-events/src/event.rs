@@ -28,16 +28,15 @@ pub enum Stage {
 
 /// Which event bus an event type belongs to.
 ///
-/// The server runs two loops on dedicated OS threads — a network loop
-/// for player-facing responsiveness (movement, chat, commands) and a
-/// game loop for simulation (blocks, world mutations). Each loop owns
-/// its own [`EventBus`](crate::EventBus). The `BusKind` determines
-/// where an event type's handlers are registered and dispatched.
+/// - **Instant**: dispatched immediately in the net task (chat, commands).
+///   No tick latency. Handlers run inline in the sending player's task.
+/// - **Game**: dispatched in the game loop tick (blocks, movement, lifecycle).
+///   Tick-based with ECS access.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BusKind {
-    /// Events processed by the network loop (movement, chat, commands).
-    Network,
-    /// Events processed by the game loop (blocks, world mutations).
+    /// Events dispatched instantly in the net task (chat, commands).
+    Instant,
+    /// Events dispatched in the game loop tick (blocks, movement, lifecycle).
     Game,
 }
 
@@ -113,7 +112,7 @@ mod tests {
             self
         }
         fn bus_kind(&self) -> BusKind {
-            BusKind::Network
+            BusKind::Instant
         }
     }
 
@@ -149,8 +148,8 @@ mod tests {
 
     #[test]
     fn bus_kind_equality() {
-        assert_eq!(BusKind::Network, BusKind::Network);
+        assert_eq!(BusKind::Instant, BusKind::Instant);
         assert_eq!(BusKind::Game, BusKind::Game);
-        assert_ne!(BusKind::Network, BusKind::Game);
+        assert_ne!(BusKind::Instant, BusKind::Game);
     }
 }

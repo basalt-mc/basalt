@@ -57,14 +57,14 @@ impl ServerState {
         Vec<basalt_ecs::SystemDescriptor>,
         Vec<basalt_api::plugin::ComponentRegistration>,
     ) {
-        let mut network_bus = EventBus::new();
+        let mut instant_bus = EventBus::new();
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut components = Vec::new();
         {
             let mut registrar = basalt_api::PluginRegistrar::new(
-                &mut network_bus,
+                &mut instant_bus,
                 &mut game_bus,
                 &mut commands,
                 &mut systems,
@@ -92,7 +92,7 @@ impl ServerState {
         if !commands.is_empty() {
             let commands: Vec<basalt_api::CommandEntry> = commands.into_iter().collect();
             let commands = Arc::new(commands);
-            network_bus.on::<basalt_api::events::CommandEvent, basalt_api::context::ServerContext>(
+            instant_bus.on::<basalt_api::events::CommandEvent, basalt_api::context::ServerContext>(
                 basalt_events::Stage::Process,
                 -100,
                 move |event, ctx| {
@@ -137,7 +137,7 @@ impl ServerState {
             command_args,
         });
 
-        (state, network_bus, game_bus, systems, components)
+        (state, instant_bus, game_bus, systems, components)
     }
 
     /// Allocates a unique entity ID for a new player.
@@ -392,7 +392,7 @@ mod tests {
         let config = crate::config::ServerConfig::default();
         let world = Arc::new(config.create_world());
         let plugins = config.create_plugins();
-        let (state, _network_bus, _game_bus, _systems, _components) =
+        let (state, _instant_bus, _game_bus, _systems, _components) =
             ServerState::build_for_loops(world, plugins);
         state
     }

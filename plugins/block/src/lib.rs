@@ -116,14 +116,14 @@ mod tests {
             cancelled: false,
         };
 
-        let mut network_bus = EventBus::new();
+        let mut instant_bus = EventBus::new();
         let mut game_bus = EventBus::new();
         // Validate handler cancels before BlockPlugin runs
         let mut cmds = Vec::new();
         let mut systems = Vec::new();
         let mut components = Vec::new();
         let mut registrar = basalt_api::plugin::PluginRegistrar::new(
-            &mut network_bus,
+            &mut instant_bus,
             &mut game_bus,
             &mut cmds,
             &mut systems,

@@ -170,7 +170,7 @@ mod tests {
             self
         }
         fn bus_kind(&self) -> BusKind {
-            BusKind::Network
+            BusKind::Instant
         }
     }
 
