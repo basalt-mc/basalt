@@ -9,5 +9,5 @@ repository.workspace = true
 basalt-api = { workspace = true }
 
 [dev-dependencies]
-basalt-test-utils = { workspace = true }
+basalt-testkit = { workspace = true }
 basalt-types = { workspace = true }

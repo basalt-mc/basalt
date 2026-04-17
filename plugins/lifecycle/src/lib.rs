@@ -41,7 +41,7 @@ impl Plugin for LifecyclePlugin {
 #[cfg(test)]
 mod tests {
     use basalt_api::Response;
-    use basalt_test_utils::PluginTestHarness;
+    use basalt_testkit::PluginTestHarness;
     use basalt_types::Uuid;
 
     use super::*;
