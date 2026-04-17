@@ -181,51 +181,19 @@ impl Default for CommandPlugin {
 
 #[cfg(test)]
 mod tests {
-    use basalt_api::context::ServerContext;
-    use basalt_api::{EventBus, Response};
-    use basalt_command::parse_command_args;
-    use basalt_types::Uuid;
+    use basalt_api::Response;
+    use basalt_test_utils::PluginTestHarness;
 
     use super::*;
 
-    fn test_world() -> std::sync::Arc<basalt_world::World> {
-        std::sync::Arc::new(basalt_world::World::new_memory(42))
-    }
-
-    fn test_ctx() -> ServerContext {
-        ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into(), 0.0, 0.0)
+    fn harness() -> PluginTestHarness {
+        let mut h = PluginTestHarness::new();
+        h.register(CommandPlugin);
+        h
     }
 
     fn dispatch_command(cmd: &str) -> Vec<Response> {
-        let ctx = test_ctx();
-
-        let plugin = CommandPlugin;
-        let mut instant_bus = EventBus::new();
-        let mut game_bus = EventBus::new();
-        let mut cmds = Vec::new();
-        let mut systems = Vec::new();
-        let mut components = Vec::new();
-        {
-            let mut registrar = PluginRegistrar::new(
-                &mut instant_bus,
-                &mut game_bus,
-                &mut cmds,
-                &mut systems,
-                &mut components,
-                std::sync::Arc::new(basalt_world::World::new_memory(42)),
-            );
-            plugin.on_enable(&mut registrar);
-        }
-
-        let parts: Vec<&str> = cmd.splitn(2, ' ').collect();
-        let name = parts[0];
-        let args = parts.get(1).copied().unwrap_or("");
-        if let Some(entry) = cmds.iter().find(|c| c.name == name)
-            && let Ok(parsed) = parse_command_args(args, &entry.args, &entry.variants)
-        {
-            (entry.handler)(&parsed, &ctx);
-        }
-        ctx.drain_responses()
+        harness().dispatch_command(cmd)
     }
 
     #[test]

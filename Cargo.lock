@@ -192,9 +192,8 @@ name = "basalt-plugin-command"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-command",
+ "basalt-test-utils",
  "basalt-types",
- "basalt-world",
 ]
 
 [[package]]
@@ -301,6 +300,7 @@ name = "basalt-test-utils"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
+ "basalt-command",
  "basalt-events",
  "basalt-types",
  "basalt-world",
