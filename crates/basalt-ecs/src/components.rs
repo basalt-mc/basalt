@@ -125,6 +125,37 @@ impl Inventory {
 }
 impl Component for Inventory {}
 
+/// Mojang skin texture data.
+///
+/// Stored on player entities for broadcasting to other players
+/// when they join or when new players need to see existing players.
+#[derive(Debug, Clone)]
+pub struct SkinData {
+    /// Mojang profile properties (name, value, signature).
+    pub properties: Vec<basalt_core::broadcast::ProfileProperty>,
+}
+impl Component for SkinData {}
+
+/// Tracks which chunks a player's client currently has loaded.
+///
+/// Used by chunk streaming to send only delta updates when the
+/// player crosses a chunk boundary.
+#[derive(Debug, Clone)]
+pub struct ChunkView {
+    /// Set of chunk coordinates currently loaded by the client.
+    pub loaded_chunks: std::collections::HashSet<(i32, i32)>,
+}
+
+impl ChunkView {
+    /// Creates an empty chunk view.
+    pub fn empty() -> Self {
+        Self {
+            loaded_chunks: std::collections::HashSet::new(),
+        }
+    }
+}
+impl Component for ChunkView {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
