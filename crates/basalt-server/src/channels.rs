@@ -1,55 +1,53 @@
-//! Channel infrastructure for the two-loop architecture.
+//! Channel infrastructure for the server architecture.
 //!
-//! Creates and manages the MPSC channels that connect net tasks to the
-//! network and game loops. Each loop has a single shared input channel
-//! (all net tasks send to one receiver). Each player gets a dedicated
-//! bounded output channel for backpressure detection.
+//! Provides the MPSC channel from net tasks to the game loop, a
+//! broadcast channel for instant fan-out (chat, commands), and a
+//! shared player registry for targeted sending.
 
-use tokio::sync::mpsc;
+use std::sync::Arc;
 
-use crate::messages::{GameInput, NetworkInput, ServerOutput};
+use basalt_types::Uuid;
+use dashmap::DashMap;
+use tokio::sync::{broadcast, mpsc};
+
+use crate::messages::{GameInput, ServerOutput};
 
 /// Capacity of each player's output channel.
-///
-/// When the channel is full, the loop's `try_send` fails, indicating
-/// the client is lagging. The server can then kick or throttle.
 const PLAYER_OUTPUT_CAPACITY: usize = 256;
 
-/// All channels needed by the two-loop architecture.
-///
-/// Created once at server startup. The senders are cloned to net tasks
-/// and loops as needed; the receivers are owned by the respective loops.
-pub(crate) struct LoopChannels {
-    /// Sender for net tasks → network loop. Cloned per net task.
-    pub network_tx: mpsc::UnboundedSender<NetworkInput>,
-    /// Receiver for net tasks → network loop. Owned by the network loop.
-    pub network_rx: mpsc::UnboundedReceiver<NetworkInput>,
+/// Capacity of the broadcast channel for instant messages.
+const BROADCAST_CAPACITY: usize = 256;
+
+/// All shared state needed by net tasks and the game loop.
+pub(crate) struct SharedState {
     /// Sender for net tasks → game loop. Cloned per net task.
     pub game_tx: mpsc::UnboundedSender<GameInput>,
     /// Receiver for net tasks → game loop. Owned by the game loop.
     pub game_rx: mpsc::UnboundedReceiver<GameInput>,
+    /// Broadcast sender for instant fan-out (chat, commands).
+    /// Net tasks send here; all net tasks receive via subscription.
+    pub broadcast_tx: broadcast::Sender<ServerOutput>,
+    /// Shared registry of connected players' output channels.
+    /// Used by instant event handlers for targeted sending.
+    pub player_registry: Arc<DashMap<Uuid, mpsc::Sender<ServerOutput>>>,
 }
 
-impl LoopChannels {
-    /// Creates all channels for the two-loop architecture.
+impl SharedState {
+    /// Creates all shared state for the server.
     pub fn new() -> Self {
-        let (network_tx, network_rx) = mpsc::unbounded_channel();
         let (game_tx, game_rx) = mpsc::unbounded_channel();
+        let (broadcast_tx, _) = broadcast::channel(BROADCAST_CAPACITY);
 
         Self {
-            network_tx,
-            network_rx,
             game_tx,
             game_rx,
+            broadcast_tx,
+            player_registry: Arc::new(DashMap::new()),
         }
     }
 }
 
 /// Creates a bounded output channel for a single player.
-///
-/// Returns `(sender, receiver)`. The sender is cloned to both loops
-/// (they both produce output for this player). The receiver is owned
-/// by the player's net task, which relays packets to the TCP connection.
 pub(crate) fn player_output_channel() -> (mpsc::Sender<ServerOutput>, mpsc::Receiver<ServerOutput>)
 {
     mpsc::channel(PLAYER_OUTPUT_CAPACITY)
@@ -60,17 +58,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn loop_channels_creation() {
-        let mut channels = LoopChannels::new();
-        channels
-            .network_tx
-            .send(NetworkInput::PlayerDisconnected {
-                uuid: basalt_types::Uuid::default(),
-                entity_id: 1,
-                username: "test".into(),
+    fn shared_state_creation() {
+        let mut state = SharedState::new();
+        state
+            .game_tx
+            .send(GameInput::PlayerDisconnected {
+                uuid: Uuid::default(),
             })
             .unwrap();
-        assert!(channels.network_rx.try_recv().is_ok());
+        assert!(state.game_rx.try_recv().is_ok());
     }
 
     #[test]
@@ -82,5 +78,28 @@ mod tests {
         })
         .unwrap();
         assert!(rx.try_recv().is_ok());
+    }
+
+    #[test]
+    fn broadcast_channel_delivers() {
+        let state = SharedState::new();
+        let mut rx = state.broadcast_tx.subscribe();
+        state
+            .broadcast_tx
+            .send(ServerOutput::SendPacket {
+                id: 0x01,
+                data: vec![42],
+            })
+            .unwrap();
+        assert!(rx.try_recv().is_ok());
+    }
+
+    #[test]
+    fn player_registry_insert_and_lookup() {
+        let registry: Arc<DashMap<Uuid, mpsc::Sender<ServerOutput>>> = Arc::new(DashMap::new());
+        let (tx, _rx) = player_output_channel();
+        let uuid = Uuid::from_bytes([1; 16]);
+        registry.insert(uuid, tx);
+        assert!(registry.get(&uuid).is_some());
     }
 }

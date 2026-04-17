@@ -146,6 +146,7 @@ dependencies = [
 name = "basalt-ecs"
 version = "0.1.0"
 dependencies = [
+ "basalt-core",
  "basalt-types",
  "log",
 ]
