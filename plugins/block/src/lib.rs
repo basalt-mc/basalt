@@ -55,7 +55,7 @@ impl Plugin for BlockPlugin {
 
 #[cfg(test)]
 mod tests {
-    use basalt_test_utils::PluginTestHarness;
+    use basalt_testkit::PluginTestHarness;
 
     use super::*;
 
@@ -120,6 +120,65 @@ mod tests {
         assert_eq!(
             harness.world().get_block(8, 64, 8),
             basalt_world::block::STONE
+        );
+        assert!(responses.is_empty());
+    }
+
+    #[test]
+    fn block_placed_sets_state_and_queues_responses() {
+        let mut harness = PluginTestHarness::new();
+        harness.register(BlockPlugin);
+
+        let mut event = BlockPlacedEvent {
+            x: 5,
+            y: 64,
+            z: 3,
+            block_state: basalt_world::block::STONE,
+            sequence: 10,
+            player_uuid: Uuid::default(),
+            cancelled: false,
+        };
+
+        let responses = harness.dispatch(&mut event);
+
+        assert_eq!(
+            harness.world().get_block(5, 64, 3),
+            basalt_world::block::STONE
+        );
+        assert_eq!(responses.len(), 2);
+        assert!(matches!(
+            responses[0],
+            Response::SendBlockAck { sequence: 10 }
+        ));
+        assert!(matches!(
+            responses[1],
+            Response::Broadcast(BroadcastMessage::BlockChanged { .. })
+        ));
+    }
+
+    #[test]
+    fn cancelled_block_place_skips_mutation() {
+        let mut harness = PluginTestHarness::new();
+        harness.on::<BlockPlacedEvent>(Stage::Validate, 0, |event, _ctx| {
+            event.cancel();
+        });
+        harness.register(BlockPlugin);
+
+        // Use y=200 which is guaranteed to be air in any world
+        let mut event = BlockPlacedEvent {
+            x: 5,
+            y: 200,
+            z: 3,
+            block_state: basalt_world::block::STONE,
+            sequence: 10,
+            player_uuid: Uuid::default(),
+            cancelled: false,
+        };
+
+        let responses = harness.dispatch(&mut event);
+        assert_eq!(
+            harness.world().get_block(5, 200, 3),
+            basalt_world::block::AIR
         );
         assert!(responses.is_empty());
     }

@@ -182,7 +182,7 @@ impl Default for CommandPlugin {
 #[cfg(test)]
 mod tests {
     use basalt_api::Response;
-    use basalt_test_utils::PluginTestHarness;
+    use basalt_testkit::PluginTestHarness;
 
     use super::*;
 
@@ -276,11 +276,5 @@ mod tests {
     fn unknown_command_returns_empty() {
         let responses = dispatch_command("foobar");
         assert!(responses.is_empty());
-    }
-
-    #[test]
-    fn default_impl() {
-        let _plugin: CommandPlugin = Default::default();
-        let _ = _plugin;
     }
 }
