@@ -75,7 +75,7 @@ pub struct ComponentRegistration {
 /// which loop handles their events.
 pub struct PluginRegistrar<'a> {
     /// Event bus for the network loop (movement, chat, commands).
-    network_bus: &'a mut EventBus,
+    instant_bus: &'a mut EventBus,
     /// Event bus for the game loop (blocks, world mutations).
     game_bus: &'a mut EventBus,
     /// Collected command entries.
@@ -91,7 +91,7 @@ pub struct PluginRegistrar<'a> {
 impl<'a> PluginRegistrar<'a> {
     /// Creates a new registrar with dual event buses.
     pub fn new(
-        network_bus: &'a mut EventBus,
+        instant_bus: &'a mut EventBus,
         game_bus: &'a mut EventBus,
         commands: &'a mut Vec<CommandEntry>,
         systems: &'a mut Vec<basalt_ecs::SystemDescriptor>,
@@ -99,7 +99,7 @@ impl<'a> PluginRegistrar<'a> {
         world: std::sync::Arc<basalt_world::World>,
     ) -> Self {
         Self {
-            network_bus,
+            instant_bus,
             game_bus,
             commands,
             systems,
@@ -119,7 +119,7 @@ impl<'a> PluginRegistrar<'a> {
     /// Registers an event handler on the correct bus.
     ///
     /// The target bus is determined at compile time by `E::BUS`:
-    /// - [`BusKind::Network`] → network loop bus
+    /// - [`BusKind::Instant`] → network loop bus
     /// - [`BusKind::Game`] → game loop bus
     pub fn on<E>(
         &mut self,
@@ -130,8 +130,8 @@ impl<'a> PluginRegistrar<'a> {
         E: Event + EventRouting + 'static,
     {
         match E::BUS {
-            BusKind::Network => self
-                .network_bus
+            BusKind::Instant => self
+                .instant_bus
                 .on::<E, ServerContext>(stage, priority, handler),
             BusKind::Game => self
                 .game_bus
@@ -366,14 +366,14 @@ mod tests {
     fn registrar_routes_to_correct_bus() {
         use crate::events::{BlockBrokenEvent, ChatMessageEvent};
 
-        let mut network_bus = EventBus::new();
+        let mut instant_bus = EventBus::new();
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut components = Vec::new();
         {
             let mut registrar = PluginRegistrar::new(
-                &mut network_bus,
+                &mut instant_bus,
                 &mut game_bus,
                 &mut commands,
                 &mut systems,
@@ -383,20 +383,20 @@ mod tests {
             registrar.on::<ChatMessageEvent>(Stage::Post, 0, |_event, _ctx| {});
             registrar.on::<BlockBrokenEvent>(Stage::Process, 0, |_event, _ctx| {});
         }
-        assert_eq!(network_bus.handler_count(), 1);
+        assert_eq!(instant_bus.handler_count(), 1);
         assert_eq!(game_bus.handler_count(), 1);
     }
 
     #[test]
     fn command_builder_with_args() {
-        let mut network_bus = EventBus::new();
+        let mut instant_bus = EventBus::new();
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut components = Vec::new();
         {
             let mut registrar = PluginRegistrar::new(
-                &mut network_bus,
+                &mut instant_bus,
                 &mut game_bus,
                 &mut commands,
                 &mut systems,
@@ -419,14 +419,14 @@ mod tests {
 
     #[test]
     fn command_builder_with_variants() {
-        let mut network_bus = EventBus::new();
+        let mut instant_bus = EventBus::new();
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut components = Vec::new();
         {
             let mut registrar = PluginRegistrar::new(
-                &mut network_bus,
+                &mut instant_bus,
                 &mut game_bus,
                 &mut commands,
                 &mut systems,
@@ -452,14 +452,14 @@ mod tests {
 
     #[test]
     fn command_no_args() {
-        let mut network_bus = EventBus::new();
+        let mut instant_bus = EventBus::new();
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut components = Vec::new();
         {
             let mut registrar = PluginRegistrar::new(
-                &mut network_bus,
+                &mut instant_bus,
                 &mut game_bus,
                 &mut commands,
                 &mut systems,

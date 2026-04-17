@@ -13,13 +13,13 @@ use crate::broadcast::PlayerSnapshot;
 
 /// Implements [`Event`](basalt_events::Event) and
 /// [`EventRouting`](basalt_events::EventRouting) for a non-cancellable
-/// event dispatched on the **network** loop's bus.
+/// event dispatched on the **instant** loop's bus.
 ///
 /// `cancel()` is a no-op and `is_cancelled()` always returns `false`.
 /// Use for events triggered by player input that the network loop
 /// handles directly: movement, chat, commands, join/leave.
 #[macro_export]
-macro_rules! network_event {
+macro_rules! instant_event {
     ($name:ident) => {
         impl basalt_events::Event for $name {
             fn is_cancelled(&self) -> bool {
@@ -33,22 +33,22 @@ macro_rules! network_event {
                 self
             }
             fn bus_kind(&self) -> basalt_events::BusKind {
-                basalt_events::BusKind::Network
+                basalt_events::BusKind::Instant
             }
         }
         impl basalt_events::EventRouting for $name {
-            const BUS: basalt_events::BusKind = basalt_events::BusKind::Network;
+            const BUS: basalt_events::BusKind = basalt_events::BusKind::Instant;
         }
     };
 }
 
 /// Implements [`Event`](basalt_events::Event) and
 /// [`EventRouting`](basalt_events::EventRouting) for a cancellable
-/// event dispatched on the **network** loop's bus.
+/// event dispatched on the **instant** loop's bus.
 ///
 /// The struct must have a `cancelled: bool` field.
 #[macro_export]
-macro_rules! network_cancellable_event {
+macro_rules! instant_cancellable_event {
     ($name:ident) => {
         impl basalt_events::Event for $name {
             fn is_cancelled(&self) -> bool {
@@ -64,11 +64,11 @@ macro_rules! network_cancellable_event {
                 self
             }
             fn bus_kind(&self) -> basalt_events::BusKind {
-                basalt_events::BusKind::Network
+                basalt_events::BusKind::Instant
             }
         }
         impl basalt_events::EventRouting for $name {
-            const BUS: basalt_events::BusKind = basalt_events::BusKind::Network;
+            const BUS: basalt_events::BusKind = basalt_events::BusKind::Instant;
         }
     };
 }
@@ -207,7 +207,7 @@ pub struct PlayerMovedEvent {
     /// Previous chunk Z before the movement.
     pub old_cz: i32,
 }
-network_event!(PlayerMovedEvent);
+game_event!(PlayerMovedEvent);
 
 /// A player sent a chat message.
 ///
@@ -221,7 +221,7 @@ pub struct ChatMessageEvent {
     /// Whether this event has been cancelled by a Validate handler.
     pub cancelled: bool,
 }
-network_cancellable_event!(ChatMessageEvent);
+instant_cancellable_event!(ChatMessageEvent);
 
 /// A player issued a command (e.g., `/tp 0 64 0`).
 ///
@@ -235,7 +235,7 @@ pub struct CommandEvent {
     /// Whether this event has been cancelled by a Validate handler.
     pub cancelled: bool,
 }
-network_cancellable_event!(CommandEvent);
+instant_cancellable_event!(CommandEvent);
 
 /// A new player has joined the server and entered the Play state.
 ///
@@ -245,7 +245,7 @@ pub struct PlayerJoinedEvent {
     /// Snapshot of the joining player's state.
     pub info: PlayerSnapshot,
 }
-network_event!(PlayerJoinedEvent);
+game_event!(PlayerJoinedEvent);
 
 /// A player has disconnected from the server.
 ///
@@ -259,7 +259,7 @@ pub struct PlayerLeftEvent {
     /// The leaving player's username.
     pub username: String,
 }
-network_event!(PlayerLeftEvent);
+game_event!(PlayerLeftEvent);
 
 #[cfg(test)]
 mod tests {
@@ -300,13 +300,10 @@ mod tests {
     }
 
     #[test]
-    fn event_routing_network_events() {
+    fn event_routing_instant_events() {
         use basalt_events::{BusKind, EventRouting};
-        assert_eq!(PlayerMovedEvent::BUS, BusKind::Network);
-        assert_eq!(ChatMessageEvent::BUS, BusKind::Network);
-        assert_eq!(CommandEvent::BUS, BusKind::Network);
-        assert_eq!(PlayerJoinedEvent::BUS, BusKind::Network);
-        assert_eq!(PlayerLeftEvent::BUS, BusKind::Network);
+        assert_eq!(ChatMessageEvent::BUS, BusKind::Instant);
+        assert_eq!(CommandEvent::BUS, BusKind::Instant);
     }
 
     #[test]
@@ -314,6 +311,9 @@ mod tests {
         use basalt_events::{BusKind, EventRouting};
         assert_eq!(BlockBrokenEvent::BUS, BusKind::Game);
         assert_eq!(BlockPlacedEvent::BUS, BusKind::Game);
+        assert_eq!(PlayerMovedEvent::BUS, BusKind::Game);
+        assert_eq!(PlayerJoinedEvent::BUS, BusKind::Game);
+        assert_eq!(PlayerLeftEvent::BUS, BusKind::Game);
     }
 
     #[test]

@@ -200,14 +200,14 @@ mod tests {
         let ctx = test_ctx();
 
         let plugin = CommandPlugin;
-        let mut network_bus = EventBus::new();
+        let mut instant_bus = EventBus::new();
         let mut game_bus = EventBus::new();
         let mut cmds = Vec::new();
         let mut systems = Vec::new();
         let mut components = Vec::new();
         {
             let mut registrar = PluginRegistrar::new(
-                &mut network_bus,
+                &mut instant_bus,
                 &mut game_bus,
                 &mut cmds,
                 &mut systems,
