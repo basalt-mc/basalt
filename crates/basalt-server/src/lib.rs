@@ -18,25 +18,21 @@
 //! }
 //! ```
 
-mod channels;
 pub mod config;
-mod connection;
 pub mod error;
-mod game_loop;
+mod game;
 mod helpers;
-mod io_thread;
 mod messages;
-mod net_task;
-mod skin;
+mod net;
+mod runtime;
 mod state;
-mod tick;
 
 use std::sync::Arc;
 
 use config::ServerConfig;
 use tokio::net::TcpListener;
 
-use channels::SharedState;
+use net::channels::SharedState;
 use state::ServerState;
 
 /// A Basalt Minecraft server instance.
@@ -96,7 +92,7 @@ impl Server {
         let instant_bus = Arc::new(instant_bus);
 
         // I/O thread — dedicated OS thread for async chunk persistence
-        let io_thread = io_thread::IoThread::start(Arc::clone(&world));
+        let io_thread = runtime::io_thread::IoThread::start(Arc::clone(&world));
 
         // ECS with core components
         let mut ecs = basalt_ecs::Ecs::new();
@@ -109,8 +105,6 @@ impl Server {
         ecs.register_component::<basalt_ecs::Lifetime>();
         ecs.register_component::<basalt_ecs::PlayerRef>();
         ecs.register_component::<basalt_ecs::Inventory>();
-        ecs.register_component::<basalt_ecs::SkinData>();
-        ecs.register_component::<basalt_ecs::ChunkView>();
         for reg in &plugin_components {
             (reg.register_fn)(&mut ecs);
         }
@@ -119,7 +113,7 @@ impl Server {
         }
 
         // Game loop — single dedicated OS thread
-        let mut game_loop_inst = game_loop::GameLoop::new(
+        let mut game_loop_inst = game::GameLoop::new(
             game_bus,
             Arc::clone(&world),
             shared.game_rx,
@@ -127,7 +121,7 @@ impl Server {
             ecs,
             server_state.declare_commands.clone(),
         );
-        let _game_loop = tick::TickLoop::start("game-loop", tps, move |tick| {
+        let _game_loop = runtime::tick::TickLoop::start("game-loop", tps, move |tick| {
             if crash_on_panic {
                 game_loop_inst.tick(tick);
             } else if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -162,7 +156,7 @@ impl Server {
             let player_registry = Arc::clone(&player_registry);
             let world = Arc::clone(&world);
             tokio::spawn(async move {
-                if let Err(e) = connection::handle_connection(
+                if let Err(e) = net::connection::handle_connection(
                     stream,
                     addr,
                     server_state,
