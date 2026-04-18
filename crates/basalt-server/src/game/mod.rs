@@ -257,6 +257,7 @@ pub(super) mod tests {
         }
 
         let mut ecs = basalt_ecs::Ecs::new();
+        ecs.set_world(Arc::clone(&world));
         // Register core systems (same as lib.rs)
         ecs.add_system(
             basalt_ecs::SystemBuilder::new("lifetime")
