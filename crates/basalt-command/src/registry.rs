@@ -71,93 +71,10 @@ impl Default for CommandRegistry {
 
 #[cfg(test)]
 mod tests {
-    use basalt_core::{
-        ChatContext, ContainerContext, EntityContext, PlayerContext, PluginLogger, WorldContext,
-    };
-    use basalt_types::Uuid;
+    use basalt_core::testing::NoopContext;
 
     use super::*;
     use crate::args::Arg;
-
-    /// Minimal test context implementing the Context trait.
-    struct TestContext;
-
-    impl PlayerContext for TestContext {
-        fn uuid(&self) -> Uuid {
-            Uuid::default()
-        }
-        fn entity_id(&self) -> i32 {
-            1
-        }
-        fn username(&self) -> &str {
-            "Steve"
-        }
-        fn yaw(&self) -> f32 {
-            0.0
-        }
-        fn pitch(&self) -> f32 {
-            0.0
-        }
-        fn teleport(&self, _x: f64, _y: f64, _z: f64, _yaw: f32, _pitch: f32) {}
-        fn set_gamemode(&self, _mode: basalt_core::Gamemode) {}
-        fn registered_commands(&self) -> Vec<(String, String)> {
-            Vec::new()
-        }
-    }
-
-    impl ChatContext for TestContext {
-        fn send(&self, _text: &str) {}
-        fn send_component(&self, _component: &basalt_types::TextComponent) {}
-        fn action_bar(&self, _text: &str) {}
-        fn broadcast(&self, _text: &str) {}
-        fn broadcast_component(&self, _component: &basalt_types::TextComponent) {}
-    }
-
-    impl WorldContext for TestContext {
-        fn world(&self) -> &basalt_world::World {
-            use std::sync::OnceLock;
-            static WORLD: OnceLock<basalt_world::World> = OnceLock::new();
-            WORLD.get_or_init(|| basalt_world::World::new_memory(42))
-        }
-        fn send_block_ack(&self, _sequence: i32) {}
-        fn stream_chunks(&self, _cx: i32, _cz: i32) {}
-        fn persist_chunk(&self, _cx: i32, _cz: i32) {}
-    }
-
-    impl EntityContext for TestContext {
-        fn spawn_dropped_item(&self, _x: i32, _y: i32, _z: i32, _item_id: i32, _count: i32) {}
-        fn broadcast_raw(&self, _msg: basalt_core::BroadcastMessage) {}
-    }
-
-    impl ContainerContext for TestContext {
-        fn open_chest(&self, _x: i32, _y: i32, _z: i32) {}
-    }
-
-    impl Context for TestContext {
-        fn logger(&self) -> PluginLogger {
-            PluginLogger::new("test")
-        }
-
-        fn player(&self) -> &dyn PlayerContext {
-            self
-        }
-
-        fn chat(&self) -> &dyn ChatContext {
-            self
-        }
-
-        fn world_ctx(&self) -> &dyn WorldContext {
-            self
-        }
-
-        fn entities(&self) -> &dyn EntityContext {
-            self
-        }
-
-        fn containers(&self) -> &dyn ContainerContext {
-            self
-        }
-    }
 
     struct PingCommand;
     impl Command for PingCommand {
@@ -191,7 +108,7 @@ mod tests {
         registry.register(PingCommand);
 
         let args = CommandArgs::new(String::new());
-        let ctx = TestContext;
+        let ctx = NoopContext;
         assert!(registry.execute("ping", &args, &ctx));
     }
 
@@ -199,7 +116,7 @@ mod tests {
     fn unknown_command_returns_false() {
         let registry = CommandRegistry::new();
         let args = CommandArgs::new(String::new());
-        assert!(!registry.execute("nonexistent", &args, &TestContext));
+        assert!(!registry.execute("nonexistent", &args, &NoopContext));
     }
 
     #[test]
@@ -251,6 +168,6 @@ mod tests {
             required: true,
         }];
         let args = crate::args::parse_args("hello world", &schema).unwrap();
-        registry.execute("echo", &args, &TestContext);
+        registry.execute("echo", &args, &NoopContext);
     }
 }
