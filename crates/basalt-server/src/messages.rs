@@ -253,6 +253,23 @@ pub enum ServerOutput {
         item: basalt_types::Slot,
     },
 
+    /// Trigger a block action (e.g. chest open/close animation).
+    /// Net task sends BlockAction packet.
+    BlockAction {
+        /// Block position.
+        x: i32,
+        /// Block Y.
+        y: i32,
+        /// Block Z.
+        z: i32,
+        /// Action ID (1 for chest open/close).
+        action_id: u8,
+        /// Action parameter (viewer count for chests).
+        action_param: u8,
+        /// Block registry ID (not state ID).
+        block_id: i32,
+    },
+
     /// Inform client of a block entity at a position.
     /// Net task sends TileEntityData packet.
     BlockEntityData {
