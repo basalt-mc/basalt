@@ -11,7 +11,7 @@ pub(crate) fn angle_to_byte(degrees: f32) -> i8 {
     ((degrees / 360.0 * 256.0) as i32 & 0xFF) as i8
 }
 
-/// A wrapper that writes raw bytes without any framing or encoding.
+/// A wrapper that writes raw owned bytes without any framing or encoding.
 ///
 /// Used when we need to build a packet payload manually (e.g.,
 /// PlayerInfo where the generated struct can't handle conditional
@@ -26,6 +26,25 @@ impl Encode for RawPayload {
 }
 
 impl EncodedSize for RawPayload {
+    fn encoded_size(&self) -> usize {
+        self.0.len()
+    }
+}
+
+/// A wrapper that writes borrowed bytes without cloning.
+///
+/// Used by the net task to write cached chunk data and broadcast
+/// bytes from [`SharedBroadcast`] without heap allocation.
+pub(crate) struct RawSlice<'a>(pub &'a [u8]);
+
+impl Encode for RawSlice<'_> {
+    fn encode(&self, buf: &mut Vec<u8>) -> basalt_types::Result<()> {
+        buf.extend_from_slice(self.0);
+        Ok(())
+    }
+}
+
+impl EncodedSize for RawSlice<'_> {
     fn encoded_size(&self) -> usize {
         self.0.len()
     }

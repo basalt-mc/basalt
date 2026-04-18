@@ -5,7 +5,7 @@
 //! 1. Reads packets from the TCP connection
 //! 2. Handles instant events (chat, commands) via `Arc<EventBus>` dispatch
 //! 3. Forwards game-relevant packets (movement, blocks, inventory) to the game loop
-//! 4. Relays output packets from the game loop + broadcast channel to TCP
+//! 4. Receives [`ServerOutput`] game events, encodes protocol packets, and writes to TCP
 //! 5. Handles keep-alive and tab-complete inline
 
 use std::net::SocketAddr;
@@ -21,12 +21,26 @@ use basalt_protocol::packets::play::chat::{
     ClientboundPlaySystemChat, ClientboundPlayTabComplete, ClientboundPlayTabCompleteMatches,
     ServerboundPlayTabComplete,
 };
+use basalt_protocol::packets::play::entity::{
+    ClientboundPlayEntityDestroy, ClientboundPlayEntityHeadRotation,
+    ClientboundPlaySyncEntityPosition,
+};
 use basalt_protocol::packets::play::misc::ClientboundPlayKeepAlive;
+use basalt_protocol::packets::play::player::{
+    ClientboundPlayGameStateChange, ClientboundPlayPlayerRemove, ClientboundPlayPosition,
+};
+use basalt_protocol::packets::play::world::{
+    ClientboundPlayAcknowledgePlayerDigging, ClientboundPlayBlockChange,
+    ClientboundPlayChunkBatchFinished, ClientboundPlayChunkBatchStart, ClientboundPlayMapChunk,
+    ClientboundPlayUnloadChunk, ClientboundPlayUpdateViewPosition,
+};
 use basalt_types::{Encode, EncodedSize, Uuid};
 use dashmap::DashMap;
 use tokio::sync::{broadcast, mpsc};
 
-use crate::messages::{GameInput, ServerOutput};
+use crate::helpers::{RawPayload, RawSlice, angle_to_byte};
+use crate::messages::{BroadcastEvent, GameInput, ServerOutput};
+use crate::net::chunk_cache::ChunkPacketCache;
 use crate::state::CommandMeta;
 
 /// Per-player net task configuration.
@@ -47,6 +61,8 @@ pub(crate) struct NetTaskConfig {
     pub player_registry: Arc<DashMap<Uuid, mpsc::Sender<ServerOutput>>>,
     /// Shared world reference for context creation.
     pub world: Arc<basalt_world::World>,
+    /// Shared chunk packet cache.
+    pub chunk_cache: Arc<ChunkPacketCache>,
     /// Command metadata for tab-complete and /help.
     pub command_args: Vec<CommandMeta>,
 }
@@ -66,6 +82,7 @@ pub(crate) async fn run_net_task(
     let broadcast_tx = config.broadcast_tx;
     let player_registry = config.player_registry;
     let world = config.world;
+    let chunk_cache = config.chunk_cache;
     let command_args = config.command_args;
 
     let mut broadcast_rx = broadcast_tx.subscribe();
@@ -120,11 +137,11 @@ pub(crate) async fn run_net_task(
                 }
             }
 
-            // Branch 3: Relay output from game loop
+            // Branch 3: Relay game events from game loop
             output = output_rx.recv() => {
                 match output {
-                    Some(ServerOutput::SendPacket { id, data }) => {
-                        conn.write_packet_typed(id, &crate::helpers::RawPayload(data)).await?;
+                    Some(msg) => {
+                        write_server_output(&mut conn, &msg, &chunk_cache).await?;
                     }
                     None => {
                         log::debug!(target: "basalt::net_task", "[{addr}] {username} output channel closed");
@@ -136,8 +153,8 @@ pub(crate) async fn run_net_task(
             // Branch 4: Receive instant broadcasts (chat)
             result = broadcast_rx.recv() => {
                 match result {
-                    Ok(ServerOutput::SendPacket { id, data }) => {
-                        conn.write_packet_typed(id, &crate::helpers::RawPayload(data)).await?;
+                    Ok(msg) => {
+                        write_server_output(&mut conn, &msg, &chunk_cache).await?;
                     }
                     Err(broadcast::error::RecvError::Lagged(n)) => {
                         log::warn!(target: "basalt::net_task", "[{addr}] {username} missed {n} broadcast messages");
@@ -149,6 +166,218 @@ pub(crate) async fn run_net_task(
     }
 
     Ok(())
+}
+
+/// Encodes and writes a [`ServerOutput`] game event to the TCP connection.
+///
+/// This is where protocol knowledge lives: each game event variant is
+/// translated into one or more protocol packets, encoded, and written.
+async fn write_server_output(
+    conn: &mut Connection<Play>,
+    output: &ServerOutput,
+    chunk_cache: &ChunkPacketCache,
+) -> crate::error::Result<()> {
+    match output {
+        // ── Hot path: targeted events ────────────────────────────────
+        ServerOutput::BlockChanged { x, y, z, state } => {
+            let packet = ClientboundPlayBlockChange {
+                location: basalt_types::Position::new(*x, *y, *z),
+                r#type: *state,
+            };
+            conn.write_packet_typed(ClientboundPlayBlockChange::PACKET_ID, &packet)
+                .await?;
+        }
+        ServerOutput::BlockAck { sequence } => {
+            let packet = ClientboundPlayAcknowledgePlayerDigging {
+                sequence_id: *sequence,
+            };
+            conn.write_packet_typed(ClientboundPlayAcknowledgePlayerDigging::PACKET_ID, &packet)
+                .await?;
+        }
+        ServerOutput::SystemChat {
+            content,
+            action_bar,
+        } => {
+            let packet = ClientboundPlaySystemChat {
+                content: content.clone(),
+                is_action_bar: *action_bar,
+            };
+            conn.write_packet_typed(ClientboundPlaySystemChat::PACKET_ID, &packet)
+                .await?;
+        }
+        ServerOutput::GameStateChange { reason, value } => {
+            let packet = ClientboundPlayGameStateChange {
+                reason: *reason,
+                game_mode: *value,
+            };
+            conn.write_packet_typed(ClientboundPlayGameStateChange::PACKET_ID, &packet)
+                .await?;
+        }
+        ServerOutput::SetPosition {
+            teleport_id,
+            x,
+            y,
+            z,
+            yaw,
+            pitch,
+        } => {
+            let packet = ClientboundPlayPosition {
+                teleport_id: *teleport_id,
+                x: *x,
+                y: *y,
+                z: *z,
+                dx: 0.0,
+                dy: 0.0,
+                dz: 0.0,
+                yaw: *yaw,
+                pitch: *pitch,
+                flags: 0,
+            };
+            conn.write_packet_typed(ClientboundPlayPosition::PACKET_ID, &packet)
+                .await?;
+        }
+        // ── Chunk path: cache-based ──────────────────────────────────
+        ServerOutput::SendChunk { cx, cz } => {
+            let bytes = chunk_cache.get_or_encode(*cx, *cz);
+            conn.write_packet_typed(ClientboundPlayMapChunk::PACKET_ID, &RawSlice(&bytes))
+                .await?;
+        }
+        ServerOutput::UnloadChunk { cx, cz } => {
+            let packet = ClientboundPlayUnloadChunk {
+                chunk_x: *cx,
+                chunk_z: *cz,
+            };
+            conn.write_packet_typed(ClientboundPlayUnloadChunk::PACKET_ID, &packet)
+                .await?;
+        }
+        ServerOutput::ChunkBatchStart => {
+            conn.write_packet_typed(
+                ClientboundPlayChunkBatchStart::PACKET_ID,
+                &ClientboundPlayChunkBatchStart,
+            )
+            .await?;
+        }
+        ServerOutput::ChunkBatchFinished { batch_size } => {
+            let packet = ClientboundPlayChunkBatchFinished {
+                batch_size: *batch_size,
+            };
+            conn.write_packet_typed(ClientboundPlayChunkBatchFinished::PACKET_ID, &packet)
+                .await?;
+        }
+        ServerOutput::UpdateViewPosition { cx, cz } => {
+            let packet = ClientboundPlayUpdateViewPosition {
+                chunk_x: *cx,
+                chunk_z: *cz,
+            };
+            conn.write_packet_typed(ClientboundPlayUpdateViewPosition::PACKET_ID, &packet)
+                .await?;
+        }
+
+        // ── Broadcast: shared, encoded once ──────────────────────────
+        ServerOutput::Broadcast(shared) => {
+            let packets = shared.get_or_encode(encode_broadcast);
+            for (id, data) in packets {
+                conn.write_packet_typed(*id, &RawSlice(data)).await?;
+            }
+        }
+
+        // ── Cold path: rare events ───────────────────────────────────
+        ServerOutput::Packet(ep) => {
+            let mut data = Vec::with_capacity(ep.payload.encoded_size());
+            ep.payload
+                .encode(&mut data)
+                .expect("packet encoding failed");
+            conn.write_packet_typed(ep.id, &RawPayload(data)).await?;
+        }
+        ServerOutput::Raw { id, data } => {
+            conn.write_packet_typed(*id, &RawSlice(data)).await?;
+        }
+    }
+    Ok(())
+}
+
+/// Encodes a [`BroadcastEvent`] into protocol packets.
+///
+/// Called at most once per [`SharedBroadcast`] — the result is cached
+/// in the `OnceLock` and reused by all subsequent consumers.
+fn encode_broadcast(event: &BroadcastEvent) -> Vec<(i32, Vec<u8>)> {
+    match event {
+        BroadcastEvent::EntityMoved {
+            entity_id,
+            x,
+            y,
+            z,
+            yaw,
+            pitch,
+            on_ground,
+        } => {
+            let sync = ClientboundPlaySyncEntityPosition {
+                entity_id: *entity_id,
+                x: *x,
+                y: *y,
+                z: *z,
+                dx: 0.0,
+                dy: 0.0,
+                dz: 0.0,
+                yaw: *yaw,
+                pitch: *pitch,
+                on_ground: *on_ground,
+            };
+            let head = ClientboundPlayEntityHeadRotation {
+                entity_id: *entity_id,
+                head_yaw: angle_to_byte(*yaw),
+            };
+            vec![
+                encode_single(ClientboundPlaySyncEntityPosition::PACKET_ID, &sync),
+                encode_single(ClientboundPlayEntityHeadRotation::PACKET_ID, &head),
+            ]
+        }
+        BroadcastEvent::BlockChanged { x, y, z, state } => {
+            let packet = ClientboundPlayBlockChange {
+                location: basalt_types::Position::new(*x, *y, *z),
+                r#type: *state,
+            };
+            vec![encode_single(
+                ClientboundPlayBlockChange::PACKET_ID,
+                &packet,
+            )]
+        }
+        BroadcastEvent::SystemChat {
+            content,
+            action_bar,
+        } => {
+            let packet = ClientboundPlaySystemChat {
+                content: content.clone(),
+                is_action_bar: *action_bar,
+            };
+            vec![encode_single(ClientboundPlaySystemChat::PACKET_ID, &packet)]
+        }
+        BroadcastEvent::RemoveEntities { entity_ids } => {
+            let packet = ClientboundPlayEntityDestroy {
+                entity_ids: entity_ids.clone(),
+            };
+            vec![encode_single(
+                ClientboundPlayEntityDestroy::PACKET_ID,
+                &packet,
+            )]
+        }
+        BroadcastEvent::RemovePlayers { uuids } => {
+            let packet = ClientboundPlayPlayerRemove {
+                players: uuids.clone(),
+            };
+            vec![encode_single(
+                ClientboundPlayPlayerRemove::PACKET_ID,
+                &packet,
+            )]
+        }
+    }
+}
+
+/// Encodes a single protocol packet into `(packet_id, payload_bytes)`.
+fn encode_single<P: Encode + EncodedSize>(id: i32, packet: &P) -> (i32, Vec<u8>) {
+    let mut data = Vec::with_capacity(packet.encoded_size());
+    packet.encode(&mut data).expect("packet encoding failed");
+    (id, data)
 }
 
 /// Handles a single serverbound packet — instant or forwarded.
@@ -352,14 +581,13 @@ async fn process_instant_responses(
     for response in responses {
         match response {
             Response::Broadcast(basalt_api::BroadcastMessage::Chat { content }) => {
-                let data = encode_packet(
-                    ClientboundPlaySystemChat::PACKET_ID,
-                    &ClientboundPlaySystemChat {
+                let bc = Arc::new(crate::messages::SharedBroadcast::new(
+                    BroadcastEvent::SystemChat {
                         content: content.clone(),
-                        is_action_bar: false,
+                        action_bar: false,
                     },
-                );
-                let _ = broadcast_tx.send(data);
+                ));
+                let _ = broadcast_tx.send(ServerOutput::Broadcast(bc));
             }
             Response::SendSystemChat {
                 content,
@@ -380,7 +608,6 @@ async fn process_instant_responses(
                 yaw,
                 pitch,
             } => {
-                use basalt_protocol::packets::play::player::ClientboundPlayPosition;
                 let packet = ClientboundPlayPosition {
                     teleport_id: *teleport_id,
                     x: *x,
@@ -397,7 +624,6 @@ async fn process_instant_responses(
                     .await?;
             }
             Response::SendGameStateChange { reason, value } => {
-                use basalt_protocol::packets::play::player::ClientboundPlayGameStateChange;
                 let packet = ClientboundPlayGameStateChange {
                     reason: *reason,
                     game_mode: *value,
@@ -413,16 +639,6 @@ async fn process_instant_responses(
         }
     }
     Ok(())
-}
-
-/// Encodes a packet struct into a [`ServerOutput::SendPacket`].
-fn encode_packet<P: Encode + EncodedSize>(packet_id: i32, packet: &P) -> ServerOutput {
-    let mut data = Vec::with_capacity(packet.encoded_size());
-    packet.encode(&mut data).expect("packet encoding failed");
-    ServerOutput::SendPacket {
-        id: packet_id,
-        data,
-    }
 }
 
 /// Handles a TabComplete request inline.

@@ -3,7 +3,7 @@
 //! Runs at 20 TPS. Each tick:
 //! 1. Drains the [`GameInput`] channel (connect, disconnect, movement, blocks, inventory)
 //! 2. Runs ECS systems (physics, AI, pathfinding)
-//! 3. Produces output packets to player net tasks via [`OutputHandle`]
+//! 3. Produces [`ServerOutput`] game events to player net tasks (zero encoding)
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -15,24 +15,14 @@ use basalt_api::events::{
 };
 use basalt_events::Event;
 use basalt_protocol::packets::play::chat::ClientboundPlayDeclareCommands;
-use basalt_protocol::packets::play::entity::{
-    ClientboundPlayEntityDestroy, ClientboundPlayEntityHeadRotation, ClientboundPlaySpawnEntity,
-    ClientboundPlaySyncEntityPosition,
-};
-use basalt_protocol::packets::play::player::{
-    ClientboundPlayGameStateChange, ClientboundPlayLogin, ClientboundPlayLoginSpawninfo,
-    ClientboundPlayPlayerInfo, ClientboundPlayPlayerRemove, ClientboundPlayPosition,
-};
-use basalt_protocol::packets::play::world::{
-    ClientboundPlayAcknowledgePlayerDigging, ClientboundPlayBlockChange,
-    ClientboundPlayChunkBatchFinished, ClientboundPlayChunkBatchStart,
-    ClientboundPlaySpawnPosition, ClientboundPlayUnloadChunk, ClientboundPlayUpdateViewPosition,
-};
-use basalt_types::{Encode, EncodedSize, Position, Uuid, VarInt, Vec3i16};
+use basalt_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
+use basalt_protocol::packets::play::player::{ClientboundPlayLogin, ClientboundPlayLoginSpawninfo};
+use basalt_types::{Encode, Position, Uuid, VarInt, Vec3i16};
 use tokio::sync::mpsc;
 
 use crate::helpers::angle_to_byte;
-use crate::messages::{GameInput, ServerOutput};
+use crate::messages::{BroadcastEvent, EncodablePacket, GameInput, ServerOutput, SharedBroadcast};
+use crate::net::chunk_cache::ChunkPacketCache;
 
 /// View distance radius in chunks.
 const VIEW_RADIUS: i32 = 5;
@@ -80,6 +70,8 @@ pub(crate) struct GameLoop {
     bus: EventBus,
     /// World — sole owner for writes, concurrent reads by net tasks.
     world: Arc<basalt_world::World>,
+    /// Shared chunk packet cache — invalidated on block mutations.
+    chunk_cache: Arc<ChunkPacketCache>,
     /// Entity Component System: entities, components, systems.
     ecs: basalt_ecs::Ecs,
     /// Receiver for net task → game loop messages.
@@ -95,6 +87,7 @@ impl GameLoop {
     pub fn new(
         bus: EventBus,
         world: Arc<basalt_world::World>,
+        chunk_cache: Arc<ChunkPacketCache>,
         game_rx: mpsc::UnboundedReceiver<GameInput>,
         io_tx: mpsc::UnboundedSender<crate::runtime::io_thread::IoRequest>,
         ecs: basalt_ecs::Ecs,
@@ -103,6 +96,7 @@ impl GameLoop {
         Self {
             bus,
             world,
+            chunk_cache,
             ecs,
             game_rx,
             io_tx,
@@ -332,7 +326,10 @@ impl GameLoop {
                     .color(basalt_types::TextColor::Named(
                         basalt_types::NamedColor::Yellow,
                     ));
-                send_system_chat(tx, &msg, false);
+                let _ = tx.try_send(ServerOutput::SystemChat {
+                    content: msg.to_nbt(),
+                    action_bar: false,
+                });
             });
         }
 
@@ -341,7 +338,10 @@ impl GameLoop {
             let msg = basalt_types::TextComponent::text(format!("Welcome, {username}!")).color(
                 basalt_types::TextColor::Named(basalt_types::NamedColor::Gold),
             );
-            send_system_chat(tx, &msg, false);
+            let _ = tx.try_send(ServerOutput::SystemChat {
+                content: msg.to_nbt(),
+                action_bar: false,
+            });
         });
 
         // Dispatch PlayerJoinedEvent
@@ -384,14 +384,17 @@ impl GameLoop {
             enforces_secure_chat: false,
         };
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(encode_packet(ClientboundPlayLogin::PACKET_ID, &login));
+            let _ = tx.try_send(ServerOutput::Packet(EncodablePacket::new(
+                ClientboundPlayLogin::PACKET_ID,
+                login,
+            )));
         });
 
         // DeclareCommands
         if !self.declare_commands.is_empty() {
             let dc = self.declare_commands.clone();
             self.send_to(eid, |tx| {
-                let _ = tx.try_send(ServerOutput::SendPacket {
+                let _ = tx.try_send(ServerOutput::Raw {
                     id: ClientboundPlayDeclareCommands::PACKET_ID,
                     data: dc,
                 });
@@ -401,62 +404,46 @@ impl GameLoop {
         // SpawnPosition
         let spawn_y = self.world.spawn_y() as i32;
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(encode_packet(
-                ClientboundPlaySpawnPosition::PACKET_ID,
-                &ClientboundPlaySpawnPosition {
+            let _ = tx.try_send(ServerOutput::Packet(EncodablePacket::new(
+                basalt_protocol::packets::play::world::ClientboundPlaySpawnPosition::PACKET_ID,
+                basalt_protocol::packets::play::world::ClientboundPlaySpawnPosition {
                     location: Position::new(0, spawn_y, 0),
                     angle: 0.0,
                 },
-            ));
+            )));
         });
 
         // GameEvent (wait for chunks)
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(encode_packet(
-                ClientboundPlayGameStateChange::PACKET_ID,
-                &ClientboundPlayGameStateChange {
-                    reason: 13,
-                    game_mode: 0.0,
-                },
-            ));
+            let _ = tx.try_send(ServerOutput::GameStateChange {
+                reason: 13,
+                value: 0.0,
+            });
         });
 
         // UpdateViewPosition + chunks
         let cx = (position.0 as i32) >> 4;
         let cz = (position.2 as i32) >> 4;
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(encode_packet(
-                ClientboundPlayUpdateViewPosition::PACKET_ID,
-                &ClientboundPlayUpdateViewPosition {
-                    chunk_x: cx,
-                    chunk_z: cz,
-                },
-            ));
-            let _ = tx.try_send(encode_packet(
-                ClientboundPlayChunkBatchStart::PACKET_ID,
-                &ClientboundPlayChunkBatchStart,
-            ));
+            let _ = tx.try_send(ServerOutput::UpdateViewPosition { cx, cz });
+            let _ = tx.try_send(ServerOutput::ChunkBatchStart);
         });
 
         let mut count = 0i32;
         for dx in -VIEW_RADIUS..=VIEW_RADIUS {
             for dz in -VIEW_RADIUS..=VIEW_RADIUS {
-                let packet = self.world.get_chunk_packet(cx + dx, cz + dz);
                 self.send_to(eid, |tx| {
-                    let _ = tx.try_send(encode_packet(
-                        basalt_protocol::packets::play::world::ClientboundPlayMapChunk::PACKET_ID,
-                        &packet,
-                    ));
+                    let _ = tx.try_send(ServerOutput::SendChunk {
+                        cx: cx + dx,
+                        cz: cz + dz,
+                    });
                 });
                 count += 1;
             }
         }
 
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(encode_packet(
-                ClientboundPlayChunkBatchFinished::PACKET_ID,
-                &ClientboundPlayChunkBatchFinished { batch_size: count },
-            ));
+            let _ = tx.try_send(ServerOutput::ChunkBatchFinished { batch_size: count });
         });
 
         // Track loaded chunks
@@ -470,21 +457,14 @@ impl GameLoop {
 
         // Position
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(encode_packet(
-                ClientboundPlayPosition::PACKET_ID,
-                &ClientboundPlayPosition {
-                    teleport_id: 1,
-                    x: position.0,
-                    y: position.1,
-                    z: position.2,
-                    dx: 0.0,
-                    dy: 0.0,
-                    dz: 0.0,
-                    yaw: 0.0,
-                    pitch: 0.0,
-                    flags: 0,
-                },
-            ));
+            let _ = tx.try_send(ServerOutput::SetPosition {
+                teleport_id: 1,
+                x: position.0,
+                y: position.1,
+                z: position.2,
+                yaw: 0.0,
+                pitch: 0.0,
+            });
         });
     }
 
@@ -514,27 +494,25 @@ impl GameLoop {
         self.ecs.despawn(eid);
 
         // Broadcast leave to remaining players
-        let remove = encode_packet(
-            ClientboundPlayPlayerRemove::PACKET_ID,
-            &ClientboundPlayPlayerRemove {
-                players: vec![uuid],
-            },
-        );
-        let destroy = encode_packet(
-            ClientboundPlayEntityDestroy::PACKET_ID,
-            &ClientboundPlayEntityDestroy {
-                entity_ids: vec![entity_id],
-            },
-        );
+        let remove_players = Arc::new(SharedBroadcast::new(BroadcastEvent::RemovePlayers {
+            uuids: vec![uuid],
+        }));
+        let remove_entities = Arc::new(SharedBroadcast::new(BroadcastEvent::RemoveEntities {
+            entity_ids: vec![entity_id],
+        }));
         let msg = basalt_types::TextComponent::text(format!("{username} left the game")).color(
             basalt_types::TextColor::Named(basalt_types::NamedColor::Yellow),
         );
+        let leave_chat = Arc::new(SharedBroadcast::new(BroadcastEvent::SystemChat {
+            content: msg.to_nbt(),
+            action_bar: false,
+        }));
 
         for (other_eid, _) in self.ecs.iter::<OutputHandle>() {
             self.send_to(other_eid, |tx| {
-                let _ = tx.try_send(remove.clone());
-                let _ = tx.try_send(destroy.clone());
-                send_system_chat(tx, &msg, false);
+                let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&remove_players)));
+                let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&remove_entities)));
+                let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&leave_chat)));
             });
         }
     }
@@ -607,33 +585,19 @@ impl GameLoop {
         self.process_responses(uuid, &responses);
 
         // Broadcast movement to other players
-        let sync = encode_packet(
-            ClientboundPlaySyncEntityPosition::PACKET_ID,
-            &ClientboundPlaySyncEntityPosition {
-                entity_id,
-                x,
-                y,
-                z,
-                dx: 0.0,
-                dy: 0.0,
-                dz: 0.0,
-                yaw,
-                pitch,
-                on_ground,
-            },
-        );
-        let head = encode_packet(
-            ClientboundPlayEntityHeadRotation::PACKET_ID,
-            &ClientboundPlayEntityHeadRotation {
-                entity_id,
-                head_yaw: angle_to_byte(yaw),
-            },
-        );
+        let moved = Arc::new(SharedBroadcast::new(BroadcastEvent::EntityMoved {
+            entity_id,
+            x,
+            y,
+            z,
+            yaw,
+            pitch,
+            on_ground,
+        }));
         for (other_eid, _) in self.ecs.iter::<OutputHandle>() {
             if other_eid != eid {
                 self.send_to(other_eid, |tx| {
-                    let _ = tx.try_send(sync.clone());
-                    let _ = tx.try_send(head.clone());
+                    let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&moved)));
                 });
             }
         }
@@ -649,13 +613,10 @@ impl GameLoop {
     /// Streams chunks when a player crosses a chunk boundary.
     fn stream_chunks(&mut self, eid: basalt_ecs::EntityId, new_cx: i32, new_cz: i32) {
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(encode_packet(
-                ClientboundPlayUpdateViewPosition::PACKET_ID,
-                &ClientboundPlayUpdateViewPosition {
-                    chunk_x: new_cx,
-                    chunk_z: new_cz,
-                },
-            ));
+            let _ = tx.try_send(ServerOutput::UpdateViewPosition {
+                cx: new_cx,
+                cz: new_cz,
+            });
         });
 
         let r = VIEW_RADIUS;
@@ -677,15 +638,9 @@ impl GameLoop {
             .copied()
             .collect();
 
-        for (cx, cz) in &to_unload {
+        for &(cx, cz) in &to_unload {
             self.send_to(eid, |tx| {
-                let _ = tx.try_send(encode_packet(
-                    ClientboundPlayUnloadChunk::PACKET_ID,
-                    &ClientboundPlayUnloadChunk {
-                        chunk_x: *cx,
-                        chunk_z: *cz,
-                    },
-                ));
+                let _ = tx.try_send(ServerOutput::UnloadChunk { cx, cz });
             });
         }
 
@@ -706,27 +661,17 @@ impl GameLoop {
 
         if !to_load.is_empty() {
             self.send_to(eid, |tx| {
-                let _ = tx.try_send(encode_packet(
-                    ClientboundPlayChunkBatchStart::PACKET_ID,
-                    &ClientboundPlayChunkBatchStart,
-                ));
+                let _ = tx.try_send(ServerOutput::ChunkBatchStart);
             });
-            for (cx, cz) in &to_load {
-                let packet = self.world.get_chunk_packet(*cx, *cz);
+            for &(cx, cz) in &to_load {
                 self.send_to(eid, |tx| {
-                    let _ = tx.try_send(encode_packet(
-                        basalt_protocol::packets::play::world::ClientboundPlayMapChunk::PACKET_ID,
-                        &packet,
-                    ));
+                    let _ = tx.try_send(ServerOutput::SendChunk { cx, cz });
                 });
             }
             self.send_to(eid, |tx| {
-                let _ = tx.try_send(encode_packet(
-                    ClientboundPlayChunkBatchFinished::PACKET_ID,
-                    &ClientboundPlayChunkBatchFinished {
-                        batch_size: to_load.len() as i32,
-                    },
-                ));
+                let _ = tx.try_send(ServerOutput::ChunkBatchFinished {
+                    batch_size: to_load.len() as i32,
+                });
             });
         }
     }
@@ -759,13 +704,12 @@ impl GameLoop {
 
         if event.is_cancelled() {
             if let Some(handle) = self.ecs.get::<OutputHandle>(eid) {
-                let _ = handle.tx.try_send(encode_packet(
-                    ClientboundPlayBlockChange::PACKET_ID,
-                    &ClientboundPlayBlockChange {
-                        location: Position::new(x, y, z),
-                        r#type: i32::from(original_state),
-                    },
-                ));
+                let _ = handle.tx.try_send(ServerOutput::BlockChanged {
+                    x,
+                    y,
+                    z,
+                    state: i32::from(original_state),
+                });
             }
             return;
         }
@@ -820,13 +764,12 @@ impl GameLoop {
 
         if event.is_cancelled() {
             if let Some(handle) = self.ecs.get::<OutputHandle>(eid) {
-                let _ = handle.tx.try_send(encode_packet(
-                    ClientboundPlayBlockChange::PACKET_ID,
-                    &ClientboundPlayBlockChange {
-                        location: Position::new(px, py, pz),
-                        r#type: i32::from(basalt_world::block::AIR),
-                    },
-                ));
+                let _ = handle.tx.try_send(ServerOutput::BlockChanged {
+                    x: px,
+                    y: py,
+                    z: pz,
+                    state: i32::from(basalt_world::block::AIR),
+                });
             }
             return;
         }
@@ -846,30 +789,28 @@ impl GameLoop {
                     z,
                     block_state,
                 }) => {
-                    let data = encode_packet(
-                        ClientboundPlayBlockChange::PACKET_ID,
-                        &ClientboundPlayBlockChange {
-                            location: Position::new(*x, *y, *z),
-                            r#type: *block_state,
-                        },
-                    );
+                    // Invalidate chunk cache for this block's chunk
+                    self.chunk_cache.invalidate(*x >> 4, *z >> 4);
+                    let bc = Arc::new(SharedBroadcast::new(BroadcastEvent::BlockChanged {
+                        x: *x,
+                        y: *y,
+                        z: *z,
+                        state: *block_state,
+                    }));
                     for (e, _) in self.ecs.iter::<OutputHandle>() {
                         self.send_to(e, |tx| {
-                            let _ = tx.try_send(data.clone());
+                            let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&bc)));
                         });
                     }
                 }
                 Response::Broadcast(basalt_api::BroadcastMessage::Chat { content }) => {
-                    let data = encode_packet(
-                        basalt_protocol::packets::play::chat::ClientboundPlaySystemChat::PACKET_ID,
-                        &basalt_protocol::packets::play::chat::ClientboundPlaySystemChat {
-                            content: content.clone(),
-                            is_action_bar: false,
-                        },
-                    );
+                    let bc = Arc::new(SharedBroadcast::new(BroadcastEvent::SystemChat {
+                        content: content.clone(),
+                        action_bar: false,
+                    }));
                     for (e, _) in self.ecs.iter::<OutputHandle>() {
                         self.send_to(e, |tx| {
-                            let _ = tx.try_send(data.clone());
+                            let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&bc)));
                         });
                     }
                 }
@@ -878,12 +819,9 @@ impl GameLoop {
                     if let Some(eid) = self.ecs.find_by_uuid(source_uuid)
                         && let Some(handle) = self.ecs.get::<OutputHandle>(eid)
                     {
-                        let _ = handle.tx.try_send(encode_packet(
-                            ClientboundPlayAcknowledgePlayerDigging::PACKET_ID,
-                            &ClientboundPlayAcknowledgePlayerDigging {
-                                sequence_id: *sequence,
-                            },
-                        ));
+                        let _ = handle.tx.try_send(ServerOutput::BlockAck {
+                            sequence: *sequence,
+                        });
                     }
                 }
                 Response::SendSystemChat {
@@ -893,13 +831,10 @@ impl GameLoop {
                     if let Some(eid) = self.ecs.find_by_uuid(source_uuid)
                         && let Some(handle) = self.ecs.get::<OutputHandle>(eid)
                     {
-                        let _ = handle.tx.try_send(encode_packet(
-                            basalt_protocol::packets::play::chat::ClientboundPlaySystemChat::PACKET_ID,
-                            &basalt_protocol::packets::play::chat::ClientboundPlaySystemChat {
-                                content: content.clone(),
-                                is_action_bar: *action_bar,
-                            },
-                        ));
+                        let _ = handle.tx.try_send(ServerOutput::SystemChat {
+                            content: content.clone(),
+                            action_bar: *action_bar,
+                        });
                     }
                 }
                 Response::SendPosition {
@@ -917,21 +852,14 @@ impl GameLoop {
                             pos.z = *z;
                         }
                         if let Some(handle) = self.ecs.get::<OutputHandle>(eid) {
-                            let _ = handle.tx.try_send(encode_packet(
-                                ClientboundPlayPosition::PACKET_ID,
-                                &ClientboundPlayPosition {
-                                    teleport_id: *teleport_id,
-                                    x: *x,
-                                    y: *y,
-                                    z: *z,
-                                    dx: 0.0,
-                                    dy: 0.0,
-                                    dz: 0.0,
-                                    yaw: *yaw,
-                                    pitch: *pitch,
-                                    flags: 0,
-                                },
-                            ));
+                            let _ = handle.tx.try_send(ServerOutput::SetPosition {
+                                teleport_id: *teleport_id,
+                                x: *x,
+                                y: *y,
+                                z: *z,
+                                yaw: *yaw,
+                                pitch: *pitch,
+                            });
                         }
                     }
                 }
@@ -944,13 +872,10 @@ impl GameLoop {
                     if let Some(eid) = self.ecs.find_by_uuid(source_uuid)
                         && let Some(handle) = self.ecs.get::<OutputHandle>(eid)
                     {
-                        let _ = handle.tx.try_send(encode_packet(
-                            ClientboundPlayGameStateChange::PACKET_ID,
-                            &ClientboundPlayGameStateChange {
-                                reason: *reason,
-                                game_mode: *value,
-                            },
-                        ));
+                        let _ = handle.tx.try_send(ServerOutput::GameStateChange {
+                            reason: *reason,
+                            value: *value,
+                        });
                     }
                 }
                 Response::PersistChunk { cx, cz } => {
@@ -1007,18 +932,10 @@ fn face_offset(direction: i32) -> (i32, i32, i32) {
     }
 }
 
-/// Encodes a packet struct into a [`ServerOutput::SendPacket`].
-fn encode_packet<P: Encode + EncodedSize>(packet_id: i32, packet: &P) -> ServerOutput {
-    let mut data = Vec::with_capacity(packet.encoded_size());
-    packet.encode(&mut data).expect("packet encoding failed");
-    ServerOutput::SendPacket {
-        id: packet_id,
-        data,
-    }
-}
-
-/// Sends a PlayerInfo "add player" packet.
+/// Sends a PlayerInfo "add player" packet (manually encoded due to switch fields).
 fn send_player_info_add(output_tx: &mpsc::Sender<ServerOutput>, info: &basalt_api::PlayerSnapshot) {
+    use basalt_protocol::packets::play::player::ClientboundPlayPlayerInfo;
+
     let mut buf = Vec::new();
     let actions: u8 = 0x01 | 0x04 | 0x08;
     actions.encode(&mut buf).unwrap();
@@ -1040,7 +957,7 @@ fn send_player_info_add(output_tx: &mpsc::Sender<ServerOutput>, info: &basalt_ap
     }
     VarInt(1).encode(&mut buf).unwrap(); // gamemode: creative
     true.encode(&mut buf).unwrap(); // listed
-    let _ = output_tx.try_send(ServerOutput::SendPacket {
+    let _ = output_tx.try_send(ServerOutput::Raw {
         id: ClientboundPlayPlayerInfo::PACKET_ID,
         data: buf,
     });
@@ -1061,25 +978,10 @@ fn send_spawn_entity(output_tx: &mpsc::Sender<ServerOutput>, info: &basalt_api::
         object_data: 0,
         velocity: Vec3i16 { x: 0, y: 0, z: 0 },
     };
-    let _ = output_tx.try_send(encode_packet(
+    let _ = output_tx.try_send(ServerOutput::Packet(EncodablePacket::new(
         ClientboundPlaySpawnEntity::PACKET_ID,
-        &packet,
-    ));
-}
-
-/// Sends a system chat message.
-fn send_system_chat(
-    output_tx: &mpsc::Sender<ServerOutput>,
-    component: &basalt_types::TextComponent,
-    action_bar: bool,
-) {
-    let _ = output_tx.try_send(encode_packet(
-        basalt_protocol::packets::play::chat::ClientboundPlaySystemChat::PACKET_ID,
-        &basalt_protocol::packets::play::chat::ClientboundPlaySystemChat {
-            content: component.to_nbt(),
-            is_action_bar: action_bar,
-        },
-    ));
+        packet,
+    )));
 }
 
 #[cfg(test)]
@@ -1093,6 +995,7 @@ mod tests {
         mpsc::UnboundedReceiver<crate::runtime::io_thread::IoRequest>,
     ) {
         let world = Arc::new(basalt_world::World::new_memory(42));
+        let chunk_cache = Arc::new(ChunkPacketCache::new(Arc::clone(&world)));
         let (game_tx, game_rx) = mpsc::unbounded_channel();
         let (io_tx, io_rx) = mpsc::unbounded_channel();
 
@@ -1114,7 +1017,7 @@ mod tests {
         }
 
         let ecs = basalt_ecs::Ecs::new();
-        let game_loop = GameLoop::new(bus, world, game_rx, io_tx, ecs, Vec::new());
+        let game_loop = GameLoop::new(bus, world, chunk_cache, game_rx, io_tx, ecs, Vec::new());
         (game_loop, game_tx, io_rx)
     }
 
@@ -1206,8 +1109,6 @@ mod tests {
         let uuid = Uuid::from_bytes([1; 16]);
         let mut rx = connect_player(&mut game_loop, &game_tx, uuid, 1);
 
-        // Should have received many packets (Login, DeclareCommands,
-        // SpawnPosition, GameEvent, chunks, Position, PlayerInfo, welcome)
         let mut count = 0;
         while rx.try_recv().is_ok() {
             count += 1;
@@ -1277,7 +1178,6 @@ mod tests {
         let rot = game_loop.ecs.get::<basalt_ecs::Rotation>(eid).unwrap();
         assert_eq!(rot.yaw, 180.0);
         assert_eq!(rot.pitch, -30.0);
-        // Position should be unchanged (0, -60, 0 from connect)
         let pos = game_loop.ecs.get::<basalt_ecs::Position>(eid).unwrap();
         assert_eq!(pos.x, 0.0);
     }
@@ -1289,17 +1189,14 @@ mod tests {
         let uuid2 = Uuid::from_bytes([2; 16]);
         let mut rx1 = connect_player(&mut game_loop, &game_tx, uuid1, 1);
 
-        // Drain initial packets for player 1
         while rx1.try_recv().is_ok() {}
 
-        // Player 2 joins — player 1 should receive join broadcast
         let _rx2 = connect_player(&mut game_loop, &game_tx, uuid2, 2);
 
         let mut p1_count = 0;
         while rx1.try_recv().is_ok() {
             p1_count += 1;
         }
-        // Player 1 should get: PlayerInfo + SpawnEntity + join message
         assert!(
             p1_count >= 3,
             "player 1 should receive join broadcast, got {p1_count} packets"
@@ -1314,14 +1211,11 @@ mod tests {
         let mut rx1 = connect_player(&mut game_loop, &game_tx, uuid1, 1);
         let _rx2 = connect_player(&mut game_loop, &game_tx, uuid2, 2);
 
-        // Drain all packets
         while rx1.try_recv().is_ok() {}
 
-        // Player 2 disconnects
         let _ = game_tx.send(GameInput::PlayerDisconnected { uuid: uuid2 });
         game_loop.tick(2);
 
-        // Player 1 should receive leave broadcast
         let mut p1_count = 0;
         while rx1.try_recv().is_ok() {
             p1_count += 1;
@@ -1340,10 +1234,8 @@ mod tests {
         let _rx1 = connect_player(&mut game_loop, &game_tx, uuid1, 1);
         let mut rx2 = connect_player(&mut game_loop, &game_tx, uuid2, 2);
 
-        // Drain initial packets
         while rx2.try_recv().is_ok() {}
 
-        // Player 1 moves
         let _ = game_tx.send(GameInput::Position {
             uuid: uuid1,
             x: 5.0,
@@ -1353,15 +1245,13 @@ mod tests {
         });
         game_loop.tick(2);
 
-        // Player 2 should receive movement broadcast
-        let mut p2_count = 0;
-        while rx2.try_recv().is_ok() {
-            p2_count += 1;
+        let mut got_moved = false;
+        while let Ok(msg) = rx2.try_recv() {
+            if matches!(msg, ServerOutput::Broadcast(_)) {
+                got_moved = true;
+            }
         }
-        assert!(
-            p2_count >= 2,
-            "player 2 should receive sync + head rotation, got {p2_count}"
-        );
+        assert!(got_moved, "player 2 should receive movement broadcast");
     }
 
     #[test]
@@ -1370,7 +1260,6 @@ mod tests {
         let uuid = Uuid::from_bytes([1; 16]);
         let _rx = connect_player(&mut game_loop, &game_tx, uuid, 1);
 
-        // Give stone in hotbar slot 0
         let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
         if let Some(inv) = game_loop.ecs.get_mut::<basalt_ecs::Inventory>(eid) {
             inv.hotbar[0] = basalt_types::Slot {
@@ -1380,7 +1269,6 @@ mod tests {
             };
         }
 
-        // Place on top of (5, 63, 3)
         let _ = game_tx.send(GameInput::BlockPlace {
             uuid,
             x: 5,
@@ -1426,7 +1314,6 @@ mod tests {
         let uuid = Uuid::from_bytes([1; 16]);
         let _rx = connect_player(&mut game_loop, &game_tx, uuid, 1);
 
-        // Slot 10 is outside hotbar range (36-44)
         let _ = game_tx.send(GameInput::SetCreativeSlot {
             uuid,
             slot: 10,
@@ -1438,7 +1325,6 @@ mod tests {
         });
         game_loop.tick(1);
 
-        // Hotbar should be unchanged (all empty)
         let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
         let inv = game_loop.ecs.get::<basalt_ecs::Inventory>(eid).unwrap();
         assert!(inv.hotbar[0].item_id.is_none());
@@ -1453,7 +1339,6 @@ mod tests {
             .world
             .set_block(5, 64, 3, basalt_world::block::STONE);
 
-        // Drain initial packets
         while rx.try_recv().is_ok() {}
 
         let _ = game_tx.send(GameInput::BlockDig {
@@ -1468,16 +1353,22 @@ mod tests {
 
         let mut got_ack = false;
         let mut got_block_change = false;
-        while let Ok(ServerOutput::SendPacket { id, .. }) = rx.try_recv() {
-            if id == basalt_protocol::packets::play::world::ClientboundPlayAcknowledgePlayerDigging::PACKET_ID {
-                got_ack = true;
-            }
-            if id == basalt_protocol::packets::play::world::ClientboundPlayBlockChange::PACKET_ID {
-                got_block_change = true;
+        while let Ok(msg) = rx.try_recv() {
+            match &msg {
+                ServerOutput::BlockAck { .. } => got_ack = true,
+                ServerOutput::Broadcast(bc) => {
+                    if matches!(bc.event, BroadcastEvent::BlockChanged { .. }) {
+                        got_block_change = true;
+                    }
+                }
+                _ => {}
             }
         }
         assert!(got_ack, "should have received block ack");
-        assert!(got_block_change, "should have received block change");
+        assert!(
+            got_block_change,
+            "should have received block change broadcast"
+        );
     }
 
     #[test]
@@ -1485,7 +1376,6 @@ mod tests {
         let (mut game_loop, game_tx, _io_rx) = test_game_loop();
         let unknown = Uuid::from_bytes([99; 16]);
 
-        // Should not panic
         let _ = game_tx.send(GameInput::Position {
             uuid: unknown,
             x: 10.0,
@@ -1510,7 +1400,6 @@ mod tests {
             sequence: 1,
         });
         game_loop.tick(0);
-        // No crash = pass
     }
 
     #[test]
@@ -1519,10 +1408,8 @@ mod tests {
         let uuid = Uuid::from_bytes([1; 16]);
         let mut rx = connect_player(&mut game_loop, &game_tx, uuid, 1);
 
-        // Drain initial packets
         while rx.try_recv().is_ok() {}
 
-        // Move to a different chunk (16 blocks away = chunk boundary)
         let _ = game_tx.send(GameInput::Position {
             uuid,
             x: 32.0,
@@ -1532,7 +1419,6 @@ mod tests {
         });
         game_loop.tick(1);
 
-        // Should receive UpdateViewPosition + chunk load/unload packets
         let mut got_packets = false;
         while rx.try_recv().is_ok() {
             got_packets = true;
@@ -1542,7 +1428,6 @@ mod tests {
             "should receive chunk streaming packets on boundary crossing"
         );
 
-        // Verify ChunkView was updated
         let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
         let view = game_loop.ecs.get::<ChunkView>(eid).unwrap();
         let new_cx = (32.0_f64 as i32) >> 4;
