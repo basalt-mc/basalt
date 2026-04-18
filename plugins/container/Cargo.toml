@@ -1,0 +1,16 @@
+[package]
+name = "basalt-plugin-container"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+basalt-api = { workspace = true }
+basalt-world = { workspace = true }
+
+[dev-dependencies]
+basalt-testkit = { workspace = true }
+basalt-types = { workspace = true }
+basalt-world = { workspace = true }
+basalt-plugin-block = { path = "../block" }
