@@ -135,7 +135,7 @@ impl ProtocolType {
             Self::Uuid => ("Uuid".into(), None),
             Self::Position => ("Position".into(), None),
             Self::NbtCompound => ("NbtCompound".into(), None),
-            Self::OptionalNbt => ("Option<NbtCompound>".into(), Some("optional".into())),
+            Self::OptionalNbt => ("NbtCompound".into(), None),
             Self::Slot => ("Slot".into(), None),
             Self::Vec2f => ("Vec2f".into(), None),
             Self::Vec3f => ("Vec3f".into(), None),
@@ -258,7 +258,7 @@ mod tests {
         );
         assert_eq!(
             ProtocolType::OptionalNbt.to_rust(),
-            ("Option<NbtCompound>".into(), Some("optional".into()))
+            ("NbtCompound".into(), None)
         );
     }
 

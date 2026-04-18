@@ -196,8 +196,7 @@ pub struct ClientboundPlayMapChunkChunkblockentity {
     pub y: i16,
     #[field(varint)]
     pub r#type: i32,
-    #[field(optional)]
-    pub nbt_data: Option<NbtCompound>,
+    pub nbt_data: NbtCompound,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -237,8 +236,7 @@ pub struct ClientboundPlayMultiBlockChange {
 pub struct ClientboundPlayNbtQueryResponse {
     #[field(varint)]
     pub transaction_id: i32,
-    #[field(optional)]
-    pub nbt: Option<NbtCompound>,
+    pub nbt: NbtCompound,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -254,8 +252,7 @@ pub struct ClientboundPlayTileEntityData {
     pub location: Position,
     #[field(varint)]
     pub action: i32,
-    #[field(optional)]
-    pub nbt_data: Option<NbtCompound>,
+    pub nbt_data: NbtCompound,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
