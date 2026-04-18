@@ -297,6 +297,25 @@ async fn write_server_output(
             conn.write_packet_typed(ClientboundPlaySetSlot::PACKET_ID, &packet)
                 .await?;
         }
+        ServerOutput::BlockAction {
+            x,
+            y,
+            z,
+            action_id,
+            action_param,
+            block_id,
+        } => {
+            use basalt_protocol::packets::play::world::ClientboundPlayBlockAction;
+            let packet = ClientboundPlayBlockAction {
+                location: basalt_types::Position::new(*x, *y, *z),
+                byte1: *action_id,
+                byte2: *action_param,
+                block_id: *block_id,
+            };
+            conn.write_packet_typed(ClientboundPlayBlockAction::PACKET_ID, &packet)
+                .await?;
+            // TODO: chest open/close sound — SoundEffect encoding needs investigation
+        }
         ServerOutput::BlockEntityData { x, y, z, action } => {
             use basalt_protocol::packets::play::world::ClientboundPlayTileEntityData;
             let packet = ClientboundPlayTileEntityData {
