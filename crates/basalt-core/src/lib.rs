@@ -16,6 +16,7 @@ pub mod components;
 pub mod context;
 pub mod gamemode;
 pub mod logger;
+pub mod player;
 pub mod system;
 pub mod testing;
 
@@ -30,6 +31,7 @@ pub use context::{
 };
 pub use gamemode::Gamemode;
 pub use logger::PluginLogger;
+pub use player::PlayerInfo;
 pub use system::{
     SystemAccess, SystemBuilder, SystemContext, SystemContextExt, SystemDescriptor, SystemRunner,
 };
