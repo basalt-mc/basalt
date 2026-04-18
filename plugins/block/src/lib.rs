@@ -21,44 +21,49 @@ impl Plugin for BlockPlugin {
     fn on_enable(&self, registrar: &mut PluginRegistrar) {
         // Process: mutate world state
         registrar.on::<BlockBrokenEvent>(Stage::Process, 0, |event, ctx| {
-            ctx.world_ctx()
-                .world()
-                .set_block(event.x, event.y, event.z, basalt_world::block::AIR);
+            ctx.world_ctx().world().set_block(
+                event.position.x,
+                event.position.y,
+                event.position.z,
+                basalt_api::world::block::AIR,
+            );
         });
 
         registrar.on::<BlockPlacedEvent>(Stage::Process, 0, |event, ctx| {
-            ctx.world_ctx()
-                .world()
-                .set_block(event.x, event.y, event.z, event.block_state);
+            ctx.world_ctx().world().set_block(
+                event.position.x,
+                event.position.y,
+                event.position.z,
+                event.block_state,
+            );
         });
 
         // Post: acknowledge + broadcast
         registrar.on::<BlockBrokenEvent>(Stage::Post, 0, |event, ctx| {
             ctx.world_ctx().send_block_ack(event.sequence);
-            ctx.entities()
-                .broadcast_raw(BroadcastMessage::BlockChanged {
-                    x: event.x,
-                    y: event.y,
-                    z: event.z,
-                    block_state: basalt_world::block::AIR as i32,
-                });
+            ctx.entities().broadcast_block_change(
+                event.position.x,
+                event.position.y,
+                event.position.z,
+                basalt_api::world::block::AIR as i32,
+            );
         });
 
         registrar.on::<BlockPlacedEvent>(Stage::Post, 0, |event, ctx| {
             ctx.world_ctx().send_block_ack(event.sequence);
-            ctx.entities()
-                .broadcast_raw(BroadcastMessage::BlockChanged {
-                    x: event.x,
-                    y: event.y,
-                    z: event.z,
-                    block_state: event.block_state as i32,
-                });
+            ctx.entities().broadcast_block_change(
+                event.position.x,
+                event.position.y,
+                event.position.z,
+                event.block_state as i32,
+            );
         });
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use basalt_api::components::BlockPosition;
     use basalt_testkit::PluginTestHarness;
 
     use super::*;
@@ -68,16 +73,13 @@ mod tests {
         let mut harness = PluginTestHarness::new();
         harness
             .world()
-            .set_block(5, 64, 3, basalt_world::block::STONE);
+            .set_block(5, 64, 3, basalt_api::world::block::STONE);
         harness.register(BlockPlugin);
 
         let mut event = BlockBrokenEvent {
-            x: 5,
-            y: 64,
-            z: 3,
-            block_state: basalt_world::block::STONE,
+            position: BlockPosition { x: 5, y: 64, z: 3 },
+            block_state: basalt_api::world::block::STONE,
             sequence: 42,
-            player_uuid: Uuid::default(),
             cancelled: false,
         };
 
@@ -85,7 +87,7 @@ mod tests {
 
         assert_eq!(
             harness.world().get_block(5, 64, 3),
-            basalt_world::block::AIR
+            basalt_api::world::block::AIR
         );
         assert_eq!(responses.len(), 2);
         assert!(matches!(
@@ -103,7 +105,7 @@ mod tests {
         let mut harness = PluginTestHarness::new();
         harness
             .world()
-            .set_block(8, 64, 8, basalt_world::block::STONE);
+            .set_block(8, 64, 8, basalt_api::world::block::STONE);
 
         // Register a Validate handler that cancels before BlockPlugin runs
         harness.on::<BlockBrokenEvent>(Stage::Validate, 0, |event, _ctx| {
@@ -112,12 +114,9 @@ mod tests {
         harness.register(BlockPlugin);
 
         let mut event = BlockBrokenEvent {
-            x: 8,
-            y: 64,
-            z: 8,
-            block_state: basalt_world::block::STONE,
+            position: BlockPosition { x: 8, y: 64, z: 8 },
+            block_state: basalt_api::world::block::STONE,
             sequence: 1,
-            player_uuid: Uuid::default(),
             cancelled: false,
         };
 
@@ -125,7 +124,7 @@ mod tests {
 
         assert_eq!(
             harness.world().get_block(8, 64, 8),
-            basalt_world::block::STONE
+            basalt_api::world::block::STONE
         );
         assert!(responses.is_empty());
     }
@@ -136,12 +135,9 @@ mod tests {
         harness.register(BlockPlugin);
 
         let mut event = BlockPlacedEvent {
-            x: 5,
-            y: 64,
-            z: 3,
-            block_state: basalt_world::block::STONE,
+            position: BlockPosition { x: 5, y: 64, z: 3 },
+            block_state: basalt_api::world::block::STONE,
             sequence: 10,
-            player_uuid: Uuid::default(),
             cancelled: false,
         };
 
@@ -149,7 +145,7 @@ mod tests {
 
         assert_eq!(
             harness.world().get_block(5, 64, 3),
-            basalt_world::block::STONE
+            basalt_api::world::block::STONE
         );
         assert_eq!(responses.len(), 2);
         assert!(matches!(
@@ -172,19 +168,16 @@ mod tests {
 
         // Use y=200 which is guaranteed to be air in any world
         let mut event = BlockPlacedEvent {
-            x: 5,
-            y: 200,
-            z: 3,
-            block_state: basalt_world::block::STONE,
+            position: BlockPosition { x: 5, y: 200, z: 3 },
+            block_state: basalt_api::world::block::STONE,
             sequence: 10,
-            player_uuid: Uuid::default(),
             cancelled: false,
         };
 
         let responses = harness.dispatch(&mut event);
         assert_eq!(
             harness.world().get_block(5, 200, 3),
-            basalt_world::block::AIR
+            basalt_api::world::block::AIR
         );
         assert!(responses.is_empty());
     }

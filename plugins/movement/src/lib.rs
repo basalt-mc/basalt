@@ -22,15 +22,15 @@ impl Plugin for MovementPlugin {
 
     fn on_enable(&self, registrar: &mut PluginRegistrar) {
         registrar.on::<PlayerMovedEvent>(Stage::Post, 0, |event, ctx| {
-            ctx.entities().broadcast_raw(BroadcastMessage::EntityMoved {
-                entity_id: event.entity_id,
-                x: event.x,
-                y: event.y,
-                z: event.z,
-                yaw: event.yaw,
-                pitch: event.pitch,
-                on_ground: event.on_ground,
-            });
+            ctx.entities().broadcast_entity_moved(
+                ctx.player().entity_id(),
+                event.position.x,
+                event.position.y,
+                event.position.z,
+                event.rotation.yaw,
+                event.rotation.pitch,
+                event.on_ground,
+            );
         });
     }
 }
@@ -38,6 +38,7 @@ impl Plugin for MovementPlugin {
 #[cfg(test)]
 mod tests {
     use basalt_api::Response;
+    use basalt_api::components::{ChunkPosition, Position, Rotation};
     use basalt_testkit::PluginTestHarness;
 
     use super::*;
@@ -48,15 +49,17 @@ mod tests {
         harness.register(MovementPlugin);
 
         let mut event = PlayerMovedEvent {
-            entity_id: 1,
-            x: 10.0,
-            y: 64.0,
-            z: 5.0,
-            yaw: 90.0,
-            pitch: 0.0,
+            position: Position {
+                x: 10.0,
+                y: 64.0,
+                z: 5.0,
+            },
+            rotation: Rotation {
+                yaw: 90.0,
+                pitch: 0.0,
+            },
             on_ground: true,
-            old_cx: 0,
-            old_cz: 0,
+            old_chunk: ChunkPosition { x: 0, z: 0 },
         };
 
         let responses = harness.dispatch(&mut event);

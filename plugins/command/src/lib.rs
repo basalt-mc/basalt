@@ -4,8 +4,9 @@
 //! API. Commands use typed arguments with auto-validation and
 //! tab-completion.
 
+use basalt_api::command::{Arg, Validation};
 use basalt_api::prelude::*;
-use basalt_types::{NamedColor, TextColor, TextComponent};
+use basalt_api::types::{NamedColor, TextColor, TextComponent};
 
 /// Gameplay and administration command plugin.
 ///
@@ -224,7 +225,7 @@ mod tests {
         assert_eq!(responses.len(), 1);
         assert!(matches!(
             responses[0],
-            Response::Broadcast(basalt_api::BroadcastMessage::Chat { .. })
+            Response::Broadcast(BroadcastMessage::Chat { .. })
         ));
     }
 
@@ -241,7 +242,7 @@ mod tests {
         assert_eq!(responses.len(), 1);
         assert!(matches!(
             responses[0],
-            Response::Broadcast(basalt_api::BroadcastMessage::Chat { .. })
+            Response::Broadcast(BroadcastMessage::Chat { .. })
         ));
     }
 

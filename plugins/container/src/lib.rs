@@ -6,8 +6,8 @@
 //! - [`BlockBrokenEvent`]: drops chest contents, removes block entities, reverts double chests
 
 use basalt_api::prelude::*;
-use basalt_world::block;
-use basalt_world::block_entity::BlockEntity;
+use basalt_api::world::block;
+use basalt_api::world::block_entity::BlockEntity;
 
 /// Handles chest interaction, double chest pairing, and block entity lifecycle.
 pub struct ContainerPlugin;
@@ -26,7 +26,8 @@ impl Plugin for ContainerPlugin {
         // Open chest on right-click (Process stage, cancels event)
         registrar.on::<PlayerInteractEvent>(Stage::Process, 0, |event, ctx| {
             if block::is_chest(event.block_state) {
-                ctx.containers().open_chest(event.x, event.y, event.z);
+                ctx.containers()
+                    .open_chest(event.position.x, event.position.y, event.position.z);
                 event.cancel();
             }
         });
@@ -41,51 +42,63 @@ impl Plugin for ContainerPlugin {
             let world = ctx.world_ctx().world();
 
             // Create block entity
-            world.set_block_entity(event.x, event.y, event.z, BlockEntity::empty_chest());
+            world.set_block_entity(
+                event.position.x,
+                event.position.y,
+                event.position.z,
+                BlockEntity::empty_chest(),
+            );
 
             // Orient chest based on player yaw
             let yaw = ctx.player().yaw();
             let oriented = block::chest_state_for_yaw(yaw);
-            world.set_block(event.x, event.y, event.z, oriented);
-            ctx.entities()
-                .broadcast_raw(BroadcastMessage::BlockChanged {
-                    x: event.x,
-                    y: event.y,
-                    z: event.z,
-                    block_state: i32::from(oriented),
-                });
+            world.set_block(
+                event.position.x,
+                event.position.y,
+                event.position.z,
+                oriented,
+            );
+            ctx.entities().broadcast_block_change(
+                event.position.x,
+                event.position.y,
+                event.position.z,
+                i32::from(oriented),
+            );
 
             // Double chest pairing — scan adjacent for single chest with same facing
             let facing = block::chest_facing(oriented);
             let offsets = block::chest_adjacent_offsets(facing);
             for &(dx, dz) in &offsets {
-                let nx = event.x + dx;
-                let nz = event.z + dz;
-                let neighbor = world.get_block(nx, event.y, nz);
+                let nx = event.position.x + dx;
+                let nz = event.position.z + dz;
+                let neighbor = world.get_block(nx, event.position.y, nz);
                 if block::is_single_chest(neighbor) && block::chest_facing(neighbor) == facing {
-                    let ddx = nx - event.x;
-                    let ddz = nz - event.z;
+                    let ddx = nx - event.position.x;
+                    let ddz = nz - event.position.z;
                     let (new_type, existing_type) = block::chest_double_types(facing, ddx, ddz);
                     let new_state = block::chest_state(facing, new_type);
                     let neighbor_state = block::chest_state(facing, existing_type);
-                    world.set_block(event.x, event.y, event.z, new_state);
-                    world.set_block(nx, event.y, nz, neighbor_state);
-                    world.mark_chunk_dirty(event.x >> 4, event.z >> 4);
+                    world.set_block(
+                        event.position.x,
+                        event.position.y,
+                        event.position.z,
+                        new_state,
+                    );
+                    world.set_block(nx, event.position.y, nz, neighbor_state);
+                    world.mark_chunk_dirty(event.position.x >> 4, event.position.z >> 4);
                     world.mark_chunk_dirty(nx >> 4, nz >> 4);
-                    ctx.entities()
-                        .broadcast_raw(BroadcastMessage::BlockChanged {
-                            x: event.x,
-                            y: event.y,
-                            z: event.z,
-                            block_state: i32::from(new_state),
-                        });
-                    ctx.entities()
-                        .broadcast_raw(BroadcastMessage::BlockChanged {
-                            x: nx,
-                            y: event.y,
-                            z: nz,
-                            block_state: i32::from(neighbor_state),
-                        });
+                    ctx.entities().broadcast_block_change(
+                        event.position.x,
+                        event.position.y,
+                        event.position.z,
+                        i32::from(new_state),
+                    );
+                    ctx.entities().broadcast_block_change(
+                        nx,
+                        event.position.y,
+                        nz,
+                        i32::from(neighbor_state),
+                    );
                     break;
                 }
             }
@@ -101,15 +114,17 @@ impl Plugin for ContainerPlugin {
             let world = ctx.world_ctx().world();
 
             // Drop contents
-            if let Some(be) = world.get_block_entity(event.x, event.y, event.z) {
+            if let Some(be) =
+                world.get_block_entity(event.position.x, event.position.y, event.position.z)
+            {
                 match &*be {
                     BlockEntity::Chest { slots } => {
                         for slot in slots.iter() {
                             if let Some(item_id) = slot.item_id {
                                 ctx.entities().spawn_dropped_item(
-                                    event.x,
-                                    event.y,
-                                    event.z,
+                                    event.position.x,
+                                    event.position.y,
+                                    event.position.z,
                                     item_id,
                                     slot.item_count,
                                 );
@@ -120,30 +135,29 @@ impl Plugin for ContainerPlugin {
             }
 
             // Remove block entity
-            world.remove_block_entity(event.x, event.y, event.z);
+            world.remove_block_entity(event.position.x, event.position.y, event.position.z);
 
             // Revert double chest partner to single
             if block::chest_type(state) != 0 {
                 let facing = block::chest_facing(state);
                 let offsets = block::chest_adjacent_offsets(facing);
                 for &(dx, dz) in &offsets {
-                    let nx = event.x + dx;
-                    let nz = event.z + dz;
-                    let neighbor = world.get_block(nx, event.y, nz);
+                    let nx = event.position.x + dx;
+                    let nz = event.position.z + dz;
+                    let neighbor = world.get_block(nx, event.position.y, nz);
                     if block::is_chest(neighbor)
                         && block::chest_facing(neighbor) == facing
                         && block::chest_type(neighbor) != 0
                     {
                         let single = block::chest_state(facing, 0);
-                        world.set_block(nx, event.y, nz, single);
+                        world.set_block(nx, event.position.y, nz, single);
                         world.mark_chunk_dirty(nx >> 4, nz >> 4);
-                        ctx.entities()
-                            .broadcast_raw(BroadcastMessage::BlockChanged {
-                                x: nx,
-                                y: event.y,
-                                z: nz,
-                                block_state: i32::from(single),
-                            });
+                        ctx.entities().broadcast_block_change(
+                            nx,
+                            event.position.y,
+                            nz,
+                            i32::from(single),
+                        );
                         break;
                     }
                 }
@@ -154,8 +168,8 @@ impl Plugin for ContainerPlugin {
 
 #[cfg(test)]
 mod tests {
+    use basalt_api::components::BlockPosition;
     use basalt_testkit::PluginTestHarness;
-    use basalt_types::Uuid;
 
     use super::*;
 
@@ -165,10 +179,7 @@ mod tests {
         harness.register(ContainerPlugin);
 
         let mut event = PlayerInteractEvent {
-            x: 5,
-            y: 64,
-            z: 3,
-            player_uuid: Uuid::default(),
+            position: BlockPosition { x: 5, y: 64, z: 3 },
             block_state: block::CHEST,
             direction: 1,
             sequence: 1,
@@ -185,10 +196,7 @@ mod tests {
         harness.register(ContainerPlugin);
 
         let mut event = PlayerInteractEvent {
-            x: 5,
-            y: 64,
-            z: 3,
-            player_uuid: Uuid::default(),
+            position: BlockPosition { x: 5, y: 64, z: 3 },
             block_state: block::STONE,
             direction: 1,
             sequence: 1,
@@ -212,12 +220,9 @@ mod tests {
             .set_block_entity(5, 64, 3, BlockEntity::empty_chest());
 
         let mut event = BlockBrokenEvent {
-            x: 5,
-            y: 64,
-            z: 3,
+            position: BlockPosition { x: 5, y: 64, z: 3 },
             block_state: block::CHEST,
             sequence: 1,
-            player_uuid: Uuid::default(),
             cancelled: false,
         };
 
