@@ -31,7 +31,8 @@ impl Plugin for DropsPlugin {
     fn on_enable(&self, registrar: &mut PluginRegistrar) {
         registrar.on::<BlockBrokenEvent>(Stage::Post, 0, |event, ctx| {
             if let Some(item_id) = block::block_state_to_item_id(event.block_state) {
-                ctx.spawn_dropped_item(event.x, event.y, event.z, item_id, 1);
+                ctx.entities()
+                    .spawn_dropped_item(event.x, event.y, event.z, item_id, 1);
             }
         });
     }

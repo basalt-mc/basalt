@@ -11,7 +11,10 @@ pub mod logger;
 pub mod plugin;
 
 // Re-export core types for convenience.
-pub use basalt_core::{BroadcastMessage, Context, Gamemode, PlayerSnapshot, ProfileProperty};
+pub use basalt_core::{
+    BroadcastMessage, ChatContext, ContainerContext, Context, EntityContext, Gamemode,
+    PlayerContext, PlayerSnapshot, ProfileProperty, WorldContext,
+};
 pub use context::{Response, ServerContext};
 pub use plugin::{CommandEntry, Plugin, PluginMetadata, PluginRegistrar};
 
@@ -24,7 +27,10 @@ pub use basalt_events::{Event, EventBus, Stage};
 /// Prelude module for convenient glob imports.
 pub mod prelude {
     pub use basalt_command::{Arg, CommandArgs, Validation};
-    pub use basalt_core::{BroadcastMessage, Context, Gamemode, PlayerSnapshot};
+    pub use basalt_core::{
+        BroadcastMessage, ChatContext, ContainerContext, Context, EntityContext, Gamemode,
+        PlayerContext, PlayerSnapshot, WorldContext,
+    };
 
     pub use basalt_types::Uuid;
 

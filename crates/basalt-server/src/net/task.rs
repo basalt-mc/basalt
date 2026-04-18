@@ -834,7 +834,8 @@ async fn process_instant_responses(
             | Response::SendBlockAck { .. }
             | Response::StreamChunks { .. }
             | Response::PersistChunk { .. }
-            | Response::SpawnDroppedItem { .. } => {}
+            | Response::SpawnDroppedItem { .. }
+            | Response::OpenChest { .. } => {}
         }
     }
     Ok(())

@@ -24,7 +24,7 @@ impl Plugin for ChatPlugin {
     fn on_enable(&self, registrar: &mut PluginRegistrar) {
         registrar.on::<ChatMessageEvent>(Stage::Post, 0, |event, ctx| {
             let component = build_chat_component(&event.username, &event.message);
-            ctx.broadcast_message_component(&component);
+            ctx.chat().broadcast_component(&component);
         });
     }
 }

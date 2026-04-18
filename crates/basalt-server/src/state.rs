@@ -110,7 +110,7 @@ impl ServerState {
                             Ok(parsed) => (entry.handler)(&parsed, ctx),
                             Err(msg) => {
                                 let err_msg = format!("/{cmd}: {msg}");
-                                ctx.send_message_component(
+                                ctx.chat().send_component(
                                     &basalt_types::TextComponent::text(err_msg).color(
                                         basalt_types::TextColor::Named(
                                             basalt_types::NamedColor::Red,
@@ -120,7 +120,7 @@ impl ServerState {
                             }
                         }
                     } else {
-                        ctx.send_message_component(
+                        ctx.chat().send_component(
                             &basalt_types::TextComponent::text(format!("Unknown command: /{cmd}"))
                                 .color(basalt_types::TextColor::Named(
                                     basalt_types::NamedColor::Red,
