@@ -175,6 +175,19 @@ impl World {
         }
     }
 
+    /// Returns the coordinates of all chunks currently marked as dirty.
+    ///
+    /// Used by the game loop's periodic flush system to collect chunks
+    /// that need persistence. Does not clear the dirty flags — that
+    /// happens when `persist_chunk()` is called for each chunk.
+    pub fn dirty_chunks(&self) -> Vec<(i32, i32)> {
+        self.chunks
+            .iter()
+            .filter(|e| e.value().dirty)
+            .map(|e| *e.key())
+            .collect()
+    }
+
     /// Returns true if the chunk at (cx, cz) is in the memory cache.
     pub fn is_chunk_loaded(&self, cx: i32, cz: i32) -> bool {
         self.chunks.contains_key(&(cx, cz))
