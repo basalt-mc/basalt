@@ -10,6 +10,8 @@ use std::time::Instant;
 
 use basalt_api::context::{Response, ServerContext};
 use basalt_api::events::{ChatMessageEvent, CommandEvent};
+use basalt_core::PlayerInfo;
+use basalt_core::components::Rotation;
 use basalt_events::EventBus;
 use basalt_net::connection::{Connection, Play};
 use basalt_protocol::packets::play::ServerboundPlayPacket;
@@ -64,11 +66,15 @@ pub(super) async fn handle_packet(
             log::info!(target: "basalt::net_task", "[{addr}] <{username}> {}", msg.message);
             let ctx = ServerContext::new(
                 Arc::clone(world),
-                uuid,
-                entity_id,
-                username.to_string(),
-                0.0,
-                0.0,
+                PlayerInfo {
+                    uuid,
+                    entity_id,
+                    username: username.to_string(),
+                    rotation: Rotation {
+                        yaw: 0.0,
+                        pitch: 0.0,
+                    },
+                },
             );
             let mut event = ChatMessageEvent {
                 message: msg.message,
@@ -90,11 +96,15 @@ pub(super) async fn handle_packet(
             log::info!(target: "basalt::net_task", "[{addr}] {username} issued /{}", cmd.command);
             let ctx = ServerContext::new(
                 Arc::clone(world),
-                uuid,
-                entity_id,
-                username.to_string(),
-                0.0,
-                0.0,
+                PlayerInfo {
+                    uuid,
+                    entity_id,
+                    username: username.to_string(),
+                    rotation: Rotation {
+                        yaw: 0.0,
+                        pitch: 0.0,
+                    },
+                },
             );
             ctx.set_command_list(
                 command_args
@@ -276,22 +286,19 @@ async fn process_instant_responses(
             }
             Response::SendPosition {
                 teleport_id,
-                x,
-                y,
-                z,
-                yaw,
-                pitch,
+                position,
+                rotation,
             } => {
                 let packet = ClientboundPlayPosition {
                     teleport_id: *teleport_id,
-                    x: *x,
-                    y: *y,
-                    z: *z,
+                    x: position.x,
+                    y: position.y,
+                    z: position.z,
                     dx: 0.0,
                     dy: 0.0,
                     dz: 0.0,
-                    yaw: *yaw,
-                    pitch: *pitch,
+                    yaw: rotation.yaw,
+                    pitch: rotation.pitch,
                     flags: 0,
                 };
                 conn.write_packet_typed(ClientboundPlayPosition::PACKET_ID, &packet)
@@ -308,10 +315,10 @@ async fn process_instant_responses(
             // Game-loop concerns -- not handled in instant context
             Response::Broadcast(_)
             | Response::SendBlockAck { .. }
-            | Response::StreamChunks { .. }
-            | Response::PersistChunk { .. }
+            | Response::StreamChunks(_)
+            | Response::PersistChunk(_)
             | Response::SpawnDroppedItem { .. }
-            | Response::OpenChest { .. } => {}
+            | Response::OpenChest(_) => {}
         }
     }
     Ok(())

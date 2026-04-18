@@ -3,6 +3,8 @@
 use std::sync::Arc;
 
 use basalt_api::context::ServerContext;
+use basalt_core::PlayerInfo;
+use basalt_core::components::Rotation;
 use basalt_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
 use basalt_types::{Encode, Uuid, VarInt, Vec3i16};
 use tokio::sync::mpsc;
@@ -34,11 +36,12 @@ impl GameLoop {
     ) -> ServerContext {
         ServerContext::new(
             Arc::clone(&self.world),
-            uuid,
-            entity_id,
-            username.to_string(),
-            yaw,
-            pitch,
+            PlayerInfo {
+                uuid,
+                entity_id,
+                username: username.to_string(),
+                rotation: Rotation { yaw, pitch },
+            },
         )
     }
 

@@ -63,10 +63,7 @@ mod tests {
         assert_eq!(responses.len(), 1);
         assert!(matches!(
             responses[0],
-            Response::StreamChunks {
-                new_cx: 1,
-                new_cz: 0
-            }
+            Response::StreamChunks(ChunkPosition { x: 1, z: 0 })
         ));
     }
 
@@ -94,10 +91,7 @@ mod tests {
         assert_eq!(responses.len(), 1);
         assert!(matches!(
             responses[0],
-            Response::StreamChunks {
-                new_cx: -1,
-                new_cz: -1
-            }
+            Response::StreamChunks(ChunkPosition { x: -1, z: -1 })
         ));
     }
 
