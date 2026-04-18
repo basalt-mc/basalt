@@ -715,6 +715,14 @@ async fn handle_packet(
             let _ = game_tx.send(GameInput::CloseWindow { uuid });
         }
 
+        // -- Game loop: entity action (sneak, sprint, etc.) --
+        ServerboundPlayPacket::EntityAction(action) => {
+            let _ = game_tx.send(GameInput::EntityAction {
+                uuid,
+                action_id: action.action_id,
+            });
+        }
+
         // -- Inline (no routing) --
         ServerboundPlayPacket::TeleportConfirm(_)
         | ServerboundPlayPacket::Flying(_)

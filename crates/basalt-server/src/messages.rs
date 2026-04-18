@@ -153,6 +153,13 @@ pub enum GameInput {
         /// UUID of the player.
         uuid: Uuid,
     },
+    /// Player started or stopped sneaking.
+    EntityAction {
+        /// UUID of the player.
+        uuid: Uuid,
+        /// Action ID (0 = start sneak, 1 = stop sneak).
+        action_id: i32,
+    },
 }
 
 /// Output from the game loop to a player's net task.
