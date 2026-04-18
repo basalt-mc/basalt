@@ -147,7 +147,7 @@ impl GameLoop {
         // Dispatch PlayerJoinedEvent
         let ctx = self.make_context(uuid, entity_id, &username, yaw, pitch);
         let mut event = PlayerJoinedEvent;
-        self.bus.dispatch(&mut event, &ctx);
+        self.dispatch_event(&mut event, &ctx);
         self.process_responses(uuid, &ctx.drain_responses());
         self.rebuild_active_chunks();
     }
@@ -290,7 +290,7 @@ impl GameLoop {
         // Dispatch PlayerLeftEvent
         let ctx = self.make_context(uuid, entity_id, &username, 0.0, 0.0);
         let mut event = PlayerLeftEvent;
-        self.bus.dispatch(&mut event, &ctx);
+        self.dispatch_event(&mut event, &ctx);
         self.process_responses(uuid, &ctx.drain_responses());
 
         self.ecs.despawn(eid);

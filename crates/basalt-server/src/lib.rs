@@ -168,17 +168,10 @@ impl Server {
             server_state.entity_id_counter(),
             self.config.server.simulation_distance,
             persistence_interval_ticks,
+            crash_on_panic,
         );
         let _game_loop = runtime::tick::TickLoop::start("game-loop", tps, move |tick| {
-            if crash_on_panic {
-                game_loop_inst.tick(tick);
-            } else if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                game_loop_inst.tick(tick);
-            }))
-            .is_err()
-            {
-                log::error!(target: "basalt::server", "Game loop tick {tick} panicked — continuing (crash_on_plugin_panic = false)");
-            }
+            game_loop_inst.tick(tick);
         });
 
         log::info!(target: "basalt::server", "Game loop and I/O thread started at {tps} TPS");

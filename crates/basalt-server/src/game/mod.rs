@@ -102,6 +102,8 @@ pub(crate) struct GameLoop {
     pub(super) next_window_id: u8,
     /// UUID → EntityId index for O(1) player lookups.
     pub(super) uuid_index: std::collections::HashMap<basalt_types::Uuid, basalt_ecs::EntityId>,
+    /// Whether to crash the server when a plugin handler panics.
+    pub(super) crash_on_plugin_panic: bool,
 }
 
 impl GameLoop {
@@ -118,6 +120,7 @@ impl GameLoop {
         next_entity_id: std::sync::Arc<std::sync::atomic::AtomicI32>,
         simulation_distance: i32,
         persistence_interval_ticks: u64,
+        crash_on_plugin_panic: bool,
     ) -> Self {
         Self {
             bus,
@@ -133,6 +136,31 @@ impl GameLoop {
             persistence_interval_ticks,
             next_window_id: 1,
             uuid_index: std::collections::HashMap::new(),
+            crash_on_plugin_panic,
+        }
+    }
+
+    /// Dispatches an event through the bus, catching plugin panics
+    /// if `crash_on_plugin_panic` is false.
+    pub(super) fn dispatch_event(
+        &self,
+        event: &mut dyn basalt_events::Event,
+        ctx: &basalt_api::context::ServerContext,
+    ) {
+        if self.crash_on_plugin_panic {
+            self.bus.dispatch_dyn(event, ctx);
+        } else {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                self.bus.dispatch_dyn(event, ctx);
+            }));
+            if let Err(panic) = result {
+                let msg = panic
+                    .downcast_ref::<&str>()
+                    .copied()
+                    .or_else(|| panic.downcast_ref::<String>().map(|s| s.as_str()))
+                    .unwrap_or("unknown panic");
+                log::error!(target: "basalt::server", "Plugin handler panicked: {msg} — disabling handler");
+            }
         }
     }
 
@@ -300,6 +328,7 @@ pub(super) mod tests {
             Arc::new(std::sync::atomic::AtomicI32::new(1000)),
             8,
             0,
+            true,
         );
         (game_loop, game_tx, io_rx)
     }
