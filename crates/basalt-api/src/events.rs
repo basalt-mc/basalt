@@ -147,6 +147,12 @@ pub struct BlockBrokenEvent {
     pub y: i32,
     /// Block Z coordinate (absolute world coordinates).
     pub z: i32,
+    /// Block state that was at this position before breaking.
+    ///
+    /// Available in Post stage for plugins that need to know what
+    /// was broken (e.g., drops plugin). Set by the game loop before
+    /// dispatch from `World::get_block()`.
+    pub block_state: u16,
     /// Sequence number for client acknowledgement.
     pub sequence: i32,
     /// UUID of the player who broke the block.
@@ -273,6 +279,7 @@ mod tests {
             x: 0,
             y: 64,
             z: 0,
+            block_state: 1,
             sequence: 1,
             player_uuid: Uuid::default(),
             cancelled: false,

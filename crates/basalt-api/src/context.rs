@@ -197,6 +197,16 @@ impl Context for ServerContext {
         self.responses.push(Response::PersistChunk { cx, cz });
     }
 
+    fn spawn_dropped_item(&self, x: i32, y: i32, z: i32, item_id: i32, count: i32) {
+        self.responses.push(Response::SpawnDroppedItem {
+            x,
+            y,
+            z,
+            item_id,
+            count,
+        });
+    }
+
     fn broadcast(&self, msg: BroadcastMessage) {
         self.responses.push(Response::Broadcast(msg));
     }
@@ -270,6 +280,23 @@ pub enum Response {
         cx: i32,
         /// Chunk Z coordinate.
         cz: i32,
+    },
+    /// Spawn a dropped item entity in the world.
+    ///
+    /// The game loop creates an ECS entity with Position, Velocity,
+    /// BoundingBox, Lifetime, DroppedItem, and EntityKind components,
+    /// then broadcasts the spawn to all connected players.
+    SpawnDroppedItem {
+        /// Block X where the item spawns.
+        x: i32,
+        /// Block Y where the item spawns.
+        y: i32,
+        /// Block Z where the item spawns.
+        z: i32,
+        /// Item ID to drop.
+        item_id: i32,
+        /// Item count.
+        count: i32,
     },
 }
 
