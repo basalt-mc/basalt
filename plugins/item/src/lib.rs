@@ -1,4 +1,4 @@
-//! Drops plugin — spawns item entities when blocks are broken.
+//! Item plugin — manages dropped item lifecycle.
 //!
 //! Listens to [`BlockBrokenEvent`] in the Post stage (after the block
 //! has been set to AIR by the block plugin) and spawns a dropped item
@@ -16,12 +16,12 @@ use basalt_world::block;
 /// Reads `BlockBrokenEvent.block_state` to determine the item to drop
 /// via [`block::block_state_to_item_id`]. Non-droppable blocks (air,
 /// technical blocks) produce no drop.
-pub struct DropsPlugin;
+pub struct ItemPlugin;
 
-impl Plugin for DropsPlugin {
+impl Plugin for ItemPlugin {
     fn metadata(&self) -> PluginMetadata {
         PluginMetadata {
-            name: "drops",
+            name: "item",
             version: "0.1.0",
             author: Some("Basalt"),
             dependencies: &["block"],
@@ -49,7 +49,7 @@ mod tests {
     fn breaking_stone_produces_drop_response() {
         let mut harness = PluginTestHarness::new();
         harness.register(basalt_plugin_block::BlockPlugin);
-        harness.register(DropsPlugin);
+        harness.register(ItemPlugin);
 
         // Place a stone block first
         harness.world().set_block(5, 64, 3, block::STONE);
@@ -86,7 +86,7 @@ mod tests {
     fn breaking_air_produces_no_drop() {
         let mut harness = PluginTestHarness::new();
         harness.register(basalt_plugin_block::BlockPlugin);
-        harness.register(DropsPlugin);
+        harness.register(ItemPlugin);
 
         let mut event = BlockBrokenEvent {
             x: 5,
