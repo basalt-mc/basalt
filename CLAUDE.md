@@ -51,6 +51,7 @@ Plugin crates under `plugins/`:
 | `basalt-plugin-lifecycle` | Player join/leave broadcast |
 | `basalt-plugin-movement` | Player position/look broadcast |
 | `basalt-plugin-physics` | Gravity, AABB collision, movement resolution (ECS system) |
+| `basalt-plugin-drops` | Item entity spawning on block break |
 
 - `basalt-core` provides the `Context` trait (shared abstraction for in-game and future console contexts) and shared types (`BroadcastMessage`, `PlayerSnapshot`, `PluginLogger`).
 - `basalt-command` provides typed argument API (`Arg`, `Validation`, `CommandArg`, `CommandArgs`, parsing with variant support) and the `Command` trait. Depends on `basalt-core`, NOT on `basalt-api` (no circular dependency).
@@ -148,7 +149,8 @@ crates/basalt-server/
 | `MovementPlugin` | PlayerMoved | Post: broadcast movement |
 | `WorldPlugin` | PlayerMoved | Process: chunk streaming |
 | `BlockPlugin` | BlockBroken, BlockPlaced | Process: world mutation, Post: ack + broadcast |
-| `StoragePlugin` | BlockBroken, BlockPlaced | Post: persist chunk (priority 10) |
+| `StoragePlugin` | (feature flag) | Enables chunk persistence (batch flush handled by game loop) |
+| `DropsPlugin` | BlockBroken | Post: spawn dropped item entity via `ctx.spawn_dropped_item()` |
 | `PhysicsPlugin` | (ECS system) | Simulate: gravity, AABB collision, movement resolution |
 
 - Plugins are registered at startup via `Plugin::on_enable(&mut PluginRegistrar)`
