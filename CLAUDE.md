@@ -61,6 +61,7 @@ Plugin crates under `plugins/`:
   - `Component` marker trait, `EntityId` type alias, `Phase` enum
   - `SystemContext` trait + `SystemContextExt` extension for typed entity access in system plugins
   - `SystemDescriptor`, `SystemBuilder` for system registration
+  - `PlayerInfo` struct (uuid, entity_id, username, rotation) in `player` module
   - `NoopContext` in `testing` module for unit tests that need a `&dyn Context`
   - Shared broadcast types (`BroadcastMessage`, `PlayerSnapshot`, `ProfileProperty`)
 - `basalt-command` provides typed argument API (`Arg`, `Validation`, `CommandArg`, `CommandArgs`, parsing with variant support) and the `Command` trait. Depends on `basalt-core`, NOT on `basalt-api` (no circular dependency).
@@ -197,6 +198,7 @@ crates/basalt-server/
 - **I/O thread** (dedicated OS thread): receives chunk persist requests via channel, writes BSR region files without blocking the game loop. On shutdown, flushes all dirty chunks from World before exiting.
 - Two event buses: **instant bus** (chat, commands — dispatched in net tasks) and **game bus** (blocks, movement, lifecycle — dispatched in game loop).
 - Handlers are sync. They interact with the server through `ServerContext` methods which queue deferred responses.
+- **Panic handling**: infrastructure panics (game loop, I/O thread) crash the server via `process::exit(1)` — detected through `JoinHandle::join()`. Plugin handler panics are caught via `catch_unwind` at the dispatch level: when `crash_on_plugin_panic = false`, the handler is logged and skipped without killing the game loop. Net task panics are monitored via `JoinHandle` and logged without crashing the server.
 - 10 built-in plugins under `plugins/`, each implementing `Plugin`:
 
 | Plugin | Events | Stages |
@@ -633,7 +635,7 @@ Benchmarks (`criterion`) from day one: encode/decode throughput, allocations per
 
 Two test utilities are available:
 
-**`PluginTestHarness`** (`basalt-testkit`) — for event-based plugins:
+**`PluginTestHarness`** (`basalt-testkit`) — for event-based plugins. Returns `DispatchResult` with high-level assertion methods — plugins never import `Response` directly:
 ```rust
 use basalt_testkit::PluginTestHarness;
 
@@ -641,9 +643,13 @@ let mut harness = PluginTestHarness::new();
 harness.register(MyPlugin);
 
 let mut event = BlockBrokenEvent { position: BlockPosition { x: 5, y: 64, z: 3 }, ... };
-let responses = harness.dispatch(&mut event);
-assert!(matches!(responses[0], Response::SendBlockAck { .. }));
+let result = harness.dispatch(&mut event);
+assert_eq!(result.len(), 2);
+assert!(result.has_block_ack_seq(42));
+assert!(result.has_block_change_broadcast());
 ```
+
+`DispatchResult` methods: `len()`, `is_empty()`, `has_block_ack()`, `has_block_ack_seq(n)`, `has_system_chat()`, `has_teleport()`, `has_game_state_change()`, `has_chat_broadcast()`, `has_block_change_broadcast()`, `has_entity_moved_broadcast()`, `has_player_joined_broadcast()`, `has_player_left_broadcast()`, `has_stream_chunks(x, z)`, `has_spawn_dropped_item(item_id, count)`, `has_any_spawn_dropped_item()`.
 
 **`SystemTestContext`** (`basalt-testkit`) — for system plugins:
 ```rust
