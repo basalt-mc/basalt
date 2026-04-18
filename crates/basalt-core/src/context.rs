@@ -90,6 +90,15 @@ pub trait Context {
     /// game loop. This replaces direct `world().persist_chunk()` calls.
     fn persist_chunk(&self, cx: i32, cz: i32);
 
+    // --- Entity spawning ---
+
+    /// Spawns a dropped item entity at the given block coordinates.
+    ///
+    /// The entity gets Position (block center), random upward Velocity,
+    /// BoundingBox, Lifetime (5 min), DroppedItem, and EntityKind
+    /// components. Broadcast to all connected players.
+    fn spawn_dropped_item(&self, x: i32, y: i32, z: i32, item_id: i32, count: i32);
+
     // --- Raw broadcast ---
 
     /// Sends a raw broadcast message to all connected players.
