@@ -105,6 +105,7 @@ impl Server {
 
         // ECS with core components
         let mut ecs = basalt_ecs::Ecs::new();
+        ecs.set_world(Arc::clone(&world));
         ecs.register_component::<basalt_core::Position>();
         ecs.register_component::<basalt_core::Rotation>();
         ecs.register_component::<basalt_core::Velocity>();

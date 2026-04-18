@@ -137,6 +137,8 @@ pub struct Ecs {
     alive: Vec<EntityId>,
     /// Registered systems, sorted by phase.
     systems: Vec<crate::system::SystemDescriptor>,
+    /// World reference for SystemContext::world(). Set by the server at startup.
+    world: Option<std::sync::Arc<basalt_world::World>>,
 }
 
 impl Ecs {
@@ -147,7 +149,15 @@ impl Ecs {
             next_entity_id: AtomicU32::new(1),
             alive: Vec::new(),
             systems: Vec::new(),
+            world: None,
         }
+    }
+
+    /// Sets the world reference for system runners.
+    ///
+    /// Must be called before `run_all` if any system uses `ctx.world()`.
+    pub fn set_world(&mut self, world: std::sync::Arc<basalt_world::World>) {
+        self.world = Some(world);
     }
 
     /// Registers a component type so entities can have it.
@@ -338,7 +348,9 @@ impl Default for Ecs {
 
 impl basalt_core::SystemContext for Ecs {
     fn world(&self) -> &basalt_world::World {
-        unimplemented!("raw Ecs does not own a World — use the server's SystemContext wrapper")
+        self.world
+            .as_ref()
+            .expect("Ecs::set_world() must be called before running systems that use ctx.world()")
     }
 
     fn spawn(&mut self) -> EntityId {
