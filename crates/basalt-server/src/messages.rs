@@ -148,6 +148,11 @@ pub enum GameInput {
         /// Item on the cursor after the click.
         cursor_item: Slot,
     },
+    /// Player closed a container window.
+    CloseWindow {
+        /// UUID of the player.
+        uuid: Uuid,
+    },
 }
 
 /// Output from the game loop to a player's net task.
@@ -219,6 +224,39 @@ pub enum ServerOutput {
     SyncInventory {
         /// All 46 protocol slots (crafting + armor + main + hotbar + offhand).
         slots: Vec<basalt_types::Slot>,
+    },
+    /// Open a container window on the client.
+    OpenWindow {
+        /// Window ID (1-127).
+        window_id: u8,
+        /// Inventory type (e.g., 2 = generic_9x3 for chests).
+        inventory_type: i32,
+        /// Window title (NBT text component).
+        title: basalt_types::nbt::NbtCompound,
+        /// Container slots + player inventory slots.
+        slots: Vec<basalt_types::Slot>,
+    },
+    /// Update a slot in an open container window.
+    SetContainerSlot {
+        /// Window ID.
+        window_id: u8,
+        /// Slot index within the window.
+        slot: i16,
+        /// The item in the slot.
+        item: basalt_types::Slot,
+    },
+
+    /// Inform client of a block entity at a position.
+    /// Net task sends TileEntityData packet.
+    BlockEntityData {
+        /// Block position.
+        x: i32,
+        /// Block Y.
+        y: i32,
+        /// Block Z.
+        z: i32,
+        /// Block entity type (2 = chest).
+        action: i32,
     },
 
     // ── Chunk path (cache-based, zero alloc) ──────────────────────────

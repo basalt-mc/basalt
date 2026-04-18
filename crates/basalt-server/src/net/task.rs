@@ -257,6 +257,56 @@ async fn write_server_output(
             conn.write_packet_typed(ClientboundPlayWindowItems::PACKET_ID, &packet)
                 .await?;
         }
+        ServerOutput::OpenWindow {
+            window_id,
+            inventory_type,
+            title,
+            slots,
+        } => {
+            use basalt_protocol::packets::play::inventory::{
+                ClientboundPlayOpenWindow, ClientboundPlayWindowItems,
+            };
+            let open = ClientboundPlayOpenWindow {
+                window_id: *window_id as i32,
+                inventory_type: *inventory_type,
+                window_title: title.clone(),
+            };
+            conn.write_packet_typed(ClientboundPlayOpenWindow::PACKET_ID, &open)
+                .await?;
+            let items = ClientboundPlayWindowItems {
+                window_id: *window_id as i32,
+                state_id: 0,
+                items: slots.clone(),
+                carried_item: basalt_types::Slot::empty(),
+            };
+            conn.write_packet_typed(ClientboundPlayWindowItems::PACKET_ID, &items)
+                .await?;
+        }
+        ServerOutput::SetContainerSlot {
+            window_id,
+            slot,
+            item,
+        } => {
+            use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+            let packet = ClientboundPlaySetSlot {
+                window_id: *window_id as i32,
+                state_id: 0,
+                slot: *slot,
+                item: item.clone(),
+            };
+            conn.write_packet_typed(ClientboundPlaySetSlot::PACKET_ID, &packet)
+                .await?;
+        }
+        ServerOutput::BlockEntityData { x, y, z, action } => {
+            use basalt_protocol::packets::play::world::ClientboundPlayTileEntityData;
+            let packet = ClientboundPlayTileEntityData {
+                location: basalt_types::Position::new(*x, *y, *z),
+                action: *action,
+                nbt_data: basalt_types::nbt::NbtCompound::new(),
+            };
+            conn.write_packet_typed(ClientboundPlayTileEntityData::PACKET_ID, &packet)
+                .await?;
+        }
         // ── Chunk path: cache-based ──────────────────────────────────
         ServerOutput::SendChunk { cx, cz } => {
             let bytes = chunk_cache.get_or_encode(*cx, *cz);
@@ -658,6 +708,11 @@ async fn handle_packet(
                     .collect(),
                 cursor_item: click.cursor_item,
             });
+        }
+
+        // -- Game loop: close window --
+        ServerboundPlayPacket::CloseWindow(_) => {
+            let _ = game_tx.send(GameInput::CloseWindow { uuid });
         }
 
         // -- Inline (no routing) --

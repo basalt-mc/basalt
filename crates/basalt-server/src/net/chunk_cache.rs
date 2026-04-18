@@ -135,13 +135,13 @@ fn build_map_chunk_packet(col: &basalt_world::chunk::ChunkColumn) -> Clientbound
     let chunk_data = col.encode_sections();
     let heightmaps = col.compute_heightmaps();
 
-    // Sky light: all sections get full sunlight (level 15).
-    // 26 entries = 24 sections + 1 below + 1 above.
-    // Each entry is 2048 bytes (4 bits per block, 16x16x16 / 2).
     let light_sections = SECTIONS_PER_CHUNK + 2;
     let sky_light_mask = build_full_light_mask(light_sections);
     let sky_light: Vec<Vec<u8>> = (0..light_sections).map(|_| vec![0xFF; 2048]).collect();
 
+    // Block entities are sent separately via TileEntityData packets
+    // because the chunk packet's block_entities NBT encoding has
+    // compatibility issues with the generated struct.
     ClientboundPlayMapChunk {
         x: col.x,
         z: col.z,

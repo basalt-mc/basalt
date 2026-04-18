@@ -16,6 +16,7 @@
 //!     block_data: [u16; 4096]  — raw block state IDs (8KB)
 //! ```
 
+use crate::block_entity::BlockEntity;
 use crate::chunk::{ChunkColumn, SECTIONS_PER_CHUNK};
 use crate::palette::PalettedContainer;
 
@@ -62,10 +63,122 @@ pub fn serialize_chunk(chunk: &ChunkColumn) -> Vec<u8> {
     buf
 }
 
+/// Appends block entity data to a BSR buffer.
+///
+/// Format: `count: u32`, then for each entry:
+/// `local_x: u8, y: i16, local_z: u8, type: u8, data...`
+///
+/// Chest data: 27 × Slot (item_id: i32, count: i32 — simplified).
+pub fn serialize_block_entities(
+    buf: &mut Vec<u8>,
+    block_entities: &[(i32, i32, i32, BlockEntity)],
+    chunk_x: i32,
+    chunk_z: i32,
+) {
+    // Filter to entities in this chunk
+    let in_chunk: Vec<_> = block_entities
+        .iter()
+        .filter(|(x, _, z, _)| (x >> 4) == chunk_x && (z >> 4) == chunk_z)
+        .collect();
+
+    buf.extend_from_slice(&(in_chunk.len() as u32).to_le_bytes());
+
+    for (x, y, z, be) in in_chunk {
+        let local_x = x.rem_euclid(16) as u8;
+        let local_z = z.rem_euclid(16) as u8;
+        buf.push(local_x);
+        buf.extend_from_slice(&(*y as i16).to_le_bytes());
+        buf.push(local_z);
+
+        match be {
+            BlockEntity::Chest { slots } => {
+                buf.push(0); // type 0 = chest
+                for slot in slots.iter() {
+                    let item_id = slot.item_id.unwrap_or(-1);
+                    buf.extend_from_slice(&item_id.to_le_bytes());
+                    buf.extend_from_slice(&slot.item_count.to_le_bytes());
+                }
+            }
+        }
+    }
+}
+
+/// Deserializes block entities from BSR format appended after chunk data.
+///
+/// Returns `(local_x, y, local_z, BlockEntity)` tuples.
+pub fn deserialize_block_entities(
+    data: &[u8],
+    cursor: &mut usize,
+) -> Vec<(u8, i16, u8, BlockEntity)> {
+    let mut result = Vec::new();
+
+    if *cursor + 4 > data.len() {
+        return result;
+    }
+
+    let count = u32::from_le_bytes(data[*cursor..*cursor + 4].try_into().unwrap_or_default());
+    *cursor += 4;
+
+    for _ in 0..count {
+        if *cursor + 4 > data.len() {
+            break;
+        }
+        let local_x = data[*cursor];
+        *cursor += 1;
+        let y = i16::from_le_bytes(data[*cursor..*cursor + 2].try_into().unwrap_or_default());
+        *cursor += 2;
+        let local_z = data[*cursor];
+        *cursor += 1;
+        let be_type = data[*cursor];
+        *cursor += 1;
+
+        match be_type {
+            0 => {
+                // Chest: 27 slots × (item_id: i32 + count: i32) = 216 bytes
+                let mut slots: Box<[basalt_types::Slot; 27]> =
+                    Box::new(std::array::from_fn(|_| basalt_types::Slot::empty()));
+                for slot in slots.iter_mut() {
+                    if *cursor + 8 > data.len() {
+                        break;
+                    }
+                    let item_id = i32::from_le_bytes(
+                        data[*cursor..*cursor + 4].try_into().unwrap_or_default(),
+                    );
+                    *cursor += 4;
+                    let item_count = i32::from_le_bytes(
+                        data[*cursor..*cursor + 4].try_into().unwrap_or_default(),
+                    );
+                    *cursor += 4;
+                    if item_id >= 0 {
+                        *slot = basalt_types::Slot::new(item_id, item_count);
+                    }
+                }
+                result.push((local_x, y, local_z, BlockEntity::Chest { slots }));
+            }
+            _ => break, // Unknown type, stop
+        }
+    }
+
+    result
+}
+
+/// Deserializes a `ChunkColumn` from BSR binary format.
+///
+/// The input should be the uncompressed bytes (after LZ4 decompression).
 /// Deserializes a `ChunkColumn` from BSR binary format.
 ///
 /// The input should be the uncompressed bytes (after LZ4 decompression).
 pub fn deserialize_chunk(data: &[u8], chunk_x: i32, chunk_z: i32) -> Option<ChunkColumn> {
+    deserialize_chunk_with_cursor(data, chunk_x, chunk_z).map(|(col, _)| col)
+}
+
+/// Deserializes a `ChunkColumn` and returns the cursor position after
+/// chunk data, so the caller can continue reading block entities.
+pub fn deserialize_chunk_with_cursor(
+    data: &[u8],
+    chunk_x: i32,
+    chunk_z: i32,
+) -> Option<(ChunkColumn, usize)> {
     let mut cursor = 0;
 
     if data.len() < 4 {
@@ -115,7 +228,7 @@ pub fn deserialize_chunk(data: &[u8], chunk_x: i32, chunk_z: i32) -> Option<Chun
         }
     }
 
-    Some(chunk)
+    Some((chunk, cursor))
 }
 
 #[cfg(test)]
@@ -182,5 +295,55 @@ mod tests {
         assert_eq!(restored.get_block(0, -63, 0), block::DIRT);
         assert_eq!(restored.get_block(0, -61, 0), block::GRASS_BLOCK);
         assert_eq!(restored.get_block(0, -60, 0), block::AIR);
+    }
+
+    #[test]
+    fn block_entity_roundtrip() {
+        let mut slots: Box<[basalt_types::Slot; 27]> =
+            Box::new(std::array::from_fn(|_| basalt_types::Slot::empty()));
+        slots[0] = basalt_types::Slot::new(1, 10);
+        slots[5] = basalt_types::Slot::new(42, 64);
+
+        let bes = vec![(3, 64, 7, BlockEntity::Chest { slots })];
+
+        let mut buf = Vec::new();
+        serialize_block_entities(&mut buf, &bes, 0, 0);
+
+        let mut cursor = 0;
+        let restored = deserialize_block_entities(&buf, &mut cursor);
+
+        assert_eq!(restored.len(), 1);
+        let (lx, y, lz, be) = &restored[0];
+        assert_eq!(*lx, 3);
+        assert_eq!(*y, 64);
+        assert_eq!(*lz, 7);
+        match be {
+            BlockEntity::Chest { slots } => {
+                assert_eq!(slots[0].item_id, Some(1));
+                assert_eq!(slots[0].item_count, 10);
+                assert_eq!(slots[5].item_id, Some(42));
+                assert_eq!(slots[5].item_count, 64);
+                assert!(slots[1].is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn empty_block_entities_roundtrip() {
+        let bes: Vec<(i32, i32, i32, BlockEntity)> = vec![];
+        let mut buf = Vec::new();
+        serialize_block_entities(&mut buf, &bes, 0, 0);
+
+        let mut cursor = 0;
+        let restored = deserialize_block_entities(&buf, &mut cursor);
+        assert!(restored.is_empty());
+    }
+
+    #[test]
+    fn chunk_with_cursor_returns_correct_position() {
+        let chunk = ChunkColumn::new(0, 0);
+        let data = serialize_chunk(&chunk);
+        let (_, cursor) = deserialize_chunk_with_cursor(&data, 0, 0).unwrap();
+        assert_eq!(cursor, 4); // just the bitmap
     }
 }

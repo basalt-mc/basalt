@@ -109,6 +109,20 @@ pub struct DroppedItem {
 }
 impl Component for DroppedItem {}
 
+/// Tracks an open container window for a player.
+///
+/// Present on player entities while they have a container (chest, etc.)
+/// open. Used to route WindowClick packets and broadcast slot changes
+/// to all viewers of the same container.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenContainer {
+    /// Protocol window ID (1-127, cycling).
+    pub window_id: u8,
+    /// Absolute block position of the container.
+    pub position: (i32, i32, i32),
+}
+impl Component for OpenContainer {}
+
 /// Pickup delay before a dropped item can be collected.
 ///
 /// Decremented each tick. While remaining > 0, the item cannot be

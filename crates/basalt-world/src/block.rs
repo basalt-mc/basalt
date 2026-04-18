@@ -31,6 +31,38 @@ pub const GRAVEL: u16 = 124;
 /// Snow block — covers high-altitude terrain tops.
 pub const SNOW_BLOCK: u16 = 5950;
 
+/// Chest — default state (facing north, type single, no waterlog).
+pub const CHEST: u16 = 3010;
+
+/// Range of block states that are chest variants (facing × type × waterlogged).
+const CHEST_MIN: u16 = 3009;
+const CHEST_MAX: u16 = 3032;
+
+/// Returns true if the block state is any chest variant.
+pub fn is_chest(state: u16) -> bool {
+    (CHEST_MIN..=CHEST_MAX).contains(&state)
+}
+
+/// Returns the chest block state for a given player yaw (facing the player).
+///
+/// The chest faces the player: if the player is looking north (yaw ~180),
+/// the chest faces south so the player sees the front.
+pub fn chest_state_for_yaw(yaw: f32) -> u16 {
+    // Normalize yaw to 0-360
+    let yaw = ((yaw % 360.0) + 360.0) % 360.0;
+    // Chest states: base 3009, facing*6 + type*2 + waterlogged
+    // type=single(0), waterlogged=false(1)
+    // facing: 0=north, 1=south, 2=west, 3=east
+    let facing = match yaw as u16 {
+        0..=45 | 316..=360 => 0, // player faces south → chest faces north
+        46..=135 => 3,           // player faces west → chest faces east
+        136..=225 => 1,          // player faces north → chest faces south
+        226..=315 => 2,          // player faces east → chest faces west
+        _ => 0,
+    };
+    3009 + facing * 6 + 1 // +1 for waterlogged=false
+}
+
 /// Maximum item ID in the lookup table.
 const MAX_ITEM_ID: usize = 1384;
 

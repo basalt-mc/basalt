@@ -114,6 +114,7 @@ impl Server {
         ecs.register_component::<basalt_ecs::Lifetime>();
         ecs.register_component::<basalt_ecs::PickupDelay>();
         ecs.register_component::<basalt_ecs::DroppedItem>();
+        ecs.register_component::<basalt_ecs::OpenContainer>();
         ecs.register_component::<basalt_ecs::PlayerRef>();
         ecs.register_component::<basalt_ecs::Inventory>();
         for reg in &plugin_components {

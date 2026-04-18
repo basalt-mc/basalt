@@ -91,6 +91,8 @@ pub(crate) struct GameLoop {
     simulation_distance: i32,
     /// How often to flush dirty chunks to disk, in ticks.
     persistence_interval_ticks: u64,
+    /// Cycling counter for container window IDs (1-127).
+    next_window_id: u8,
 }
 
 impl GameLoop {
@@ -120,7 +122,15 @@ impl GameLoop {
             active_chunks: HashSet::new(),
             simulation_distance,
             persistence_interval_ticks,
+            next_window_id: 1,
         }
+    }
+
+    /// Allocates the next container window ID (1-127, cycling).
+    fn alloc_window_id(&mut self) -> u8 {
+        let id = self.next_window_id;
+        self.next_window_id = if id >= 127 { 1 } else { id + 1 };
+        id
     }
 
     /// Processes one tick.
@@ -468,6 +478,34 @@ impl GameLoop {
                 } => {
                     self.handle_window_click(uuid, slot, button, mode, changed_slots, cursor_item);
                 }
+                GameInput::CloseWindow { uuid, .. } => {
+                    if let Some(eid) = self.ecs.find_by_uuid(uuid) {
+                        // Return cursor item to inventory or drop it
+                        let cursor_item = self
+                            .ecs
+                            .get_mut::<basalt_ecs::Inventory>(eid)
+                            .map(|inv| {
+                                let item = inv.cursor.clone();
+                                inv.cursor = basalt_types::Slot::empty();
+                                item
+                            })
+                            .unwrap_or_default();
+                        if let Some(item_id) = cursor_item.item_id
+                            && let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid)
+                            && inv.try_insert(item_id, cursor_item.item_count).is_none()
+                            && let Some(pos) = self.ecs.get::<basalt_ecs::Position>(eid)
+                        {
+                            self.spawn_item_entity(
+                                pos.x as i32,
+                                pos.y as i32 + 1,
+                                pos.z as i32,
+                                item_id,
+                                cursor_item.item_count,
+                            );
+                        }
+                        self.ecs.remove_component::<basalt_ecs::OpenContainer>(eid);
+                    }
+                }
             }
         }
     }
@@ -553,6 +591,83 @@ impl GameLoop {
         let Some(eid) = self.ecs.find_by_uuid(uuid) else {
             return;
         };
+
+        // If a container is open, route to container click handler
+        if let Some(oc) = self.ecs.get::<basalt_ecs::OpenContainer>(eid) {
+            let pos = oc.position;
+            // Drop outside container window
+            if slot == -999 {
+                let old_cursor = self
+                    .ecs
+                    .get::<basalt_ecs::Inventory>(eid)
+                    .map(|inv| inv.cursor.clone())
+                    .unwrap_or_default();
+                if let Some(item_id) = old_cursor.item_id
+                    && let Some(player_pos) = self.ecs.get::<basalt_ecs::Position>(eid)
+                {
+                    self.spawn_item_entity(
+                        player_pos.x as i32,
+                        player_pos.y as i32 + 1,
+                        player_pos.z as i32,
+                        item_id,
+                        old_cursor.item_count,
+                    );
+                }
+                if let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid) {
+                    inv.cursor = cursor_item;
+                }
+                return;
+            }
+            // Mode 4: Q key drop while hovering a container slot
+            if mode == 4 && slot >= 0 {
+                // Determine what to drop: container slot or player slot
+                let ws = slot;
+                let drop_item = if (0..27).contains(&ws) {
+                    // Chest slot
+                    self.world
+                        .get_block_entity(pos.0, pos.1, pos.2)
+                        .map(|be| match &*be {
+                            basalt_world::block_entity::BlockEntity::Chest { slots } => {
+                                slots[ws as usize].clone()
+                            }
+                        })
+                } else if (27..54).contains(&ws) {
+                    let idx = (ws - 27 + 9) as usize;
+                    self.ecs
+                        .get::<basalt_ecs::Inventory>(eid)
+                        .and_then(|inv| (idx < 36).then(|| inv.slots[idx].clone()))
+                } else if (54..63).contains(&ws) {
+                    let idx = (ws - 54) as usize;
+                    self.ecs
+                        .get::<basalt_ecs::Inventory>(eid)
+                        .map(|inv| inv.slots[idx].clone())
+                } else {
+                    None
+                };
+
+                if let Some(item) = drop_item
+                    && let Some(item_id) = item.item_id
+                {
+                    let drop_count = if button == 0 { 1 } else { item.item_count };
+                    // Apply the changed_slots from the client (handles decrement)
+                    self.handle_container_click(eid, pos, &changed_slots, cursor_item);
+                    // Spawn the dropped item
+                    if let Some(player_pos) = self.ecs.get::<basalt_ecs::Position>(eid) {
+                        self.spawn_item_entity(
+                            player_pos.x as i32,
+                            player_pos.y as i32 + 1,
+                            player_pos.z as i32,
+                            item_id,
+                            drop_count,
+                        );
+                    }
+                }
+                return;
+            }
+
+            self.handle_container_click(eid, pos, &changed_slots, cursor_item);
+            return;
+        }
 
         // Click outside window (slot -999): drop what was on the cursor
         if slot == -999 {
@@ -860,12 +975,7 @@ impl GameLoop {
         let mut count = 0i32;
         for dx in -VIEW_RADIUS..=VIEW_RADIUS {
             for dz in -VIEW_RADIUS..=VIEW_RADIUS {
-                self.send_to(eid, |tx| {
-                    let _ = tx.try_send(ServerOutput::SendChunk {
-                        cx: cx + dx,
-                        cz: cz + dz,
-                    });
-                });
+                self.send_chunk_with_entities(eid, cx + dx, cz + dz);
                 count += 1;
             }
         }
@@ -1104,9 +1214,7 @@ impl GameLoop {
                 let _ = tx.try_send(ServerOutput::ChunkBatchStart);
             });
             for &(cx, cz) in &to_load {
-                self.send_to(eid, |tx| {
-                    let _ = tx.try_send(ServerOutput::SendChunk { cx, cz });
-                });
+                self.send_chunk_with_entities(eid, cx, cz);
             }
             self.send_to(eid, |tx| {
                 let _ = tx.try_send(ServerOutput::ChunkBatchFinished {
@@ -1156,6 +1264,9 @@ impl GameLoop {
         }
 
         self.process_responses(uuid, &ctx.drain_responses());
+
+        // Remove block entity if the broken block had one
+        self.world.remove_block_entity(x, y, z);
     }
 
     /// Handles a block place.
@@ -1171,6 +1282,14 @@ impl GameLoop {
         let Some(eid) = self.ecs.find_by_uuid(uuid) else {
             return;
         };
+
+        // Check if the clicked block is an interactable container
+        let clicked_state = self.world.get_block(x, y, z);
+        if basalt_world::block::is_chest(clicked_state) {
+            self.open_chest(eid, x, y, z);
+            return;
+        }
+
         let (dx, dy, dz) = face_offset(direction);
         let (px, py, pz) = (x + dx, y + dy, z + dz);
 
@@ -1181,10 +1300,18 @@ impl GameLoop {
             let Some(item_id) = inv.held_item().item_id else {
                 return;
             };
-            let Some(block_state) = basalt_world::block::item_to_default_block_state(item_id)
+            let Some(mut block_state) = basalt_world::block::item_to_default_block_state(item_id)
             else {
                 return;
             };
+            // Orient directional blocks based on player yaw
+            if basalt_world::block::is_chest(block_state) {
+                let yaw = self
+                    .ecs
+                    .get::<basalt_ecs::Rotation>(eid)
+                    .map_or(0.0, |r| r.yaw);
+                block_state = basalt_world::block::chest_state_for_yaw(yaw);
+            }
             let Some(pr) = self.ecs.get::<basalt_ecs::PlayerRef>(eid) else {
                 return;
             };
@@ -1216,6 +1343,34 @@ impl GameLoop {
         }
 
         self.process_responses(uuid, &ctx.drain_responses());
+
+        // Create block entity for interactive blocks (chests)
+        if basalt_world::block::is_chest(block_state) {
+            self.world.set_block_entity(
+                px,
+                py,
+                pz,
+                basalt_world::block_entity::BlockEntity::empty_chest(),
+            );
+            // Tell all players about the block entity so the chest renders
+            let bc = Arc::new(SharedBroadcast::new(BroadcastEvent::BlockChanged {
+                x: px,
+                y: py,
+                z: pz,
+                state: i32::from(block_state),
+            }));
+            for (e, _) in self.ecs.iter::<OutputHandle>() {
+                self.send_to(e, |tx| {
+                    let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&bc)));
+                    let _ = tx.try_send(ServerOutput::BlockEntityData {
+                        x: px,
+                        y: py,
+                        z: pz,
+                        action: 2,
+                    });
+                });
+            }
+        }
     }
 
     // ── Response processing ───────────────────────────────────────────
@@ -1415,9 +1570,161 @@ impl GameLoop {
         }
     }
 
+    // ── Containers ─────────────────────────────────────────────────────
+
+    /// Opens a chest container for a player.
+    ///
+    /// Creates a block entity if it doesn't exist yet, assigns a window
+    /// ID, and sends OpenWindow + SetContainerContent to the client.
+    fn open_chest(&mut self, eid: basalt_ecs::EntityId, x: i32, y: i32, z: i32) {
+        // Ensure block entity exists
+        if self.world.get_block_entity(x, y, z).is_none() {
+            self.world.set_block_entity(
+                x,
+                y,
+                z,
+                basalt_world::block_entity::BlockEntity::empty_chest(),
+            );
+        }
+
+        let window_id = self.alloc_window_id();
+
+        // Build the container window slots: 27 chest + 36 player inventory
+        let mut window_slots = Vec::with_capacity(63);
+
+        // Chest slots (0-26)
+        if let Some(be) = self.world.get_block_entity(x, y, z) {
+            match &*be {
+                basalt_world::block_entity::BlockEntity::Chest { slots } => {
+                    window_slots.extend_from_slice(slots.as_ref());
+                }
+            }
+        }
+
+        // Player main inventory (window 27-53) = internal 9-35
+        // Player hotbar (window 54-62) = internal 0-8
+        if let Some(inv) = self.ecs.get::<basalt_ecs::Inventory>(eid) {
+            window_slots.extend_from_slice(&inv.slots[9..]); // main: 27 slots
+            window_slots.extend_from_slice(&inv.slots[..9]); // hotbar: 9 slots
+        }
+
+        // Set OpenContainer on the player
+        self.ecs.set(
+            eid,
+            basalt_ecs::OpenContainer {
+                window_id,
+                position: (x, y, z),
+            },
+        );
+
+        // Send OpenWindow + contents
+        let title = basalt_types::TextComponent::text("Chest").to_nbt();
+        self.send_to(eid, |tx| {
+            let _ = tx.try_send(ServerOutput::OpenWindow {
+                window_id,
+                inventory_type: 2, // generic_9x3
+                title,
+                slots: window_slots,
+            });
+        });
+    }
+
+    /// Handles a WindowClick that targets an open container.
+    ///
+    /// Container window slot layout for generic_9x3 (chest):
+    /// - 0-26: chest slots
+    /// - 27-53: player main inventory (our 9-35)
+    /// - 54-62: player hotbar (our 0-8)
+    fn handle_container_click(
+        &mut self,
+        eid: basalt_ecs::EntityId,
+        container_pos: (i32, i32, i32),
+        changed_slots: &[(i16, basalt_types::Slot)],
+        cursor_item: basalt_types::Slot,
+    ) {
+        let (cx, cy, cz) = container_pos;
+
+        for (window_slot, item) in changed_slots {
+            let ws = *window_slot;
+            if (0..27).contains(&ws) {
+                // Chest slot
+                if let Some(mut be) = self.world.get_block_entity_mut(cx, cy, cz) {
+                    match &mut *be {
+                        basalt_world::block_entity::BlockEntity::Chest { slots } => {
+                            slots[ws as usize] = item.clone();
+                        }
+                    }
+                }
+                // Mark chunk dirty for persistence
+                self.world.mark_chunk_dirty(cx >> 4, cz >> 4);
+                // Invalidate chunk cache (block entity data changed)
+                self.chunk_cache.invalidate(cx >> 4, cz >> 4);
+                // Notify other viewers
+                self.notify_container_viewers(container_pos, eid, ws, item);
+            } else if (27..54).contains(&ws) {
+                // Player main inventory: window 27-53 → internal 9-35
+                let idx = (ws - 27 + 9) as usize;
+                if let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid)
+                    && idx < 36
+                {
+                    inv.slots[idx] = item.clone();
+                }
+            } else if (54..63).contains(&ws) {
+                // Player hotbar: window 54-62 → internal 0-8
+                let idx = (ws - 54) as usize;
+                if let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid) {
+                    inv.slots[idx] = item.clone();
+                }
+            }
+        }
+
+        // Update cursor
+        if let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid) {
+            inv.cursor = cursor_item;
+        }
+    }
+
+    /// Notifies other viewers of a container that a slot changed.
+    fn notify_container_viewers(
+        &self,
+        container_pos: (i32, i32, i32),
+        exclude_eid: basalt_ecs::EntityId,
+        window_slot: i16,
+        item: &basalt_types::Slot,
+    ) {
+        for (other_eid, oc) in self.ecs.iter::<basalt_ecs::OpenContainer>() {
+            if other_eid != exclude_eid && oc.position == container_pos {
+                self.send_to(other_eid, |tx| {
+                    let _ = tx.try_send(ServerOutput::SetContainerSlot {
+                        window_id: oc.window_id,
+                        slot: window_slot,
+                        item: item.clone(),
+                    });
+                });
+            }
+        }
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────
 
     /// Sends output to a player entity via their OutputHandle.
+    /// Sends a chunk to a player and follows up with BlockEntityData
+    /// for any block entities in that chunk (chests, etc.).
+    fn send_chunk_with_entities(&self, eid: basalt_ecs::EntityId, cx: i32, cz: i32) {
+        self.send_to(eid, |tx| {
+            let _ = tx.try_send(ServerOutput::SendChunk { cx, cz });
+        });
+        // Send block entity data for chests in this chunk
+        for (x, y, z, be) in self.world.block_entities_in_chunk(cx, cz) {
+            let action = match &be {
+                basalt_world::block_entity::BlockEntity::Chest { .. } => 2,
+            };
+            self.send_to(eid, |tx| {
+                let _ = tx.try_send(ServerOutput::BlockEntityData { x, y, z, action });
+            });
+        }
+    }
+
     fn send_to(&self, eid: basalt_ecs::EntityId, f: impl FnOnce(&mpsc::Sender<ServerOutput>)) {
         if let Some(handle) = self.ecs.get::<OutputHandle>(eid) {
             f(&handle.tx);
@@ -2225,5 +2532,367 @@ mod tests {
             }
         }
         assert!(got_sync, "should receive SyncInventory on connect");
+    }
+
+    #[test]
+    fn chest_placement_creates_block_entity() {
+        let (mut game_loop, game_tx, _io_rx) = test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let _rx = connect_player(&mut game_loop, &game_tx, uuid, 1);
+
+        // Give chest in hotbar slot 0 (item 280 = chest)
+        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
+        game_loop
+            .ecs
+            .get_mut::<basalt_ecs::Inventory>(eid)
+            .unwrap()
+            .slots[0] = basalt_types::Slot::new(313, 1); // chest item ID
+
+        // Place chest on top of (5, -60, 3)
+        let _ = game_tx.send(GameInput::BlockPlace {
+            uuid,
+            x: 5,
+            y: -60,
+            z: 3,
+            direction: 1,
+            sequence: 10,
+        });
+        game_loop.tick(1);
+
+        // Block entity should exist
+        assert!(
+            game_loop.world.get_block_entity(5, -59, 3).is_some(),
+            "chest placement should create block entity"
+        );
+    }
+
+    #[test]
+    fn chest_break_removes_block_entity() {
+        let (mut game_loop, game_tx, _io_rx) = test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let _rx = connect_player(&mut game_loop, &game_tx, uuid, 1);
+
+        // Place a chest block + entity manually
+        game_loop
+            .world
+            .set_block(5, 64, 3, basalt_world::block::CHEST);
+        game_loop.world.set_block_entity(
+            5,
+            64,
+            3,
+            basalt_world::block_entity::BlockEntity::empty_chest(),
+        );
+
+        // Break it
+        let _ = game_tx.send(GameInput::BlockDig {
+            uuid,
+            status: 0,
+            x: 5,
+            y: 64,
+            z: 3,
+            sequence: 1,
+        });
+        game_loop.tick(1);
+
+        assert!(
+            game_loop.world.get_block_entity(5, 64, 3).is_none(),
+            "breaking chest should remove block entity"
+        );
+    }
+
+    #[test]
+    fn open_chest_sends_open_window() {
+        let (mut game_loop, game_tx, _io_rx) = test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let mut rx = connect_player(&mut game_loop, &game_tx, uuid, 1);
+        while rx.try_recv().is_ok() {}
+
+        // Place chest
+        game_loop
+            .world
+            .set_block(5, 64, 3, basalt_world::block::CHEST);
+        game_loop.world.set_block_entity(
+            5,
+            64,
+            3,
+            basalt_world::block_entity::BlockEntity::empty_chest(),
+        );
+
+        // Right-click the chest (BlockPlace on the chest block)
+        let _ = game_tx.send(GameInput::BlockPlace {
+            uuid,
+            x: 5,
+            y: 64,
+            z: 3,
+            direction: 1,
+            sequence: 1,
+        });
+        game_loop.tick(1);
+
+        let mut got_open = false;
+        while let Ok(msg) = rx.try_recv() {
+            if matches!(&msg, ServerOutput::OpenWindow { .. }) {
+                got_open = true;
+            }
+        }
+        assert!(got_open, "right-clicking chest should send OpenWindow");
+
+        // Player should have OpenContainer component
+        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
+        assert!(game_loop.ecs.has::<basalt_ecs::OpenContainer>(eid));
+    }
+
+    #[test]
+    fn close_window_returns_cursor_to_inventory() {
+        let (mut game_loop, game_tx, _io_rx) = test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let _rx = connect_player(&mut game_loop, &game_tx, uuid, 1);
+
+        // Put an item on the cursor
+        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
+        game_loop
+            .ecs
+            .get_mut::<basalt_ecs::Inventory>(eid)
+            .unwrap()
+            .cursor = basalt_types::Slot::new(1, 5);
+
+        // Close window
+        let _ = game_tx.send(GameInput::CloseWindow { uuid });
+        game_loop.tick(1);
+
+        // Cursor should be empty, item should be in inventory
+        let inv = game_loop.ecs.get::<basalt_ecs::Inventory>(eid).unwrap();
+        assert!(inv.cursor.is_empty(), "cursor should be empty after close");
+        // Item should have been inserted somewhere
+        let has_item = inv
+            .slots
+            .iter()
+            .any(|s| s.item_id == Some(1) && s.item_count == 5);
+        assert!(has_item, "cursor item should be returned to inventory");
+    }
+
+    #[test]
+    fn container_click_modifies_chest() {
+        let (mut game_loop, game_tx, _io_rx) = test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let mut rx = connect_player(&mut game_loop, &game_tx, uuid, 1);
+        while rx.try_recv().is_ok() {}
+
+        // Place and open chest
+        game_loop
+            .world
+            .set_block(5, 64, 3, basalt_world::block::CHEST);
+        game_loop.world.set_block_entity(
+            5,
+            64,
+            3,
+            basalt_world::block_entity::BlockEntity::empty_chest(),
+        );
+        let _ = game_tx.send(GameInput::BlockPlace {
+            uuid,
+            x: 5,
+            y: 64,
+            z: 3,
+            direction: 1,
+            sequence: 1,
+        });
+        game_loop.tick(1);
+        while rx.try_recv().is_ok() {}
+
+        // Put an item in chest slot 0 via WindowClick
+        let _ = game_tx.send(GameInput::WindowClick {
+            uuid,
+            slot: 0,
+            button: 0,
+            mode: 0,
+            changed_slots: vec![(0, basalt_types::Slot::new(1, 10))],
+            cursor_item: basalt_types::Slot::empty(),
+        });
+        game_loop.tick(2);
+
+        // Chest should have the item
+        let be = game_loop.world.get_block_entity(5, 64, 3).unwrap();
+        match &*be {
+            basalt_world::block_entity::BlockEntity::Chest { slots } => {
+                assert_eq!(slots[0].item_id, Some(1));
+                assert_eq!(slots[0].item_count, 10);
+            }
+        }
+    }
+
+    #[test]
+    fn container_q_drop_spawns_item() {
+        let (mut game_loop, game_tx, _io_rx) = test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let mut rx = connect_player(&mut game_loop, &game_tx, uuid, 1);
+        while rx.try_recv().is_ok() {}
+
+        // Place and open chest with an item in slot 0
+        game_loop
+            .world
+            .set_block(5, 64, 3, basalt_world::block::CHEST);
+        let mut be = basalt_world::block_entity::BlockEntity::empty_chest();
+        let basalt_world::block_entity::BlockEntity::Chest { ref mut slots } = be;
+        slots[0] = basalt_types::Slot::new(1, 10);
+        game_loop.world.set_block_entity(5, 64, 3, be);
+
+        // Open the chest
+        let _ = game_tx.send(GameInput::BlockPlace {
+            uuid,
+            x: 5,
+            y: 64,
+            z: 3,
+            direction: 1,
+            sequence: 1,
+        });
+        game_loop.tick(1);
+        while rx.try_recv().is_ok() {}
+
+        // Q key drop from chest slot 0 (mode 4, button 0 = single)
+        let _ = game_tx.send(GameInput::WindowClick {
+            uuid,
+            slot: 0,
+            button: 0,
+            mode: 4,
+            changed_slots: vec![(0, basalt_types::Slot::new(1, 9))],
+            cursor_item: basalt_types::Slot::empty(),
+        });
+        game_loop.tick(2);
+
+        // Chest slot 0 should have 9 items
+        let chest_be = game_loop.world.get_block_entity(5, 64, 3).unwrap();
+        match &*chest_be {
+            basalt_world::block_entity::BlockEntity::Chest { slots } => {
+                assert_eq!(slots[0].item_count, 9);
+            }
+        }
+
+        // Should have broadcast a spawn entity
+        let mut got_spawn = false;
+        while let Ok(msg) = rx.try_recv() {
+            if matches!(&msg, ServerOutput::Broadcast(_)) {
+                got_spawn = true;
+            }
+        }
+        assert!(got_spawn, "Q drop from container should spawn item entity");
+    }
+
+    #[test]
+    fn chest_orientation_based_on_yaw() {
+        let (mut game_loop, game_tx, _io_rx) = test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let _rx = connect_player(&mut game_loop, &game_tx, uuid, 1);
+
+        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
+        // Set player yaw to 180 (facing north → chest faces south)
+        game_loop
+            .ecs
+            .get_mut::<basalt_ecs::Rotation>(eid)
+            .unwrap()
+            .yaw = 180.0;
+        // Give chest in hotbar
+        game_loop
+            .ecs
+            .get_mut::<basalt_ecs::Inventory>(eid)
+            .unwrap()
+            .slots[0] = basalt_types::Slot::new(313, 1);
+
+        let _ = game_tx.send(GameInput::BlockPlace {
+            uuid,
+            x: 5,
+            y: -60,
+            z: 3,
+            direction: 1,
+            sequence: 1,
+        });
+        game_loop.tick(1);
+
+        // Chest at (5, -59, 3) should face south (state 3016)
+        let state = game_loop.world.get_block(5, -59, 3);
+        assert_eq!(
+            state,
+            basalt_world::block::chest_state_for_yaw(180.0),
+            "chest should face south when player faces north"
+        );
+    }
+
+    #[test]
+    fn close_window_removes_open_container() {
+        let (mut game_loop, game_tx, _io_rx) = test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let _rx = connect_player(&mut game_loop, &game_tx, uuid, 1);
+
+        // Manually set OpenContainer
+        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
+        game_loop.ecs.set(
+            eid,
+            basalt_ecs::OpenContainer {
+                window_id: 1,
+                position: (5, 64, 3),
+            },
+        );
+
+        let _ = game_tx.send(GameInput::CloseWindow { uuid });
+        game_loop.tick(1);
+
+        assert!(
+            !game_loop.ecs.has::<basalt_ecs::OpenContainer>(eid),
+            "CloseWindow should remove OpenContainer"
+        );
+    }
+
+    #[test]
+    fn container_drop_outside_drops_cursor() {
+        let (mut game_loop, game_tx, _io_rx) = test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let mut rx = connect_player(&mut game_loop, &game_tx, uuid, 1);
+        while rx.try_recv().is_ok() {}
+
+        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
+
+        // Open a chest
+        game_loop
+            .world
+            .set_block(5, 64, 3, basalt_world::block::CHEST);
+        game_loop.world.set_block_entity(
+            5,
+            64,
+            3,
+            basalt_world::block_entity::BlockEntity::empty_chest(),
+        );
+        let _ = game_tx.send(GameInput::BlockPlace {
+            uuid,
+            x: 5,
+            y: 64,
+            z: 3,
+            direction: 1,
+            sequence: 1,
+        });
+        game_loop.tick(1);
+        while rx.try_recv().is_ok() {}
+
+        // Set cursor item
+        game_loop
+            .ecs
+            .get_mut::<basalt_ecs::Inventory>(eid)
+            .unwrap()
+            .cursor = basalt_types::Slot::new(1, 8);
+
+        // Click outside (slot -999) to drop
+        let _ = game_tx.send(GameInput::WindowClick {
+            uuid,
+            slot: -999,
+            button: 0,
+            mode: 0,
+            changed_slots: vec![],
+            cursor_item: basalt_types::Slot::empty(),
+        });
+        game_loop.tick(2);
+
+        let inv = game_loop.ecs.get::<basalt_ecs::Inventory>(eid).unwrap();
+        assert!(
+            inv.cursor.is_empty(),
+            "cursor should be empty after drop outside container"
+        );
     }
 }
