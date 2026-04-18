@@ -36,6 +36,13 @@ struct OutputHandle {
 }
 impl basalt_ecs::Component for OutputHandle {}
 
+/// Whether a player is currently sneaking (shift key held).
+///
+/// Affects block interaction: sneaking players place blocks instead
+/// of opening containers.
+struct Sneaking;
+impl basalt_ecs::Component for Sneaking {}
+
 /// Mojang skin texture data.
 ///
 /// Server-internal component storing skin properties for broadcasting
@@ -504,6 +511,19 @@ impl GameLoop {
                             );
                         }
                         self.ecs.remove_component::<basalt_ecs::OpenContainer>(eid);
+                    }
+                }
+                GameInput::EntityAction {
+                    uuid, action_id, ..
+                } => {
+                    if let Some(eid) = self.ecs.find_by_uuid(uuid) {
+                        match action_id {
+                            0 => self.ecs.set(eid, Sneaking), // start sneak
+                            1 => {
+                                self.ecs.remove_component::<Sneaking>(eid);
+                            } // stop sneak
+                            _ => {}
+                        }
                     }
                 }
             }
@@ -1265,8 +1285,57 @@ impl GameLoop {
 
         self.process_responses(uuid, &ctx.drain_responses());
 
-        // Remove block entity if the broken block had one
+        // Collect items to drop from block entity before removing it
+        let items_to_drop: Vec<(i32, i32)> = self
+            .world
+            .get_block_entity(x, y, z)
+            .map(|be| match &*be {
+                basalt_world::block_entity::BlockEntity::Chest { slots } => slots
+                    .iter()
+                    .filter_map(|s| s.item_id.map(|id| (id, s.item_count)))
+                    .collect(),
+            })
+            .unwrap_or_default();
+
         self.world.remove_block_entity(x, y, z);
+
+        // Spawn dropped items for chest contents
+        for (item_id, count) in items_to_drop {
+            self.spawn_item_entity(x, y, z, item_id, count);
+        }
+
+        // If this was part of a double chest, revert the other half to single
+        if basalt_world::block::is_chest(original_state)
+            && basalt_world::block::chest_type(original_state) != 0
+        {
+            let facing = basalt_world::block::chest_facing(original_state);
+            let offsets = basalt_world::block::chest_adjacent_offsets(facing);
+            for (dx, dz) in offsets {
+                let nx = x + dx;
+                let nz = z + dz;
+                let neighbor = self.world.get_block(nx, y, nz);
+                if basalt_world::block::is_chest(neighbor)
+                    && basalt_world::block::chest_facing(neighbor) == facing
+                    && basalt_world::block::chest_type(neighbor) != 0
+                {
+                    let single = basalt_world::block::chest_state(facing, 0);
+                    self.world.set_block(nx, y, nz, single);
+                    self.chunk_cache.invalidate(nx >> 4, nz >> 4);
+                    let bc = Arc::new(SharedBroadcast::new(BroadcastEvent::BlockChanged {
+                        x: nx,
+                        y,
+                        z: nz,
+                        state: i32::from(single),
+                    }));
+                    for (e, _) in self.ecs.iter::<OutputHandle>() {
+                        self.send_to(e, |tx| {
+                            let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&bc)));
+                        });
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     /// Handles a block place.
@@ -1284,8 +1353,10 @@ impl GameLoop {
         };
 
         // Check if the clicked block is an interactable container
+        // Sneaking players skip interaction and place blocks instead
+        let is_sneaking = self.ecs.has::<Sneaking>(eid);
         let clicked_state = self.world.get_block(x, y, z);
-        if basalt_world::block::is_chest(clicked_state) {
+        if !is_sneaking && basalt_world::block::is_chest(clicked_state) {
             self.open_chest(eid, x, y, z);
             return;
         }
@@ -1352,23 +1423,85 @@ impl GameLoop {
                 pz,
                 basalt_world::block_entity::BlockEntity::empty_chest(),
             );
-            // Tell all players about the block entity so the chest renders
-            let bc = Arc::new(SharedBroadcast::new(BroadcastEvent::BlockChanged {
-                x: px,
-                y: py,
-                z: pz,
-                state: i32::from(block_state),
-            }));
-            for (e, _) in self.ecs.iter::<OutputHandle>() {
-                self.send_to(e, |tx| {
-                    let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&bc)));
-                    let _ = tx.try_send(ServerOutput::BlockEntityData {
-                        x: px,
-                        y: py,
-                        z: pz,
-                        action: 2,
+
+            // Check for adjacent single chest to form a double chest
+            // Sneaking prevents pairing (vanilla behavior)
+            let facing = basalt_world::block::chest_facing(block_state);
+            let offsets = basalt_world::block::chest_adjacent_offsets(facing);
+            let mut paired = false;
+            if !is_sneaking {
+                for (dx, dz) in offsets {
+                    let nx = px + dx;
+                    let nz = pz + dz;
+                    let neighbor = self.world.get_block(nx, py, nz);
+                    if basalt_world::block::is_single_chest(neighbor)
+                        && basalt_world::block::chest_facing(neighbor) == facing
+                    {
+                        let (new_type, existing_type) =
+                            basalt_world::block::chest_double_types(facing, dx, dz);
+                        // Update new chest to left/right
+                        let new_state = basalt_world::block::chest_state(facing, new_type);
+                        self.world.set_block(px, py, pz, new_state);
+                        // Update existing chest to the other type
+                        let neighbor_state =
+                            basalt_world::block::chest_state(facing, existing_type);
+                        self.world.set_block(nx, py, nz, neighbor_state);
+                        // Invalidate chunk caches
+                        self.chunk_cache.invalidate(px >> 4, pz >> 4);
+                        self.chunk_cache.invalidate(nx >> 4, nz >> 4);
+                        // Broadcast both block changes
+                        for (e, _) in self.ecs.iter::<OutputHandle>() {
+                            self.send_to(e, |tx| {
+                                let _ = tx.try_send(ServerOutput::BlockChanged {
+                                    x: px,
+                                    y: py,
+                                    z: pz,
+                                    state: i32::from(new_state),
+                                });
+                                let _ = tx.try_send(ServerOutput::BlockEntityData {
+                                    x: px,
+                                    y: py,
+                                    z: pz,
+                                    action: 2,
+                                });
+                                let _ = tx.try_send(ServerOutput::BlockChanged {
+                                    x: nx,
+                                    y: py,
+                                    z: nz,
+                                    state: i32::from(neighbor_state),
+                                });
+                                let _ = tx.try_send(ServerOutput::BlockEntityData {
+                                    x: nx,
+                                    y: py,
+                                    z: nz,
+                                    action: 2,
+                                });
+                            });
+                        }
+                        paired = true;
+                        break;
+                    }
+                }
+            } // end if !is_sneaking
+
+            if !paired {
+                // Single chest — broadcast normally
+                for (e, _) in self.ecs.iter::<OutputHandle>() {
+                    self.send_to(e, |tx| {
+                        let _ = tx.try_send(ServerOutput::BlockChanged {
+                            x: px,
+                            y: py,
+                            z: pz,
+                            state: i32::from(block_state),
+                        });
+                        let _ = tx.try_send(ServerOutput::BlockEntityData {
+                            x: px,
+                            y: py,
+                            z: pz,
+                            action: 2,
+                        });
                     });
-                });
+                }
             }
         }
     }
@@ -1711,6 +1844,9 @@ impl GameLoop {
     /// Sends a chunk to a player and follows up with BlockEntityData
     /// for any block entities in that chunk (chests, etc.).
     fn send_chunk_with_entities(&self, eid: basalt_ecs::EntityId, cx: i32, cz: i32) {
+        // Force chunk + block entities to be loaded from disk before querying
+        self.world.with_chunk(cx, cz, |_| {});
+
         self.send_to(eid, |tx| {
             let _ = tx.try_send(ServerOutput::SendChunk { cx, cz });
         });
@@ -1846,6 +1982,7 @@ mod tests {
                 Arc::clone(&world),
             );
             basalt_plugin_block::BlockPlugin.on_enable(&mut registrar);
+            basalt_plugin_drops::DropsPlugin.on_enable(&mut registrar);
         }
 
         let mut ecs = basalt_ecs::Ecs::new();
@@ -2893,6 +3030,165 @@ mod tests {
         assert!(
             inv.cursor.is_empty(),
             "cursor should be empty after drop outside container"
+        );
+    }
+
+    #[test]
+    fn chest_break_drops_contents_and_self() {
+        let (mut game_loop, game_tx, _io_rx) = test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let mut rx = connect_player(&mut game_loop, &game_tx, uuid, 1);
+        while rx.try_recv().is_ok() {}
+
+        // Place chest with items inside
+        game_loop
+            .world
+            .set_block(5, 64, 3, basalt_world::block::CHEST);
+        let mut be = basalt_world::block_entity::BlockEntity::empty_chest();
+        let basalt_world::block_entity::BlockEntity::Chest { ref mut slots } = be;
+        slots[0] = basalt_types::Slot::new(42, 16);
+        game_loop.world.set_block_entity(5, 64, 3, be);
+
+        // Break it
+        let _ = game_tx.send(GameInput::BlockDig {
+            uuid,
+            status: 0,
+            x: 5,
+            y: 64,
+            z: 3,
+            sequence: 1,
+        });
+        game_loop.tick(1);
+
+        // Block entity removed
+        assert!(game_loop.world.get_block_entity(5, 64, 3).is_none());
+
+        // Should have spawned dropped items (chest contents + chest block itself)
+        let mut spawn_count = 0;
+        while let Ok(msg) = rx.try_recv() {
+            if matches!(&msg, ServerOutput::Broadcast(bc) if matches!(bc.event, BroadcastEvent::SpawnItemEntity { .. }))
+            {
+                spawn_count += 1;
+            }
+        }
+        // At least 2 spawns: 1 for the item inside + 1 for the chest block itself
+        assert!(
+            spawn_count >= 2,
+            "should drop chest contents + chest block, got {spawn_count} spawns"
+        );
+    }
+
+    #[test]
+    fn double_chest_forms_on_adjacent_placement() {
+        let (mut game_loop, game_tx, _io_rx) = test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let _rx = connect_player(&mut game_loop, &game_tx, uuid, 1);
+
+        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
+        game_loop
+            .ecs
+            .get_mut::<basalt_ecs::Rotation>(eid)
+            .unwrap()
+            .yaw = 0.0; // facing south → chest faces north
+
+        // Place first chest
+        game_loop
+            .ecs
+            .get_mut::<basalt_ecs::Inventory>(eid)
+            .unwrap()
+            .slots[0] = basalt_types::Slot::new(313, 2);
+
+        let _ = game_tx.send(GameInput::BlockPlace {
+            uuid,
+            x: 5,
+            y: -60,
+            z: 3,
+            direction: 1,
+            sequence: 1,
+        });
+        game_loop.tick(1);
+
+        let first_state = game_loop.world.get_block(5, -59, 3);
+        assert!(
+            basalt_world::block::is_single_chest(first_state),
+            "first chest should be single"
+        );
+
+        // Place second chest adjacent (east, +X)
+        let _ = game_tx.send(GameInput::BlockPlace {
+            uuid,
+            x: 6,
+            y: -60,
+            z: 3,
+            direction: 1,
+            sequence: 2,
+        });
+        game_loop.tick(2);
+
+        let left = game_loop.world.get_block(5, -59, 3);
+        let right = game_loop.world.get_block(6, -59, 3);
+        assert!(basalt_world::block::is_chest(left), "left should be chest");
+        assert!(
+            basalt_world::block::is_chest(right),
+            "right should be chest"
+        );
+        assert_ne!(
+            basalt_world::block::chest_type(left),
+            0,
+            "left should not be single"
+        );
+        assert_ne!(
+            basalt_world::block::chest_type(right),
+            0,
+            "right should not be single"
+        );
+        assert_ne!(
+            basalt_world::block::chest_type(left),
+            basalt_world::block::chest_type(right),
+            "left and right should have different types"
+        );
+    }
+
+    #[test]
+    fn breaking_double_chest_reverts_other_to_single() {
+        let (mut game_loop, game_tx, _io_rx) = test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let _rx = connect_player(&mut game_loop, &game_tx, uuid, 1);
+
+        // Manually place a double chest (north-facing, left at x=5, right at x=6)
+        let left_state = basalt_world::block::chest_state(0, 1); // north, left
+        let right_state = basalt_world::block::chest_state(0, 2); // north, right
+        game_loop.world.set_block(5, 64, 3, left_state);
+        game_loop.world.set_block(6, 64, 3, right_state);
+        game_loop.world.set_block_entity(
+            5,
+            64,
+            3,
+            basalt_world::block_entity::BlockEntity::empty_chest(),
+        );
+        game_loop.world.set_block_entity(
+            6,
+            64,
+            3,
+            basalt_world::block_entity::BlockEntity::empty_chest(),
+        );
+
+        // Break the left half
+        let _ = game_tx.send(GameInput::BlockDig {
+            uuid,
+            status: 0,
+            x: 5,
+            y: 64,
+            z: 3,
+            sequence: 1,
+        });
+        game_loop.tick(1);
+
+        // Right half should be single now
+        let remaining = game_loop.world.get_block(6, 64, 3);
+        assert!(
+            basalt_world::block::is_single_chest(remaining),
+            "remaining half should revert to single chest"
         );
     }
 }

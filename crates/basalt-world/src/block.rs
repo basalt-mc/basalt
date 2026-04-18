@@ -43,6 +43,72 @@ pub fn is_chest(state: u16) -> bool {
     (CHEST_MIN..=CHEST_MAX).contains(&state)
 }
 
+/// Returns true if the chest state is a single chest (not part of a double).
+pub fn is_single_chest(state: u16) -> bool {
+    is_chest(state) && chest_type(state) == 0
+}
+
+/// Extracts the facing index from a chest state (0=north, 1=south, 2=west, 3=east).
+pub fn chest_facing(state: u16) -> u16 {
+    if !is_chest(state) {
+        return 0;
+    }
+    (state - CHEST_MIN) / 6
+}
+
+/// Extracts the type from a chest state (0=single, 1=left, 2=right).
+pub fn chest_type(state: u16) -> u16 {
+    if !is_chest(state) {
+        return 0;
+    }
+    ((state - CHEST_MIN) % 6) / 2
+}
+
+/// Builds a chest state from facing, type, and waterlogged=false.
+pub fn chest_state(facing: u16, chest_type: u16) -> u16 {
+    CHEST_MIN + facing * 6 + chest_type * 2 + 1 // +1 for waterlogged=false
+}
+
+/// Returns the adjacent position for double chest pairing based on facing.
+///
+/// For north/south facing: checks east/west (±X).
+/// For east/west facing: checks north/south (±Z).
+/// Returns `(dx1, dz1, dx2, dz2)` — two candidate offsets to check.
+pub fn chest_adjacent_offsets(facing: u16) -> [(i32, i32); 2] {
+    match facing {
+        0 | 1 => [(-1, 0), (1, 0)], // north/south: check west/east
+        2 | 3 => [(0, -1), (0, 1)], // west/east: check north/south
+        _ => [(0, 0), (0, 0)],
+    }
+}
+
+/// Given a facing and the offset direction of the adjacent chest,
+/// returns (type_for_new, type_for_existing).
+///
+/// The "left" chest is the one on the left when looking at the front.
+pub fn chest_double_types(facing: u16, dx: i32, dz: i32) -> (u16, u16) {
+    // (new_type, existing_type)
+    match facing {
+        0 => {
+            // North-facing: front faces north, viewed from south
+            if dx < 0 { (2, 1) } else { (1, 2) } // west neighbor: new=right, existing=left
+        }
+        1 => {
+            // South-facing: front faces south, viewed from north
+            if dx < 0 { (1, 2) } else { (2, 1) }
+        }
+        2 => {
+            // West-facing: front faces west, viewed from east
+            if dz < 0 { (1, 2) } else { (2, 1) }
+        }
+        3 => {
+            // East-facing: front faces east, viewed from west
+            if dz < 0 { (2, 1) } else { (1, 2) }
+        }
+        _ => (0, 0),
+    }
+}
+
 /// Returns the chest block state for a given player yaw (facing the player).
 ///
 /// The chest faces the player: if the player is looking north (yaw ~180),
@@ -193,6 +259,10 @@ pub fn item_to_default_block_state(item_id: i32) -> Option<u16> {
 pub fn block_state_to_item_id(state: u16) -> Option<i32> {
     if state == 0 {
         return None; // air drops nothing
+    }
+    // Blocks with multiple state variants: map any variant to the item
+    if is_chest(state) {
+        return Some(313); // chest item ID
     }
     for (item_id, &block_state) in ITEM_TO_BLOCK_STATE.iter().enumerate() {
         if block_state == state {
