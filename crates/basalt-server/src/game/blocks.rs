@@ -24,7 +24,18 @@ impl GameLoop {
         };
 
         let original_state = self.world.get_block(x, y, z);
-        let ctx = ServerContext::new(Arc::clone(&self.world), uuid, entity_id, username, 0.0, 0.0);
+        let ctx = ServerContext::new(
+            Arc::clone(&self.world),
+            basalt_core::PlayerInfo {
+                uuid,
+                entity_id,
+                username: username.clone(),
+                rotation: basalt_core::Rotation {
+                    yaw: 0.0,
+                    pitch: 0.0,
+                },
+            },
+        );
         let mut event = BlockBrokenEvent {
             position: basalt_core::BlockPosition { x, y, z },
             block_state: original_state,
@@ -117,11 +128,12 @@ impl GameLoop {
             .map_or((0.0, 0.0), |r| (r.yaw, r.pitch));
         let ctx = ServerContext::new(
             Arc::clone(&self.world),
-            uuid,
-            entity_id,
-            username,
-            yaw,
-            pitch,
+            basalt_core::PlayerInfo {
+                uuid,
+                entity_id,
+                username: username.clone(),
+                rotation: basalt_core::Rotation { yaw, pitch },
+            },
         );
         let mut event = BlockPlacedEvent {
             position: basalt_core::BlockPosition {

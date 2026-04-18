@@ -69,33 +69,30 @@ impl GameLoop {
                 }
                 Response::SendPosition {
                     teleport_id,
-                    x,
-                    y,
-                    z,
-                    yaw,
-                    pitch,
+                    position,
+                    rotation,
                 } => {
                     if let Some(eid) = self.find_by_uuid(source_uuid) {
                         if let Some(pos) = self.ecs.get_mut::<basalt_core::Position>(eid) {
-                            pos.x = *x;
-                            pos.y = *y;
-                            pos.z = *z;
+                            pos.x = position.x;
+                            pos.y = position.y;
+                            pos.z = position.z;
                         }
                         if let Some(handle) = self.ecs.get::<OutputHandle>(eid) {
                             let _ = handle.tx.try_send(ServerOutput::SetPosition {
                                 teleport_id: *teleport_id,
-                                x: *x,
-                                y: *y,
-                                z: *z,
-                                yaw: *yaw,
-                                pitch: *pitch,
+                                x: position.x,
+                                y: position.y,
+                                z: position.z,
+                                yaw: rotation.yaw,
+                                pitch: rotation.pitch,
                             });
                         }
                     }
                 }
-                Response::StreamChunks { new_cx, new_cz } => {
+                Response::StreamChunks(chunk) => {
                     if let Some(eid) = self.find_by_uuid(source_uuid) {
-                        self.stream_chunks(eid, *new_cx, *new_cz);
+                        self.stream_chunks(eid, chunk.x, chunk.z);
                     }
                 }
                 Response::SendGameStateChange { reason, value } => {
@@ -108,26 +105,24 @@ impl GameLoop {
                         });
                     }
                 }
-                Response::PersistChunk { cx, cz } => {
+                Response::PersistChunk(chunk) => {
                     let _ = self
                         .io_tx
                         .send(crate::runtime::io_thread::IoRequest::PersistChunk {
-                            cx: *cx,
-                            cz: *cz,
+                            cx: chunk.x,
+                            cz: chunk.z,
                         });
                 }
                 Response::SpawnDroppedItem {
-                    x,
-                    y,
-                    z,
+                    position,
                     item_id,
                     count,
                 } => {
-                    self.spawn_item_entity(*x, *y, *z, *item_id, *count);
+                    self.spawn_item_entity(position.x, position.y, position.z, *item_id, *count);
                 }
-                Response::OpenChest { x, y, z } => {
+                Response::OpenChest(pos) => {
                     if let Some(eid) = self.find_by_uuid(source_uuid) {
-                        self.open_chest(eid, *x, *y, *z);
+                        self.open_chest(eid, pos.x, pos.y, pos.z);
                     }
                 }
             }
