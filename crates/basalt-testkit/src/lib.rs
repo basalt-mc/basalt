@@ -74,13 +74,11 @@ impl PluginTestHarness {
     /// Registers a plugin's event handlers and commands.
     pub fn register(&mut self, plugin: impl Plugin) {
         let mut systems = Vec::new();
-        let mut components = Vec::new();
         let mut registrar = PluginRegistrar::new(
             &mut self.instant_bus,
             &mut self.game_bus,
             &mut self.commands,
             &mut systems,
-            &mut components,
             Arc::clone(&self.world),
         );
         plugin.on_enable(&mut registrar);
@@ -210,5 +208,94 @@ impl PluginTestHarness {
 impl Default for PluginTestHarness {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Test context for system plugins.
+///
+/// Pairs an [`Ecs`](basalt_ecs::Ecs) with a [`World`] and implements
+/// [`SystemContext`](basalt_core::SystemContext) so system runners can
+/// be tested without a full server.
+///
+/// # Example
+///
+/// ```ignore
+/// let mut ctx = SystemTestContext::new();
+/// let e = ctx.spawn();
+/// ctx.set::<Position>(e, Position { x: 0.0, y: 64.0, z: 0.0 });
+/// ctx.set::<Velocity>(e, Velocity { dx: 0.0, dy: 0.0, dz: 0.0 });
+/// physics_tick(&mut ctx);
+/// ```
+pub struct SystemTestContext {
+    /// The ECS instance.
+    pub ecs: basalt_ecs::Ecs,
+    /// Shared world for block/collision queries.
+    world: Arc<World>,
+}
+
+impl SystemTestContext {
+    /// Creates a new context with a flat world.
+    pub fn new() -> Self {
+        Self {
+            ecs: basalt_ecs::Ecs::new(),
+            world: Arc::new(World::flat()),
+        }
+    }
+
+    /// Creates a new context with a custom world.
+    pub fn with_world(world: Arc<World>) -> Self {
+        Self {
+            ecs: basalt_ecs::Ecs::new(),
+            world,
+        }
+    }
+}
+
+impl Default for SystemTestContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl basalt_core::SystemContext for SystemTestContext {
+    fn world(&self) -> &World {
+        &self.world
+    }
+
+    fn spawn(&mut self) -> basalt_core::EntityId {
+        self.ecs.spawn()
+    }
+
+    fn despawn(&mut self, entity: basalt_core::EntityId) {
+        self.ecs.despawn(entity);
+    }
+
+    fn set_component(
+        &mut self,
+        entity: basalt_core::EntityId,
+        type_id: std::any::TypeId,
+        component: Box<dyn std::any::Any + Send + Sync>,
+    ) {
+        self.ecs.set_component(entity, type_id, component);
+    }
+
+    fn entities_with(&self, type_id: std::any::TypeId) -> Vec<basalt_core::EntityId> {
+        self.ecs.entities_with(type_id)
+    }
+
+    fn get_component(
+        &self,
+        entity: basalt_core::EntityId,
+        type_id: std::any::TypeId,
+    ) -> Option<&dyn std::any::Any> {
+        self.ecs.get_component(entity, type_id)
+    }
+
+    fn get_component_mut(
+        &mut self,
+        entity: basalt_core::EntityId,
+        type_id: std::any::TypeId,
+    ) -> Option<&mut dyn std::any::Any> {
+        self.ecs.get_component_mut(entity, type_id)
     }
 }
