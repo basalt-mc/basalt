@@ -340,6 +340,29 @@ pub enum BroadcastEvent {
         /// Player UUIDs to remove.
         uuids: Vec<Uuid>,
     },
+    /// A dropped item entity spawned in the world.
+    ///
+    /// Net task sends SpawnEntity (type 55) + SetEntityMetadata (index 8 = Slot).
+    SpawnItemEntity {
+        /// Entity ID.
+        entity_id: i32,
+        /// Spawn X coordinate.
+        x: f64,
+        /// Spawn Y coordinate.
+        y: f64,
+        /// Spawn Z coordinate.
+        z: f64,
+        /// Velocity X.
+        vx: f64,
+        /// Velocity Y.
+        vy: f64,
+        /// Velocity Z.
+        vz: f64,
+        /// Item ID.
+        item_id: i32,
+        /// Item count.
+        count: i32,
+    },
 }
 
 /// Supertrait combining [`Encode`] and [`EncodedSize`] for trait objects.

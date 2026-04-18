@@ -22,7 +22,7 @@ use basalt_protocol::packets::play::chat::{
     ServerboundPlayTabComplete,
 };
 use basalt_protocol::packets::play::entity::{
-    ClientboundPlayEntityDestroy, ClientboundPlayEntityHeadRotation,
+    ClientboundPlayEntityDestroy, ClientboundPlayEntityHeadRotation, ClientboundPlayEntityMetadata,
     ClientboundPlaySyncEntityPosition,
 };
 use basalt_protocol::packets::play::misc::ClientboundPlayKeepAlive;
@@ -370,7 +370,73 @@ fn encode_broadcast(event: &BroadcastEvent) -> Vec<(i32, Vec<u8>)> {
                 &packet,
             )]
         }
+        BroadcastEvent::SpawnItemEntity {
+            entity_id,
+            x,
+            y,
+            z,
+            vx,
+            vy,
+            vz,
+            item_id,
+            count,
+        } => {
+            use basalt_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
+
+            // SpawnEntity packet (type 55 = item entity)
+            let spawn = ClientboundPlaySpawnEntity {
+                entity_id: *entity_id,
+                object_uuid: Uuid::from_bytes((*entity_id as u128).to_le_bytes()),
+                r#type: 68, // item entity in 1.21.4
+                x: *x,
+                y: *y,
+                z: *z,
+                pitch: 0,
+                yaw: 0,
+                head_pitch: 0,
+                object_data: 0,
+                velocity: basalt_types::Vec3i16 {
+                    x: (*vx * 8000.0) as i16,
+                    y: (*vy * 8000.0) as i16,
+                    z: (*vz * 8000.0) as i16,
+                },
+            };
+
+            // EntityMetadata with the item slot
+            let meta_packet = ClientboundPlayEntityMetadata {
+                entity_id: *entity_id,
+                metadata: encode_item_metadata(*item_id, *count),
+            };
+
+            vec![
+                encode_single(ClientboundPlaySpawnEntity::PACKET_ID, &spawn),
+                encode_single(ClientboundPlayEntityMetadata::PACKET_ID, &meta_packet),
+            ]
+        }
     }
+}
+
+/// Encodes entity metadata for a dropped item entity.
+/// Encodes entity metadata entries for a dropped item entity.
+///
+/// Produces the raw metadata bytes (without entity ID — that's in
+/// the [`ClientboundPlayEntityMetadata`] struct):
+/// - Index 8, type 7 (Slot), value = item slot
+/// - 0xFF terminator
+fn encode_item_metadata(item_id: i32, count: i32) -> Vec<u8> {
+    use basalt_types::VarInt;
+
+    let mut buf = Vec::new();
+    // Index 8 = item slot for item entities
+    8u8.encode(&mut buf).unwrap();
+    // Type 7 = Slot
+    VarInt(7).encode(&mut buf).unwrap();
+    // Slot data
+    let slot = basalt_types::Slot::new(item_id, count);
+    slot.encode(&mut buf).unwrap();
+    // Terminator
+    0xFFu8.encode(&mut buf).unwrap();
+    buf
 }
 
 /// Encodes a single protocol packet into `(packet_id, payload_bytes)`.
@@ -635,7 +701,8 @@ async fn process_instant_responses(
             Response::Broadcast(_)
             | Response::SendBlockAck { .. }
             | Response::StreamChunks { .. }
-            | Response::PersistChunk { .. } => {}
+            | Response::PersistChunk { .. }
+            | Response::SpawnDroppedItem { .. } => {}
         }
     }
     Ok(())
