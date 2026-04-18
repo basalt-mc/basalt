@@ -33,7 +33,7 @@ basalt-derive → basalt-protocol → basalt-net → basalt-server → plugins/*
 | `basalt-core` | `Context` trait, `BroadcastMessage`, `PlayerSnapshot`, `PluginLogger` | `basalt-types`, `basalt-world` |
 | `basalt-command` | Typed argument API (Arg, Validation, parsing), `Command` trait | `basalt-core` |
 | `basalt-api` | Public plugin API: `Plugin` trait, `ServerContext` (impl Context), events, `PluginRegistrar` | `basalt-core`, `basalt-command`, `basalt-events` |
-| `basalt-world` | World generation, chunk storage, paletted containers, block state registry | `basalt-types`, `basalt-protocol`, `basalt-storage` |
+| `basalt-world` | World generation, chunk storage, paletted containers, block state registry | `basalt-types`, `basalt-storage` |
 | `basalt-storage` | BSR region file format with LZ4 compression for chunk persistence | `lz4_flex` |
 | `basalt-ecs` | In-house Entity Component System: entities, components, systems, UUID index | `basalt-types` |
 | `basalt-server` | Server runtime: game loop, net tasks, I/O thread, plugin registration | `basalt-api`, `basalt-ecs`, `basalt-net`, all plugin crates |
@@ -104,18 +104,19 @@ crates/basalt-server/
 │   ├── lib.rs               # Server struct, startup orchestration
 │   ├── config.rs            # ServerConfig: TOML, plugin flags, tick_rate, crash_on_plugin_panic
 │   ├── error.rs             # Error type
-│   ├── messages.rs          # GameInput, ServerOutput enums (shared between net/ and game/)
-│   ├── helpers.rs           # angle_to_byte, RawPayload
+│   ├── messages.rs          # GameInput, ServerOutput (game events), BroadcastEvent, EncodablePacket
+│   ├── helpers.rs           # angle_to_byte, RawPayload, RawSlice
 │   ├── state.rs             # ServerState: entity ID counter, DeclareCommands builder
 │   ├── net/
 │   │   ├── mod.rs
 │   │   ├── connection.rs    # Handshake → Login → Config → net task
-│   │   ├── task.rs          # Per-player net task: TCP I/O, instant chat/commands
+│   │   ├── task.rs          # Per-player net task: TCP I/O, instant events, packet encoding
+│   │   ├── chunk_cache.rs   # ChunkPacketCache: shared DashMap of pre-encoded chunk bytes
 │   │   ├── channels.rs      # SharedState: game channel, broadcast, player registry
 │   │   └── skin.rs          # Mojang API skin fetching
 │   ├── game/
 │   │   ├── mod.rs
-│   │   └── tick.rs          # Game loop (20 TPS): movement, blocks, chunks, ECS, lifecycle
+│   │   └── tick.rs          # Game loop (20 TPS): movement, blocks, chunks, ECS, lifecycle (zero encoding)
 │   └── runtime/
 │       ├── mod.rs
 │       ├── tick.rs          # TickLoop: fixed-rate OS thread with drift correction
@@ -128,8 +129,10 @@ crates/basalt-server/
 
 ### Server architecture
 
-- **Game loop** (single dedicated OS thread, 20 TPS): handles all tick-based simulation — movement broadcasting, block operations, chunk streaming, player lifecycle, ECS systems (physics, AI). Owns the ECS and world.
-- **Net tasks** (one tokio task per player): handle TCP I/O, keep-alive, tab-complete. Instant events (chat, commands) are dispatched directly in the net task via `Arc<EventBus>` for zero latency. Game-relevant packets are forwarded to the game loop via channel.
+- **Game loop** (single dedicated OS thread, 20 TPS): handles all tick-based simulation — movement, block operations, chunk streaming, player lifecycle, ECS systems (physics, AI). Owns the ECS and world. Produces `ServerOutput` game events (zero encoding — no protocol knowledge).
+- **Net tasks** (one tokio task per player): handle TCP I/O, keep-alive, tab-complete, and **all packet encoding**. Receive `ServerOutput` game events from the game loop, construct protocol packets, encode, and write to TCP. Instant events (chat, commands) are dispatched directly via `Arc<EventBus>` for zero latency. Game-relevant packets are forwarded to the game loop via channel.
+- **ChunkPacketCache** (shared `DashMap`): caches pre-encoded chunk bytes. Net tasks look up on `SendChunk`; game loop invalidates on block change. Avoids redundant chunk encoding across players.
+- **SharedBroadcast** (`OnceLock`): broadcasts (movement, block changes) are encoded once by the first net task consumer; subsequent consumers read cached bytes.
 - **I/O thread** (dedicated OS thread): receives chunk persist requests via channel, writes BSR region files without blocking the game loop.
 - Two event buses: **instant bus** (chat, commands — dispatched in net tasks) and **game bus** (blocks, movement, lifecycle — dispatched in game loop).
 - Handlers are sync. They interact with the server through `ServerContext` methods which queue deferred responses.
@@ -168,7 +171,7 @@ crates/basalt-world/
 ├── src/
 │   ├── lib.rs           # Module declarations, re-exports
 │   ├── world.rs         # World: DashMap chunk cache, LRU eviction, lazy generation
-│   ├── chunk.rs         # ChunkColumn: 24 sections, set/get block, to_packet()
+│   ├── chunk.rs         # ChunkColumn: 24 sections, set/get block, encode_sections(), compute_heightmaps()
 │   ├── palette.rs       # PalettedContainer: single-value + indirect palette encoding
 │   ├── collision.rs     # AABB collision, ray_cast, resolve_movement
 │   ├── block.rs         # Block state IDs, is_solid()
@@ -177,7 +180,8 @@ crates/basalt-world/
 │   └── noise_gen.rs     # NoiseTerrainGenerator: Perlin noise terrain
 ```
 
-- `World::get_chunk_packet(cx, cz)` generates on first access, caches in memory
+- `World::with_chunk(cx, cz, |col| ...)` ensures loaded (generate or disk) and gives access to the `ChunkColumn`
+- `ChunkColumn::encode_sections()` and `compute_heightmaps()` provide raw data; protocol packet construction lives in basalt-server's `ChunkPacketCache`
 - `PalettedContainer` handles single-value optimization and indirect palettes with proper bits-per-entry
 - Chunk streaming: server tracks player chunk position, sends new chunks on boundary crossing, unloads old ones via `UnloadChunk`
 
