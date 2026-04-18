@@ -127,8 +127,113 @@ impl GameLoop {
     pub fn tick(&mut self, tick: u64) {
         self.drain_game_input();
         self.ecs.run_all(tick);
+        self.tick_pickup_delays();
+        self.tick_item_pickup();
         self.tick_lifetimes();
         self.flush_dirty_chunks_if_due(tick);
+    }
+
+    /// Decrements pickup delays on dropped items.
+    fn tick_pickup_delays(&mut self) {
+        for (_, delay) in self.ecs.iter_mut::<basalt_ecs::PickupDelay>() {
+            if delay.remaining_ticks > 0 {
+                delay.remaining_ticks -= 1;
+            }
+        }
+    }
+
+    /// Checks proximity between item entities and players, picks up items.
+    ///
+    /// For each dropped item with an expired pickup delay, checks distance
+    /// to all players. If within 1.5 blocks and the player's inventory has
+    /// space, the item is transferred, a collect animation is broadcast,
+    /// and the item entity is despawned.
+    fn tick_item_pickup(&mut self) {
+        // Collect all item entities eligible for pickup
+        let items: Vec<(basalt_ecs::EntityId, f64, f64, f64, i32, i32)> = self
+            .ecs
+            .iter::<basalt_ecs::DroppedItem>()
+            .filter_map(|(eid, item)| {
+                // Skip items still on pickup delay
+                if let Some(delay) = self.ecs.get::<basalt_ecs::PickupDelay>(eid)
+                    && delay.remaining_ticks > 0
+                {
+                    return None;
+                }
+                let pos = self.ecs.get::<basalt_ecs::Position>(eid)?;
+                let item_id = item.slot.item_id?;
+                Some((eid, pos.x, pos.y, pos.z, item_id, item.slot.item_count))
+            })
+            .collect();
+
+        if items.is_empty() {
+            return;
+        }
+
+        // Collect all players
+        let players: Vec<(basalt_ecs::EntityId, f64, f64, f64)> = self
+            .ecs
+            .iter::<basalt_ecs::PlayerRef>()
+            .filter_map(|(eid, _)| {
+                let pos = self.ecs.get::<basalt_ecs::Position>(eid)?;
+                Some((eid, pos.x, pos.y, pos.z))
+            })
+            .collect();
+
+        const PICKUP_RADIUS_SQ: f64 = 1.5 * 1.5;
+
+        for (item_eid, ix, iy, iz, item_id, count) in &items {
+            for (player_eid, px, py, pz) in &players {
+                let dx = ix - px;
+                let dy = iy - py;
+                let dz = iz - pz;
+                let dist_sq = dx * dx + dy * dy + dz * dz;
+
+                if dist_sq > PICKUP_RADIUS_SQ {
+                    continue;
+                }
+
+                // Try to insert into player inventory
+                let (hotbar_idx, slot_after) = {
+                    let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(*player_eid) else {
+                        continue;
+                    };
+                    let Some(idx) = inv.try_insert(*item_id, *count) else {
+                        continue;
+                    };
+                    (idx, inv.hotbar[idx as usize].clone())
+                };
+
+                // Send SetSlot to the picker to sync their client inventory
+                // Hotbar slots are 36-44 in the protocol window
+                self.send_to(*player_eid, |tx| {
+                    let _ = tx.try_send(ServerOutput::SetSlot {
+                        slot: 36 + hotbar_idx as i16,
+                        item: slot_after,
+                    });
+                });
+
+                // Broadcast collect animation + entity destroy
+                let collect = Arc::new(SharedBroadcast::new(BroadcastEvent::CollectItem {
+                    collected_entity_id: *item_eid as i32,
+                    collector_entity_id: *player_eid as i32,
+                    count: *count,
+                }));
+                let destroy = Arc::new(SharedBroadcast::new(BroadcastEvent::RemoveEntities {
+                    entity_ids: vec![*item_eid as i32],
+                }));
+                for (e, _) in self.ecs.iter::<OutputHandle>() {
+                    self.send_to(e, |tx| {
+                        let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&collect)));
+                        let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&destroy)));
+                    });
+                }
+
+                // Despawn the item entity
+                self.ecs.despawn(*item_eid);
+                break; // item is consumed, move to next item
+            }
+        }
     }
 
     /// Decrements lifetimes and despawns expired entities.
@@ -1042,6 +1147,12 @@ impl GameLoop {
             },
         );
         self.ecs.set(eid, basalt_ecs::EntityKind { type_id: 68 });
+        self.ecs.set(
+            eid,
+            basalt_ecs::PickupDelay {
+                remaining_ticks: 10,
+            },
+        );
         self.ecs.set(
             eid,
             basalt_ecs::Lifetime {
