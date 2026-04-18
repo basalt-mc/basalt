@@ -111,7 +111,7 @@ crates/basalt-server/
 │   │   ├── mod.rs
 │   │   ├── connection.rs    # Handshake → Login → Config → net task
 │   │   ├── task.rs          # Per-player net task: TCP I/O, instant events, packet encoding
-│   │   ├── chunk_cache.rs   # ChunkPacketCache: shared DashMap of pre-encoded chunk bytes
+│   │   ├── chunk_cache.rs   # ChunkPacketCache: LRU cache of pre-encoded chunk packet bytes
 │   │   ├── channels.rs      # SharedState: game channel, broadcast, player registry
 │   │   └── skin.rs          # Mojang API skin fetching
 │   ├── game/
@@ -131,7 +131,7 @@ crates/basalt-server/
 
 - **Game loop** (single dedicated OS thread, 20 TPS): handles all tick-based simulation — movement, block operations, chunk streaming, player lifecycle, ECS systems (physics, AI). Owns the ECS and world. Produces `ServerOutput` game events (zero encoding — no protocol knowledge).
 - **Net tasks** (one tokio task per player): handle TCP I/O, keep-alive, tab-complete, and **all packet encoding**. Receive `ServerOutput` game events from the game loop, construct protocol packets, encode, and write to TCP. Instant events (chat, commands) are dispatched directly via `Arc<EventBus>` for zero latency. Game-relevant packets are forwarded to the game loop via channel.
-- **ChunkPacketCache** (shared `DashMap`): caches pre-encoded chunk bytes. Net tasks look up on `SendChunk`; game loop invalidates on block change. Avoids redundant chunk encoding across players.
+- **ChunkPacketCache** (shared `DashMap` with LRU eviction): caches pre-encoded chunk bytes. Net tasks look up on `SendChunk`; game loop invalidates on block change. Configurable max size (`chunk_packet_cache_max_entries`, default 2048); evicts least recently accessed entries independently of World's chunk cache.
 - **SharedBroadcast** (`OnceLock`): broadcasts (movement, block changes) are encoded once by the first net task consumer; subsequent consumers read cached bytes.
 - **I/O thread** (dedicated OS thread): receives chunk persist requests via channel, writes BSR region files without blocking the game loop.
 - Two event buses: **instant bus** (chat, commands — dispatched in net tasks) and **game bus** (blocks, movement, lifecycle — dispatched in game loop).
