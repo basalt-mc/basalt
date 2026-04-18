@@ -97,6 +97,18 @@ pub struct PlayerRef {
 }
 impl Component for PlayerRef {}
 
+/// A dropped item on the ground.
+///
+/// Entities with this component represent items that can be picked up
+/// by players. Combined with `Position`, `Velocity`, `BoundingBox`,
+/// and `Lifetime` to create a full dropped item entity.
+#[derive(Debug, Clone)]
+pub struct DroppedItem {
+    /// The item stack (ID, count, component data).
+    pub slot: basalt_types::Slot,
+}
+impl Component for DroppedItem {}
+
 /// Player hotbar inventory.
 ///
 /// Tracks the 9 hotbar slots and which one is currently selected.

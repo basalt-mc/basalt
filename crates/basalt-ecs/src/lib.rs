@@ -13,7 +13,8 @@ mod ecs;
 mod system;
 
 pub use components::{
-    BoundingBox, EntityKind, Health, Inventory, Lifetime, PlayerRef, Position, Rotation, Velocity,
+    BoundingBox, DroppedItem, EntityKind, Health, Inventory, Lifetime, PlayerRef, Position,
+    Rotation, Velocity,
 };
 pub use ecs::{Component, Ecs, EntityId};
 pub use system::{Phase, SystemAccess, SystemBuilder, SystemDescriptor, SystemRunner};
