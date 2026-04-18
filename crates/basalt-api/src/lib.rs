@@ -36,8 +36,8 @@ pub mod prelude {
 
     pub use crate::context::{Response, ServerContext};
     pub use crate::events::{
-        BlockBrokenEvent, BlockPlacedEvent, ChatMessageEvent, CommandEvent, PlayerJoinedEvent,
-        PlayerLeftEvent, PlayerMovedEvent,
+        BlockBrokenEvent, BlockPlacedEvent, ChatMessageEvent, CommandEvent, PlayerInteractEvent,
+        PlayerJoinedEvent, PlayerLeftEvent, PlayerMovedEvent,
     };
     pub use crate::plugin::{Plugin, PluginMetadata, PluginRegistrar};
     pub use basalt_events::{Event, Stage};

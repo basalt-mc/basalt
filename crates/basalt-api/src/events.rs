@@ -267,6 +267,32 @@ pub struct PlayerLeftEvent {
 }
 game_event!(PlayerLeftEvent);
 
+/// A player right-clicked on a block (use item on block).
+///
+/// Fired before any container interaction or block placement.
+/// If cancelled by a handler (e.g., ContainerPlugin opens a chest),
+/// the game loop skips block placement entirely.
+#[derive(Debug, Clone)]
+pub struct PlayerInteractEvent {
+    /// Block X coordinate that was right-clicked.
+    pub x: i32,
+    /// Block Y coordinate that was right-clicked.
+    pub y: i32,
+    /// Block Z coordinate that was right-clicked.
+    pub z: i32,
+    /// UUID of the interacting player.
+    pub player_uuid: Uuid,
+    /// Block state at the clicked position.
+    pub block_state: u16,
+    /// Face direction clicked (0-5).
+    pub direction: i32,
+    /// Sequence number for acknowledgement.
+    pub sequence: i32,
+    /// Whether this event has been cancelled.
+    pub cancelled: bool,
+}
+game_cancellable_event!(PlayerInteractEvent);
+
 #[cfg(test)]
 mod tests {
     use basalt_events::Event;
