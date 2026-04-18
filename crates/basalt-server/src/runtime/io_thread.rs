@@ -56,9 +56,17 @@ impl IoThread {
                             world.persist_chunk(cx, cz);
                         }
                         IoRequest::Shutdown => {
-                            // Flush remaining requests before exiting
+                            // Drain any pending requests
                             while let Ok(req) = rx.try_recv() {
                                 if let IoRequest::PersistChunk { cx, cz } = req {
+                                    world.persist_chunk(cx, cz);
+                                }
+                            }
+                            // Flush all remaining dirty chunks before exit
+                            let dirty = world.dirty_chunks();
+                            if !dirty.is_empty() {
+                                log::info!(target: "basalt::io", "Flushing {} dirty chunks before shutdown", dirty.len());
+                                for (cx, cz) in dirty {
                                     world.persist_chunk(cx, cz);
                                 }
                             }
