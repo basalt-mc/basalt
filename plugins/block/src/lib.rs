@@ -83,21 +83,15 @@ mod tests {
             cancelled: false,
         };
 
-        let responses = harness.dispatch(&mut event);
+        let result = harness.dispatch(&mut event);
 
         assert_eq!(
             harness.world().get_block(5, 64, 3),
             basalt_api::world::block::AIR
         );
-        assert_eq!(responses.len(), 2);
-        assert!(matches!(
-            responses[0],
-            Response::SendBlockAck { sequence: 42 }
-        ));
-        assert!(matches!(
-            responses[1],
-            Response::Broadcast(BroadcastMessage::BlockChanged { .. })
-        ));
+        assert_eq!(result.len(), 2);
+        assert!(result.has_block_ack_seq(42));
+        assert!(result.has_block_change_broadcast());
     }
 
     #[test]
@@ -120,13 +114,13 @@ mod tests {
             cancelled: false,
         };
 
-        let responses = harness.dispatch(&mut event);
+        let result = harness.dispatch(&mut event);
 
         assert_eq!(
             harness.world().get_block(8, 64, 8),
             basalt_api::world::block::STONE
         );
-        assert!(responses.is_empty());
+        assert!(result.is_empty());
     }
 
     #[test]
@@ -141,21 +135,15 @@ mod tests {
             cancelled: false,
         };
 
-        let responses = harness.dispatch(&mut event);
+        let result = harness.dispatch(&mut event);
 
         assert_eq!(
             harness.world().get_block(5, 64, 3),
             basalt_api::world::block::STONE
         );
-        assert_eq!(responses.len(), 2);
-        assert!(matches!(
-            responses[0],
-            Response::SendBlockAck { sequence: 10 }
-        ));
-        assert!(matches!(
-            responses[1],
-            Response::Broadcast(BroadcastMessage::BlockChanged { .. })
-        ));
+        assert_eq!(result.len(), 2);
+        assert!(result.has_block_ack_seq(10));
+        assert!(result.has_block_change_broadcast());
     }
 
     #[test]
@@ -174,11 +162,11 @@ mod tests {
             cancelled: false,
         };
 
-        let responses = harness.dispatch(&mut event);
+        let result = harness.dispatch(&mut event);
         assert_eq!(
             harness.world().get_block(5, 200, 3),
             basalt_api::world::block::AIR
         );
-        assert!(responses.is_empty());
+        assert!(result.is_empty());
     }
 }

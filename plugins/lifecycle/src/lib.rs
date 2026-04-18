@@ -34,7 +34,6 @@ impl Plugin for LifecyclePlugin {
 
 #[cfg(test)]
 mod tests {
-    use basalt_api::Response;
     use basalt_testkit::PluginTestHarness;
 
     use super::*;
@@ -46,12 +45,9 @@ mod tests {
 
         let mut event = PlayerJoinedEvent;
 
-        let responses = harness.dispatch(&mut event);
-        assert_eq!(responses.len(), 1);
-        assert!(matches!(
-            responses[0],
-            Response::Broadcast(BroadcastMessage::PlayerJoined { .. })
-        ));
+        let result = harness.dispatch(&mut event);
+        assert_eq!(result.len(), 1);
+        assert!(result.has_player_joined_broadcast());
     }
 
     #[test]
@@ -61,11 +57,8 @@ mod tests {
 
         let mut event = PlayerLeftEvent;
 
-        let responses = harness.dispatch(&mut event);
-        assert_eq!(responses.len(), 1);
-        assert!(matches!(
-            responses[0],
-            Response::Broadcast(BroadcastMessage::PlayerLeft { .. })
-        ));
+        let result = harness.dispatch(&mut event);
+        assert_eq!(result.len(), 1);
+        assert!(result.has_player_left_broadcast());
     }
 }
