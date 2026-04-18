@@ -92,7 +92,13 @@ impl Server {
         let instant_bus = Arc::new(instant_bus);
 
         // Shared chunk packet cache — net tasks encode on miss, game loop invalidates
-        let chunk_cache = Arc::new(net::chunk_cache::ChunkPacketCache::new(Arc::clone(&world)));
+        let chunk_cache = Arc::new(net::chunk_cache::ChunkPacketCache::new(
+            Arc::clone(&world),
+            self.config
+                .server
+                .performance
+                .chunk_packet_cache_max_entries,
+        ));
 
         // I/O thread — dedicated OS thread for async chunk persistence
         let io_thread = runtime::io_thread::IoThread::start(Arc::clone(&world));
