@@ -6,12 +6,12 @@
 //! needed for the `PlayerInfo` packet so other players see the correct
 //! skin.
 
-use basalt_api::ProfileProperty;
+use basalt_api::broadcast::ProfileProperty;
 use serde::Deserialize;
 
 /// Mojang API profile property (deserializable).
 ///
-/// Converted to [`basalt_api::ProfileProperty`] after fetching.
+/// Converted to [`basalt_api::broadcast::ProfileProperty`] after fetching.
 #[derive(Deserialize)]
 struct MojangProperty {
     name: String,

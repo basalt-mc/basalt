@@ -10,11 +10,11 @@ impl GameLoop {
     ///
     /// Status 3 = drop entire stack, status 4 = drop single item.
     pub(super) fn handle_item_drop(&mut self, uuid: Uuid, drop_stack: bool) {
-        let Some(eid) = self.ecs.find_by_uuid(uuid) else {
+        let Some(eid) = self.find_by_uuid(uuid) else {
             return;
         };
         let (item_id, drop_count, held_idx) = {
-            let Some(inv) = self.ecs.get::<basalt_ecs::Inventory>(eid) else {
+            let Some(inv) = self.ecs.get::<basalt_core::Inventory>(eid) else {
                 return;
             };
             let held_idx = inv.held_slot as usize;
@@ -27,7 +27,7 @@ impl GameLoop {
         };
 
         // Decrement or clear the slot
-        if let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid) {
+        if let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid) {
             if drop_count >= inv.slots[held_idx].item_count {
                 inv.slots[held_idx] = basalt_types::Slot::empty();
             } else {
@@ -36,7 +36,7 @@ impl GameLoop {
         }
 
         // Spawn the dropped item entity
-        if let Some(pos) = self.ecs.get::<basalt_ecs::Position>(eid) {
+        if let Some(pos) = self.ecs.get::<basalt_core::Position>(eid) {
             self.spawn_item_entity(
                 pos.x as i32,
                 pos.y as i32 + 1,
@@ -49,7 +49,7 @@ impl GameLoop {
         // Sync the changed slot (raw internal index = SetPlayerInventory slot)
         let slot_after = self
             .ecs
-            .get::<basalt_ecs::Inventory>(eid)
+            .get::<basalt_core::Inventory>(eid)
             .map(|inv| inv.slots[held_idx].clone())
             .unwrap_or_default();
         self.send_to(eid, |tx| {
@@ -78,22 +78,22 @@ impl GameLoop {
         changed_slots: Vec<(i16, basalt_types::Slot)>,
         cursor_item: basalt_types::Slot,
     ) {
-        let Some(eid) = self.ecs.find_by_uuid(uuid) else {
+        let Some(eid) = self.find_by_uuid(uuid) else {
             return;
         };
 
         // If a container is open, route to container click handler
-        if let Some(oc) = self.ecs.get::<basalt_ecs::OpenContainer>(eid) {
+        if let Some(oc) = self.ecs.get::<basalt_core::OpenContainer>(eid) {
             let pos = oc.position;
             // Drop outside container window
             if slot == -999 {
                 let old_cursor = self
                     .ecs
-                    .get::<basalt_ecs::Inventory>(eid)
+                    .get::<basalt_core::Inventory>(eid)
                     .map(|inv| inv.cursor.clone())
                     .unwrap_or_default();
                 if let Some(item_id) = old_cursor.item_id
-                    && let Some(player_pos) = self.ecs.get::<basalt_ecs::Position>(eid)
+                    && let Some(player_pos) = self.ecs.get::<basalt_core::Position>(eid)
                 {
                     self.spawn_item_entity(
                         player_pos.x as i32,
@@ -103,7 +103,7 @@ impl GameLoop {
                         old_cursor.item_count,
                     );
                 }
-                if let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid) {
+                if let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid) {
                     inv.cursor = cursor_item;
                 }
                 return;
@@ -124,12 +124,12 @@ impl GameLoop {
                 } else if (27..54).contains(&ws) {
                     let idx = (ws - 27 + 9) as usize;
                     self.ecs
-                        .get::<basalt_ecs::Inventory>(eid)
+                        .get::<basalt_core::Inventory>(eid)
                         .and_then(|inv| (idx < 36).then(|| inv.slots[idx].clone()))
                 } else if (54..63).contains(&ws) {
                     let idx = (ws - 54) as usize;
                     self.ecs
-                        .get::<basalt_ecs::Inventory>(eid)
+                        .get::<basalt_core::Inventory>(eid)
                         .map(|inv| inv.slots[idx].clone())
                 } else {
                     None
@@ -142,7 +142,7 @@ impl GameLoop {
                     // Apply the changed_slots from the client (handles decrement)
                     self.handle_container_click(eid, pos, &changed_slots, cursor_item);
                     // Spawn the dropped item
-                    if let Some(player_pos) = self.ecs.get::<basalt_ecs::Position>(eid) {
+                    if let Some(player_pos) = self.ecs.get::<basalt_core::Position>(eid) {
                         self.spawn_item_entity(
                             player_pos.x as i32,
                             player_pos.y as i32 + 1,
@@ -162,13 +162,13 @@ impl GameLoop {
         // Click outside window (slot -999): drop what was on the cursor
         if slot == -999 {
             let old_cursor = {
-                let Some(inv) = self.ecs.get::<basalt_ecs::Inventory>(eid) else {
+                let Some(inv) = self.ecs.get::<basalt_core::Inventory>(eid) else {
                     return;
                 };
                 inv.cursor.clone()
             };
             if let Some(item_id) = old_cursor.item_id
-                && let Some(pos) = self.ecs.get::<basalt_ecs::Position>(eid)
+                && let Some(pos) = self.ecs.get::<basalt_core::Position>(eid)
             {
                 self.spawn_item_entity(
                     pos.x as i32,
@@ -179,10 +179,10 @@ impl GameLoop {
                 );
             }
             // Update cursor (now empty) and apply any changed_slots
-            if let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid) {
+            if let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid) {
                 inv.cursor = cursor_item;
                 for (window_slot, item) in &changed_slots {
-                    if let Some(idx) = basalt_ecs::Inventory::window_to_index(*window_slot) {
+                    if let Some(idx) = basalt_core::Inventory::window_to_index(*window_slot) {
                         inv.slots[idx] = item.clone();
                     }
                 }
@@ -192,23 +192,23 @@ impl GameLoop {
 
         // Mode 4: Q key while hovering a slot in open inventory
         if mode == 4 && slot >= 0 {
-            if let Some(idx) = basalt_ecs::Inventory::window_to_index(slot) {
+            if let Some(idx) = basalt_core::Inventory::window_to_index(slot) {
                 let item = {
-                    let Some(inv) = self.ecs.get::<basalt_ecs::Inventory>(eid) else {
+                    let Some(inv) = self.ecs.get::<basalt_core::Inventory>(eid) else {
                         return;
                     };
                     inv.slots[idx].clone()
                 };
                 if let Some(item_id) = item.item_id {
                     let drop_count = if button == 0 { 1 } else { item.item_count };
-                    if let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid) {
+                    if let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid) {
                         if drop_count >= inv.slots[idx].item_count {
                             inv.slots[idx] = basalt_types::Slot::empty();
                         } else {
                             inv.slots[idx].item_count -= drop_count;
                         }
                     }
-                    if let Some(pos) = self.ecs.get::<basalt_ecs::Position>(eid) {
+                    if let Some(pos) = self.ecs.get::<basalt_core::Position>(eid) {
                         self.spawn_item_entity(
                             pos.x as i32,
                             pos.y as i32 + 1,
@@ -219,7 +219,7 @@ impl GameLoop {
                     }
                     let slot_after = self
                         .ecs
-                        .get::<basalt_ecs::Inventory>(eid)
+                        .get::<basalt_core::Inventory>(eid)
                         .map(|inv| inv.slots[idx].clone())
                         .unwrap_or_default();
                     self.send_to(eid, |tx| {
@@ -234,9 +234,9 @@ impl GameLoop {
         }
 
         // All other clicks: apply changed_slots + update cursor
-        if let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid) {
+        if let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid) {
             for (window_slot, item) in &changed_slots {
-                if let Some(idx) = basalt_ecs::Inventory::window_to_index(*window_slot) {
+                if let Some(idx) = basalt_core::Inventory::window_to_index(*window_slot) {
                     inv.slots[idx] = item.clone();
                 }
             }
@@ -260,8 +260,8 @@ mod tests {
         let _ = game_tx.send(GameInput::HeldItemSlot { uuid, slot: 3 });
         game_loop.tick(1);
 
-        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
-        let inv = game_loop.ecs.get::<basalt_ecs::Inventory>(eid).unwrap();
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
+        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
         assert_eq!(inv.held_slot, 3);
     }
 
@@ -282,8 +282,8 @@ mod tests {
         });
         game_loop.tick(1);
 
-        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
-        let inv = game_loop.ecs.get::<basalt_ecs::Inventory>(eid).unwrap();
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
+        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
         assert_eq!(inv.hotbar()[0].item_id, Some(1));
         assert_eq!(inv.hotbar()[0].item_count, 64);
     }
@@ -305,8 +305,8 @@ mod tests {
         });
         game_loop.tick(1);
 
-        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
-        let inv = game_loop.ecs.get::<basalt_ecs::Inventory>(eid).unwrap();
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
+        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
         assert!(inv.hotbar()[0].item_id.is_none());
     }
 
@@ -317,10 +317,10 @@ mod tests {
         let mut rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
 
         // Set cursor item directly
-        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_ecs::Inventory>(eid)
+            .get_mut::<basalt_core::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(1, 16);
 
@@ -338,7 +338,7 @@ mod tests {
         game_loop.tick(1);
 
         // Cursor should be empty
-        let inv = game_loop.ecs.get::<basalt_ecs::Inventory>(eid).unwrap();
+        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
         assert!(
             inv.cursor.is_empty(),
             "cursor should be empty after drop outside"
@@ -360,10 +360,10 @@ mod tests {
         let uuid = Uuid::from_bytes([1; 16]);
         let _rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
 
-        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_ecs::Inventory>(eid)
+            .get_mut::<basalt_core::Inventory>(eid)
             .unwrap()
             .slots[0] = basalt_types::Slot::new(1, 10);
 
@@ -381,7 +381,7 @@ mod tests {
         });
         game_loop.tick(1);
 
-        let inv = game_loop.ecs.get::<basalt_ecs::Inventory>(eid).unwrap();
+        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
         assert!(inv.slots[0].is_empty(), "hotbar 0 should be empty");
         assert_eq!(inv.slots[9].item_id, Some(1), "main 0 should have item");
         assert_eq!(inv.slots[9].item_count, 10);
@@ -394,10 +394,10 @@ mod tests {
         let mut rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
 
         // Give 10 stone in hotbar slot 0
-        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_ecs::Inventory>(eid)
+            .get_mut::<basalt_core::Inventory>(eid)
             .unwrap()
             .slots[0] = basalt_types::Slot::new(1, 10);
 
@@ -414,7 +414,7 @@ mod tests {
         });
         game_loop.tick(1);
 
-        let inv = game_loop.ecs.get::<basalt_ecs::Inventory>(eid).unwrap();
+        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
         assert_eq!(inv.slots[0].item_count, 9, "should have 9 after dropping 1");
 
         // Should receive SetSlot + SpawnEntity broadcast
@@ -441,10 +441,10 @@ mod tests {
         let uuid = Uuid::from_bytes([1; 16]);
         let mut rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
 
-        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_ecs::Inventory>(eid)
+            .get_mut::<basalt_core::Inventory>(eid)
             .unwrap()
             .slots[0] = basalt_types::Slot::new(1, 32);
 
@@ -461,7 +461,7 @@ mod tests {
         });
         game_loop.tick(1);
 
-        let inv = game_loop.ecs.get::<basalt_ecs::Inventory>(eid).unwrap();
+        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
         assert!(
             inv.slots[0].is_empty(),
             "slot should be empty after full drop"

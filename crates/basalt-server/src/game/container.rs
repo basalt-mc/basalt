@@ -142,7 +142,7 @@ impl GameLoop {
         }
 
         // Player inventory
-        if let Some(inv) = self.ecs.get::<basalt_ecs::Inventory>(eid) {
+        if let Some(inv) = self.ecs.get::<basalt_core::Inventory>(eid) {
             window_slots.extend_from_slice(&inv.slots[9..]); // main
             window_slots.extend_from_slice(&inv.slots[..9]); // hotbar
         }
@@ -150,7 +150,7 @@ impl GameLoop {
         let container_pos = view.parts.first().map_or((0, 0, 0), |p| p.position);
         self.ecs.set(
             eid,
-            basalt_ecs::OpenContainer {
+            basalt_core::OpenContainer {
                 window_id,
                 position: container_pos,
             },
@@ -171,7 +171,7 @@ impl GameLoop {
             let (px, py, pz) = part.position;
             let viewer_count = self
                 .ecs
-                .iter::<basalt_ecs::OpenContainer>()
+                .iter::<basalt_core::OpenContainer>()
                 .filter(|(_, oc)| oc.position == container_pos)
                 .count() as u8;
             for (e, _) in self.ecs.iter::<OutputHandle>() {
@@ -256,7 +256,7 @@ impl GameLoop {
                 self.notify_container_viewers(container_pos, eid, *window_slot, item);
             } else if let Some(inv_idx) = view.slot_to_player_inv(*window_slot) {
                 // Player inventory slot
-                if let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid)
+                if let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid)
                     && inv_idx < 36
                 {
                     inv.slots[inv_idx] = item.clone();
@@ -265,7 +265,7 @@ impl GameLoop {
         }
 
         // Update cursor
-        if let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid) {
+        if let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid) {
             inv.cursor = cursor_item;
         }
     }
@@ -278,7 +278,7 @@ impl GameLoop {
         window_slot: i16,
         item: &basalt_types::Slot,
     ) {
-        for (other_eid, oc) in self.ecs.iter::<basalt_ecs::OpenContainer>() {
+        for (other_eid, oc) in self.ecs.iter::<basalt_core::OpenContainer>() {
             if other_eid != exclude_eid && oc.position == container_pos {
                 self.send_to(other_eid, |tx| {
                     let _ = tx.try_send(ServerOutput::SetContainerSlot {
@@ -336,8 +336,8 @@ mod tests {
         assert!(got_open, "right-clicking chest should send OpenWindow");
 
         // Player should have OpenContainer component
-        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
-        assert!(game_loop.ecs.has::<basalt_ecs::OpenContainer>(eid));
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
+        assert!(game_loop.ecs.has::<basalt_core::OpenContainer>(eid));
     }
 
     #[test]
@@ -347,10 +347,10 @@ mod tests {
         let _rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
 
         // Put an item on the cursor
-        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_ecs::Inventory>(eid)
+            .get_mut::<basalt_core::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(1, 5);
 
@@ -359,7 +359,7 @@ mod tests {
         game_loop.tick(1);
 
         // Cursor should be empty, item should be in inventory
-        let inv = game_loop.ecs.get::<basalt_ecs::Inventory>(eid).unwrap();
+        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
         assert!(inv.cursor.is_empty(), "cursor should be empty after close");
         // Item should have been inserted somewhere
         let has_item = inv
@@ -482,10 +482,10 @@ mod tests {
         let _rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
 
         // Manually set OpenContainer
-        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop.ecs.set(
             eid,
-            basalt_ecs::OpenContainer {
+            basalt_core::OpenContainer {
                 window_id: 1,
                 position: (5, 64, 3),
             },
@@ -495,7 +495,7 @@ mod tests {
         game_loop.tick(1);
 
         assert!(
-            !game_loop.ecs.has::<basalt_ecs::OpenContainer>(eid),
+            !game_loop.ecs.has::<basalt_core::OpenContainer>(eid),
             "CloseWindow should remove OpenContainer"
         );
     }
@@ -507,7 +507,7 @@ mod tests {
         let mut rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
         while rx.try_recv().is_ok() {}
 
-        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
 
         // Open a chest
         game_loop
@@ -533,7 +533,7 @@ mod tests {
         // Set cursor item
         game_loop
             .ecs
-            .get_mut::<basalt_ecs::Inventory>(eid)
+            .get_mut::<basalt_core::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(1, 8);
 
@@ -548,7 +548,7 @@ mod tests {
         });
         game_loop.tick(2);
 
-        let inv = game_loop.ecs.get::<basalt_ecs::Inventory>(eid).unwrap();
+        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
         assert!(
             inv.cursor.is_empty(),
             "cursor should be empty after drop outside container"

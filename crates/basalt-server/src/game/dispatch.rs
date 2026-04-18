@@ -83,8 +83,8 @@ impl GameLoop {
                     self.handle_block_place(uuid, x, y, z, direction, sequence);
                 }
                 GameInput::HeldItemSlot { uuid, slot } => {
-                    if let Some(eid) = self.ecs.find_by_uuid(uuid)
-                        && let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid)
+                    if let Some(eid) = self.find_by_uuid(uuid)
+                        && let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid)
                     {
                         let idx = slot as u8;
                         if idx < 9 {
@@ -96,8 +96,8 @@ impl GameLoop {
                     if slot == -1 {
                         // Creative drop: slot -1 means drop the item
                         if let Some(item_id) = item.item_id
-                            && let Some(eid) = self.ecs.find_by_uuid(uuid)
-                            && let Some(pos) = self.ecs.get::<basalt_ecs::Position>(eid)
+                            && let Some(eid) = self.find_by_uuid(uuid)
+                            && let Some(pos) = self.ecs.get::<basalt_core::Position>(eid)
                         {
                             self.spawn_item_entity(
                                 pos.x as i32,
@@ -107,9 +107,9 @@ impl GameLoop {
                                 item.item_count,
                             );
                         }
-                    } else if let Some(eid) = self.ecs.find_by_uuid(uuid)
-                        && let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid)
-                        && let Some(idx) = basalt_ecs::Inventory::window_to_index(slot)
+                    } else if let Some(eid) = self.find_by_uuid(uuid)
+                        && let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid)
+                        && let Some(idx) = basalt_core::Inventory::window_to_index(slot)
                     {
                         inv.slots[idx] = item;
                     }
@@ -126,11 +126,11 @@ impl GameLoop {
                     self.handle_window_click(uuid, slot, button, mode, changed_slots, cursor_item);
                 }
                 GameInput::CloseWindow { uuid, .. } => {
-                    if let Some(eid) = self.ecs.find_by_uuid(uuid) {
+                    if let Some(eid) = self.find_by_uuid(uuid) {
                         // Return cursor item to inventory or drop it
                         let cursor_item = self
                             .ecs
-                            .get_mut::<basalt_ecs::Inventory>(eid)
+                            .get_mut::<basalt_core::Inventory>(eid)
                             .map(|inv| {
                                 let item = inv.cursor.clone();
                                 inv.cursor = basalt_types::Slot::empty();
@@ -138,9 +138,9 @@ impl GameLoop {
                             })
                             .unwrap_or_default();
                         if let Some(item_id) = cursor_item.item_id
-                            && let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid)
+                            && let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid)
                             && inv.try_insert(item_id, cursor_item.item_count).is_none()
-                            && let Some(pos) = self.ecs.get::<basalt_ecs::Position>(eid)
+                            && let Some(pos) = self.ecs.get::<basalt_core::Position>(eid)
                         {
                             self.spawn_item_entity(
                                 pos.x as i32,
@@ -151,11 +151,11 @@ impl GameLoop {
                             );
                         }
                         // Broadcast chest close animation if no other viewers
-                        if let Some(oc) = self.ecs.get::<basalt_ecs::OpenContainer>(eid) {
+                        if let Some(oc) = self.ecs.get::<basalt_core::OpenContainer>(eid) {
                             let pos = oc.position;
                             let remaining = self
                                 .ecs
-                                .iter::<basalt_ecs::OpenContainer>()
+                                .iter::<basalt_core::OpenContainer>()
                                 .filter(|(id, oc2)| *id != eid && oc2.position == pos)
                                 .count() as u8;
                             let view = self.build_chest_view(pos.0, pos.1, pos.2);
@@ -177,13 +177,13 @@ impl GameLoop {
                                 }
                             }
                         }
-                        self.ecs.remove_component::<basalt_ecs::OpenContainer>(eid);
+                        self.ecs.remove_component::<basalt_core::OpenContainer>(eid);
                     }
                 }
                 GameInput::EntityAction {
                     uuid, action_id, ..
                 } => {
-                    if let Some(eid) = self.ecs.find_by_uuid(uuid) {
+                    if let Some(eid) = self.find_by_uuid(uuid) {
                         match action_id {
                             0 => self.ecs.set(eid, Sneaking), // start sneak
                             1 => {
