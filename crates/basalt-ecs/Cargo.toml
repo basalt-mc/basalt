@@ -6,8 +6,8 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-basalt-types = { workspace = true }
-log = { workspace = true }
+basalt-core = { workspace = true }
+basalt-world = { workspace = true }
 
 [[bench]]
 name = "ecs"
