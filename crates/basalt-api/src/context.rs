@@ -10,7 +10,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 use basalt_core::broadcast::BroadcastMessage;
+use basalt_core::components::{BlockPosition, ChunkPosition, Position, Rotation};
 use basalt_core::gamemode::Gamemode;
+use basalt_core::player::PlayerInfo;
 use basalt_core::{
     ChatContext, ContainerContext, Context, EntityContext, PlayerContext, PluginLogger,
     WorldContext,
@@ -34,16 +36,8 @@ pub struct ServerContext {
     world: Arc<basalt_world::World>,
     /// Queue for deferred async responses.
     responses: ResponseQueue,
-    /// UUID of the player who triggered this event.
-    player_uuid: Uuid,
-    /// Entity ID of the player who triggered this event.
-    player_entity_id: i32,
-    /// Username of the player who triggered this event.
-    player_username: String,
-    /// Current yaw rotation of the player (horizontal, degrees).
-    player_yaw: f32,
-    /// Current pitch rotation of the player (vertical, degrees).
-    player_pitch: f32,
+    /// Identity and state of the player who triggered this action.
+    player: PlayerInfo,
     /// Name of the plugin currently being dispatched.
     plugin_name: RefCell<String>,
     /// Registered command list (name, description) for /help.
@@ -57,22 +51,11 @@ static GLOBAL_TELEPORT_COUNTER: AtomicI32 = AtomicI32::new(1);
 
 impl ServerContext {
     /// Creates a new context for a single event dispatch.
-    pub fn new(
-        world: Arc<basalt_world::World>,
-        player_uuid: Uuid,
-        player_entity_id: i32,
-        player_username: String,
-        player_yaw: f32,
-        player_pitch: f32,
-    ) -> Self {
+    pub fn new(world: Arc<basalt_world::World>, player: PlayerInfo) -> Self {
         Self {
             world,
             responses: ResponseQueue::new(),
-            player_uuid,
-            player_entity_id,
-            player_username,
-            player_yaw,
-            player_pitch,
+            player,
             plugin_name: RefCell::new(String::new()),
             command_list: RefCell::new(Vec::new()),
             teleport_counter: &GLOBAL_TELEPORT_COUNTER,
@@ -97,29 +80,26 @@ impl ServerContext {
 
 impl PlayerContext for ServerContext {
     fn uuid(&self) -> Uuid {
-        self.player_uuid
+        self.player.uuid
     }
     fn entity_id(&self) -> i32 {
-        self.player_entity_id
+        self.player.entity_id
     }
     fn username(&self) -> &str {
-        &self.player_username
+        &self.player.username
     }
     fn yaw(&self) -> f32 {
-        self.player_yaw
+        self.player.rotation.yaw
     }
     fn pitch(&self) -> f32 {
-        self.player_pitch
+        self.player.rotation.pitch
     }
     fn teleport(&self, x: f64, y: f64, z: f64, yaw: f32, pitch: f32) {
         let teleport_id = self.teleport_counter.fetch_add(1, Ordering::Relaxed);
         self.responses.push(Response::SendPosition {
             teleport_id,
-            x,
-            y,
-            z,
-            yaw,
-            pitch,
+            position: Position { x, y, z },
+            rotation: Rotation { yaw, pitch },
         });
     }
     fn set_gamemode(&self, mode: Gamemode) {
@@ -171,22 +151,19 @@ impl WorldContext for ServerContext {
         self.responses.push(Response::SendBlockAck { sequence });
     }
     fn stream_chunks(&self, cx: i32, cz: i32) {
-        self.responses.push(Response::StreamChunks {
-            new_cx: cx,
-            new_cz: cz,
-        });
+        self.responses
+            .push(Response::StreamChunks(ChunkPosition { x: cx, z: cz }));
     }
     fn persist_chunk(&self, cx: i32, cz: i32) {
-        self.responses.push(Response::PersistChunk { cx, cz });
+        self.responses
+            .push(Response::PersistChunk(ChunkPosition { x: cx, z: cz }));
     }
 }
 
 impl EntityContext for ServerContext {
     fn spawn_dropped_item(&self, x: i32, y: i32, z: i32, item_id: i32, count: i32) {
         self.responses.push(Response::SpawnDroppedItem {
-            x,
-            y,
-            z,
+            position: BlockPosition { x, y, z },
             item_id,
             count,
         });
@@ -225,14 +202,14 @@ impl EntityContext for ServerContext {
         self.responses
             .push(Response::Broadcast(BroadcastMessage::PlayerJoined {
                 info: basalt_core::PlayerSnapshot {
-                    username: self.player_username.clone(),
-                    uuid: self.player_uuid,
-                    entity_id: self.player_entity_id,
+                    username: self.player.username.clone(),
+                    uuid: self.player.uuid,
+                    entity_id: self.player.entity_id,
                     x: 0.0,
                     y: 0.0,
                     z: 0.0,
-                    yaw: self.player_yaw,
-                    pitch: self.player_pitch,
+                    yaw: self.player.rotation.yaw,
+                    pitch: self.player.rotation.pitch,
                     skin_properties: Vec::new(),
                 },
             }));
@@ -240,9 +217,9 @@ impl EntityContext for ServerContext {
     fn broadcast_player_left(&self) {
         self.responses
             .push(Response::Broadcast(BroadcastMessage::PlayerLeft {
-                uuid: self.player_uuid,
-                entity_id: self.player_entity_id,
-                username: self.player_username.clone(),
+                uuid: self.player.uuid,
+                entity_id: self.player.entity_id,
+                username: self.player.username.clone(),
             }));
     }
     fn broadcast_raw(&self, msg: BroadcastMessage) {
@@ -252,7 +229,8 @@ impl EntityContext for ServerContext {
 
 impl ContainerContext for ServerContext {
     fn open_chest(&self, x: i32, y: i32, z: i32) {
-        self.responses.push(Response::OpenChest { x, y, z });
+        self.responses
+            .push(Response::OpenChest(BlockPosition { x, y, z }));
     }
 }
 
@@ -303,7 +281,7 @@ impl ResponseQueue {
     }
 }
 
-/// A deferred async operation queued by a sync event handler.
+/// A deferred operation queued by a sync event handler.
 #[derive(Debug, Clone)]
 pub enum Response {
     /// Broadcast a message to all connected players.
@@ -324,19 +302,13 @@ pub enum Response {
     SendPosition {
         /// Teleport ID.
         teleport_id: i32,
-        /// Target coordinates and angles.
-        x: f64,
-        y: f64,
-        z: f64,
-        yaw: f32,
-        pitch: f32,
+        /// Target position.
+        position: Position,
+        /// Target facing direction.
+        rotation: Rotation,
     },
-    /// Stream chunks around a position.
-    StreamChunks {
-        /// Chunk coordinates.
-        new_cx: i32,
-        new_cz: i32,
-    },
+    /// Stream chunks around a chunk position.
+    StreamChunks(ChunkPosition),
     /// Send a game state change.
     SendGameStateChange {
         /// Reason code.
@@ -344,39 +316,19 @@ pub enum Response {
         /// Associated value.
         value: f32,
     },
-    /// Schedule a chunk for asynchronous persistence on the I/O thread.
-    PersistChunk {
-        /// Chunk X coordinate.
-        cx: i32,
-        /// Chunk Z coordinate.
-        cz: i32,
-    },
+    /// Schedule a chunk for asynchronous persistence.
+    PersistChunk(ChunkPosition),
     /// Spawn a dropped item entity in the world.
-    ///
-    /// The game loop creates an ECS entity with Position, Velocity,
-    /// BoundingBox, Lifetime, DroppedItem, and EntityKind components,
-    /// then broadcasts the spawn to all connected players.
     SpawnDroppedItem {
-        /// Block X where the item spawns.
-        x: i32,
-        /// Block Y where the item spawns.
-        y: i32,
-        /// Block Z where the item spawns.
-        z: i32,
+        /// Block position where the item spawns.
+        position: BlockPosition,
         /// Item ID to drop.
         item_id: i32,
         /// Item count.
         count: i32,
     },
     /// Open a chest container at the given position.
-    OpenChest {
-        /// Block X coordinate.
-        x: i32,
-        /// Block Y coordinate.
-        y: i32,
-        /// Block Z coordinate.
-        z: i32,
-    },
+    OpenChest(BlockPosition),
 }
 
 #[cfg(test)]
@@ -388,7 +340,18 @@ mod tests {
     }
 
     fn test_ctx() -> ServerContext {
-        ServerContext::new(test_world(), Uuid::default(), 1, "Steve".into(), 0.0, 0.0)
+        ServerContext::new(
+            test_world(),
+            PlayerInfo {
+                uuid: Uuid::default(),
+                entity_id: 1,
+                username: "Steve".into(),
+                rotation: Rotation {
+                    yaw: 0.0,
+                    pitch: 0.0,
+                },
+            },
+        )
     }
 
     #[test]
