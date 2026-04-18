@@ -92,8 +92,16 @@ impl IoThread {
     /// Signals the I/O thread to flush and shut down, then joins it.
     pub fn stop(&mut self) {
         let _ = self.tx.send(IoRequest::Shutdown);
-        if let Some(handle) = self.handle.take() {
-            let _ = handle.join();
+        if let Some(handle) = self.handle.take()
+            && let Err(panic) = handle.join()
+        {
+            let msg = panic
+                .downcast_ref::<&str>()
+                .copied()
+                .or_else(|| panic.downcast_ref::<String>().map(|s| s.as_str()))
+                .unwrap_or("unknown panic");
+            log::error!(target: "basalt::io", "I/O thread panicked: {msg}");
+            std::process::exit(1);
         }
     }
 }

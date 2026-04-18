@@ -197,7 +197,7 @@ impl Server {
             let player_registry = Arc::clone(&player_registry);
             let world = Arc::clone(&world);
             let chunk_cache = Arc::clone(&chunk_cache);
-            tokio::spawn(async move {
+            let handle = tokio::spawn(async move {
                 if let Err(e) = net::connection::handle_connection(
                     stream,
                     addr,
@@ -214,6 +214,14 @@ impl Server {
                     log::error!(target: "basalt::connection", "[{addr}] {e}");
                 }
                 log::debug!(target: "basalt::connection", "[{addr}] Closed");
+            });
+            // Monitor the task for panics — log without crashing the server.
+            tokio::spawn(async move {
+                if let Err(e) = handle.await
+                    && e.is_panic()
+                {
+                    log::error!(target: "basalt::connection", "[{addr}] Net task panicked: {e}");
+                }
             });
         }
     }

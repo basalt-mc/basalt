@@ -183,7 +183,13 @@ async fn handle_configuration(
     let conn = conn.finish_configuration().await?;
     log::debug!(target: "basalt::connection", "[{addr}] Configuration → Play");
 
-    let skin_properties = skin_task.await.unwrap_or_default();
+    let skin_properties = match skin_task.await {
+        Ok(props) => props,
+        Err(e) => {
+            log::warn!(target: "basalt::connection", "[{addr}] Skin fetch failed: {e}");
+            Vec::new()
+        }
+    };
     let entity_id = state.next_entity_id();
     let spawn_y = state.world.spawn_y();
 
