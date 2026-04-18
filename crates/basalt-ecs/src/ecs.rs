@@ -4,18 +4,7 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-/// A unique entity identifier.
-///
-/// Entities are just IDs — all data lives in component stores.
-/// IDs are never reused within a server session.
-pub type EntityId = u32;
-
-/// Marker trait for component types stored in the ECS.
-///
-/// Components must be `Send + Sync + 'static` so they can be
-/// accessed from the game loop thread and (in the future) from
-/// parallel system threads via rayon.
-pub trait Component: Send + Sync + 'static {}
+pub use basalt_core::{Component, EntityId};
 
 /// Type-erased component store, allowing the [`Ecs`] to hold
 /// stores for different component types in a single HashMap.
@@ -28,6 +17,14 @@ trait AnyComponentStore: Send + Sync {
     fn remove(&mut self, entity: EntityId);
     /// Returns the number of components stored.
     fn len(&self) -> usize;
+    /// Returns a component as `&dyn Any` by entity ID.
+    fn get_any(&self, entity: EntityId) -> Option<&dyn Any>;
+    /// Returns a component as `&mut dyn Any` by entity ID.
+    fn get_any_mut(&mut self, entity: EntityId) -> Option<&mut dyn Any>;
+    /// Returns all entity IDs in this store.
+    fn entity_ids(&self) -> Vec<EntityId>;
+    /// Inserts a type-erased component for an entity.
+    fn set_any(&mut self, entity: EntityId, value: Box<dyn Any + Send + Sync>);
 }
 
 /// Typed storage for a single component type.
@@ -62,6 +59,68 @@ impl<T: Component + 'static> AnyComponentStore for ComponentStore<T> {
     fn len(&self) -> usize {
         self.data.len()
     }
+
+    fn get_any(&self, entity: EntityId) -> Option<&dyn Any> {
+        self.data.get(&entity).map(|v| v as &dyn Any)
+    }
+
+    fn get_any_mut(&mut self, entity: EntityId) -> Option<&mut dyn Any> {
+        self.data.get_mut(&entity).map(|v| v as &mut dyn Any)
+    }
+
+    fn entity_ids(&self) -> Vec<EntityId> {
+        self.data.keys().copied().collect()
+    }
+
+    fn set_any(&mut self, entity: EntityId, value: Box<dyn Any + Send + Sync>) {
+        if let Ok(typed) = value.downcast::<T>() {
+            self.data.insert(entity, *typed);
+        }
+    }
+}
+
+/// Type-erased component store for dynamic component registration.
+///
+/// Used when components are set via `SystemContext::set_component`
+/// without prior `register_component` call. Stores values as
+/// `Box<dyn Any + Send + Sync>` instead of typed `T`.
+struct ErasedComponentStore {
+    data: HashMap<EntityId, Box<dyn Any + Send + Sync>>,
+}
+
+impl ErasedComponentStore {
+    fn new() -> Self {
+        Self {
+            data: HashMap::new(),
+        }
+    }
+}
+
+impl AnyComponentStore for ErasedComponentStore {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+    fn remove(&mut self, entity: EntityId) {
+        self.data.remove(&entity);
+    }
+    fn len(&self) -> usize {
+        self.data.len()
+    }
+    fn get_any(&self, entity: EntityId) -> Option<&dyn Any> {
+        self.data.get(&entity).map(|v| &**v as &dyn Any)
+    }
+    fn get_any_mut(&mut self, entity: EntityId) -> Option<&mut dyn Any> {
+        self.data.get_mut(&entity).map(|v| &mut **v as &mut dyn Any)
+    }
+    fn entity_ids(&self) -> Vec<EntityId> {
+        self.data.keys().copied().collect()
+    }
+    fn set_any(&mut self, entity: EntityId, value: Box<dyn Any + Send + Sync>) {
+        self.data.insert(entity, value);
+    }
 }
 
 /// The ECS world containing all component stores, entities, and systems.
@@ -78,9 +137,6 @@ pub struct Ecs {
     alive: Vec<EntityId>,
     /// Registered systems, sorted by phase.
     systems: Vec<crate::system::SystemDescriptor>,
-    /// UUID → EntityId index for O(1) lookups by Minecraft UUID.
-    /// Updated via `index_uuid` / `despawn`.
-    uuid_index: HashMap<basalt_types::Uuid, EntityId>,
 }
 
 impl Ecs {
@@ -91,7 +147,6 @@ impl Ecs {
             next_entity_id: AtomicU32::new(1),
             alive: Vec::new(),
             systems: Vec::new(),
-            uuid_index: HashMap::new(),
         }
     }
 
@@ -127,10 +182,9 @@ impl Ecs {
         }
     }
 
-    /// Despawns an entity, removing all its components and UUID index.
+    /// Despawns an entity, removing all its components.
     pub fn despawn(&mut self, entity: EntityId) {
         self.alive.retain(|&e| e != entity);
-        self.uuid_index.retain(|_, &mut eid| eid != entity);
         for store in self.stores.values_mut() {
             store.remove(entity);
         }
@@ -245,7 +299,7 @@ impl Ecs {
     /// Systems are temporarily extracted from `self` to avoid a
     /// double mutable borrow (`self.systems` + `&mut self` passed
     /// to each system runner). They are put back after execution.
-    pub fn run_phase(&mut self, phase: crate::system::Phase, tick: u64) {
+    pub fn run_phase(&mut self, phase: basalt_core::Phase, tick: u64) {
         let mut systems = std::mem::take(&mut self.systems);
         for system in &mut systems {
             if system.phase == phase && tick.is_multiple_of(system.every) {
@@ -257,7 +311,7 @@ impl Ecs {
 
     /// Runs all phases in order for the given tick.
     pub fn run_all(&mut self, tick: u64) {
-        use crate::system::Phase;
+        use basalt_core::Phase;
         for phase in [
             Phase::Input,
             Phase::Validate,
@@ -274,20 +328,6 @@ impl Ecs {
     pub fn system_count(&self) -> usize {
         self.systems.len()
     }
-
-    /// Associates a UUID with an entity for O(1) lookup.
-    ///
-    /// Call this when spawning any entity that has a Minecraft UUID
-    /// (players, mobs, items, etc.). The mapping is removed
-    /// automatically on [`despawn`](Self::despawn).
-    pub fn index_uuid(&mut self, uuid: basalt_types::Uuid, entity: EntityId) {
-        self.uuid_index.insert(uuid, entity);
-    }
-
-    /// Finds an entity by Minecraft UUID. O(1).
-    pub fn find_by_uuid(&self, uuid: basalt_types::Uuid) -> Option<EntityId> {
-        self.uuid_index.get(&uuid).copied()
-    }
 }
 
 impl Default for Ecs {
@@ -296,10 +336,54 @@ impl Default for Ecs {
     }
 }
 
+impl basalt_core::SystemContext for Ecs {
+    fn world(&self) -> &basalt_world::World {
+        unimplemented!("raw Ecs does not own a World — use the server's SystemContext wrapper")
+    }
+
+    fn spawn(&mut self) -> EntityId {
+        Ecs::spawn(self)
+    }
+
+    fn despawn(&mut self, entity: EntityId) {
+        Ecs::despawn(self, entity);
+    }
+
+    fn set_component(
+        &mut self,
+        entity: EntityId,
+        type_id: TypeId,
+        component: Box<dyn Any + Send + Sync>,
+    ) {
+        if let Some(store) = self.stores.get_mut(&type_id) {
+            store.set_any(entity, component);
+        } else {
+            let mut store = ErasedComponentStore::new();
+            store.set_any(entity, component);
+            self.stores.insert(type_id, Box::new(store));
+        }
+    }
+
+    fn entities_with(&self, type_id: TypeId) -> Vec<EntityId> {
+        self.stores
+            .get(&type_id)
+            .map(|store| store.entity_ids())
+            .unwrap_or_default()
+    }
+
+    fn get_component(&self, entity: EntityId, type_id: TypeId) -> Option<&dyn Any> {
+        self.stores.get(&type_id)?.get_any(entity)
+    }
+
+    fn get_component_mut(&mut self, entity: EntityId, type_id: TypeId) -> Option<&mut dyn Any> {
+        self.stores.get_mut(&type_id)?.get_any_mut(entity)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::{Health, Position, Velocity};
+    use basalt_core::{Health, Position, Velocity};
 
     #[test]
     fn spawn_returns_unique_ids() {
@@ -511,33 +595,5 @@ mod tests {
             },
         );
         assert_eq!(ecs.get::<Health>(e).unwrap().current, 5.0);
-    }
-
-    #[test]
-    fn find_by_uuid_returns_entity() {
-        let mut ecs = Ecs::new();
-        let uuid = basalt_types::Uuid::from_bytes([1; 16]);
-        let e = ecs.spawn();
-        ecs.index_uuid(uuid, e);
-        assert_eq!(ecs.find_by_uuid(uuid), Some(e));
-    }
-
-    #[test]
-    fn find_by_uuid_returns_none_for_unknown() {
-        let ecs = Ecs::new();
-        let uuid = basalt_types::Uuid::from_bytes([1; 16]);
-        assert_eq!(ecs.find_by_uuid(uuid), None);
-    }
-
-    #[test]
-    fn despawn_cleans_uuid_index() {
-        let mut ecs = Ecs::new();
-        let uuid = basalt_types::Uuid::from_bytes([1; 16]);
-        let e = ecs.spawn();
-        ecs.index_uuid(uuid, e);
-        assert!(ecs.find_by_uuid(uuid).is_some());
-
-        ecs.despawn(e);
-        assert!(ecs.find_by_uuid(uuid).is_none());
     }
 }
