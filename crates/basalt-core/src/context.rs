@@ -62,7 +62,36 @@ pub trait WorldContext {
 pub trait EntityContext {
     /// Spawns a dropped item entity at the given block coordinates.
     fn spawn_dropped_item(&self, x: i32, y: i32, z: i32, item_id: i32, count: i32);
+
+    /// Broadcasts a block change to all connected players.
+    fn broadcast_block_change(&self, x: i32, y: i32, z: i32, block_state: i32);
+
+    /// Broadcasts an entity movement to all connected players.
+    #[allow(clippy::too_many_arguments)]
+    fn broadcast_entity_moved(
+        &self,
+        entity_id: i32,
+        x: f64,
+        y: f64,
+        z: f64,
+        yaw: f32,
+        pitch: f32,
+        on_ground: bool,
+    );
+
+    /// Broadcasts that the current player has joined the server.
+    ///
+    /// The server constructs the broadcast payload (including skin data)
+    /// from the context's player state.
+    fn broadcast_player_joined(&self);
+
+    /// Broadcasts that the current player has left the server.
+    fn broadcast_player_left(&self);
+
     /// Sends a raw broadcast message to all connected players.
+    ///
+    /// Prefer the typed broadcast methods when possible. This method
+    /// is for server-internal broadcasts that don't have typed wrappers.
     fn broadcast_raw(&self, msg: BroadcastMessage);
 }
 
