@@ -100,6 +100,8 @@ pub(crate) struct GameLoop {
     pub(super) persistence_interval_ticks: u64,
     /// Cycling counter for container window IDs (1-127).
     pub(super) next_window_id: u8,
+    /// UUID → EntityId index for O(1) player lookups.
+    pub(super) uuid_index: std::collections::HashMap<basalt_types::Uuid, basalt_ecs::EntityId>,
 }
 
 impl GameLoop {
@@ -130,7 +132,23 @@ impl GameLoop {
             simulation_distance,
             persistence_interval_ticks,
             next_window_id: 1,
+            uuid_index: std::collections::HashMap::new(),
         }
+    }
+
+    /// Associates a UUID with an entity for O(1) lookup.
+    pub(super) fn index_uuid(&mut self, uuid: basalt_types::Uuid, entity: basalt_ecs::EntityId) {
+        self.uuid_index.insert(uuid, entity);
+    }
+
+    /// Finds an entity by UUID. O(1).
+    pub(super) fn find_by_uuid(&self, uuid: basalt_types::Uuid) -> Option<basalt_ecs::EntityId> {
+        self.uuid_index.get(&uuid).copied()
+    }
+
+    /// Removes a UUID from the index.
+    pub(super) fn remove_uuid(&mut self, uuid: basalt_types::Uuid) {
+        self.uuid_index.remove(&uuid);
     }
 
     /// Allocates the next container window ID (1-127, cycling).
@@ -180,7 +198,7 @@ impl GameLoop {
     pub(super) fn rebuild_active_chunks(&mut self) {
         self.active_chunks.clear();
         let sd = self.simulation_distance;
-        for (_, pos) in self.ecs.iter::<basalt_ecs::Position>() {
+        for (_, pos) in self.ecs.iter::<basalt_core::Position>() {
             // Only count entities that are players
             let cx = (pos.x as i32) >> 4;
             let cz = (pos.z as i32) >> 4;
@@ -225,14 +243,12 @@ pub(super) mod tests {
         let mut bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
-        let mut components = Vec::new();
         {
             let mut registrar = basalt_api::PluginRegistrar::new(
                 &mut instant_bus,
                 &mut bus,
                 &mut commands,
                 &mut systems,
-                &mut components,
                 Arc::clone(&world),
             );
             basalt_plugin_block::BlockPlugin.on_enable(&mut registrar);
@@ -246,9 +262,12 @@ pub(super) mod tests {
             basalt_ecs::SystemBuilder::new("lifetime")
                 .phase(basalt_ecs::Phase::Simulate)
                 .every(1)
-                .run(|ecs: &mut basalt_ecs::Ecs| {
-                    for (_, lt) in ecs.iter_mut::<basalt_ecs::Lifetime>() {
-                        if lt.remaining_ticks > 0 {
+                .run(|ctx: &mut dyn basalt_core::SystemContext| {
+                    use basalt_core::SystemContextExt;
+                    for id in ctx.query::<basalt_core::Lifetime>() {
+                        if let Some(lt) = ctx.get_mut::<basalt_core::Lifetime>(id)
+                            && lt.remaining_ticks > 0
+                        {
                             lt.remaining_ticks -= 1;
                         }
                     }
@@ -258,9 +277,12 @@ pub(super) mod tests {
             basalt_ecs::SystemBuilder::new("pickup_delay")
                 .phase(basalt_ecs::Phase::Simulate)
                 .every(1)
-                .run(|ecs: &mut basalt_ecs::Ecs| {
-                    for (_, delay) in ecs.iter_mut::<basalt_ecs::PickupDelay>() {
-                        if delay.remaining_ticks > 0 {
+                .run(|ctx: &mut dyn basalt_core::SystemContext| {
+                    use basalt_core::SystemContextExt;
+                    for id in ctx.query::<basalt_core::PickupDelay>() {
+                        if let Some(delay) = ctx.get_mut::<basalt_core::PickupDelay>(id)
+                            && delay.remaining_ticks > 0
+                        {
                             delay.remaining_ticks -= 1;
                         }
                     }

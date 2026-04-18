@@ -81,7 +81,7 @@ impl Server {
     async fn run_with_listener(&self, listener: TcpListener) {
         let world = Arc::new(self.config.create_world());
         let plugins = self.config.create_plugins();
-        let (server_state, instant_bus, game_bus, plugin_systems, plugin_components) =
+        let (server_state, instant_bus, game_bus, plugin_systems) =
             ServerState::build_for_loops(Arc::clone(&world), plugins);
 
         let shared = SharedState::new();
@@ -105,21 +105,18 @@ impl Server {
 
         // ECS with core components
         let mut ecs = basalt_ecs::Ecs::new();
-        ecs.register_component::<basalt_ecs::Position>();
-        ecs.register_component::<basalt_ecs::Rotation>();
-        ecs.register_component::<basalt_ecs::Velocity>();
-        ecs.register_component::<basalt_ecs::BoundingBox>();
-        ecs.register_component::<basalt_ecs::EntityKind>();
-        ecs.register_component::<basalt_ecs::Health>();
-        ecs.register_component::<basalt_ecs::Lifetime>();
-        ecs.register_component::<basalt_ecs::PickupDelay>();
-        ecs.register_component::<basalt_ecs::DroppedItem>();
-        ecs.register_component::<basalt_ecs::OpenContainer>();
-        ecs.register_component::<basalt_ecs::PlayerRef>();
-        ecs.register_component::<basalt_ecs::Inventory>();
-        for reg in &plugin_components {
-            (reg.register_fn)(&mut ecs);
-        }
+        ecs.register_component::<basalt_core::Position>();
+        ecs.register_component::<basalt_core::Rotation>();
+        ecs.register_component::<basalt_core::Velocity>();
+        ecs.register_component::<basalt_core::BoundingBox>();
+        ecs.register_component::<basalt_core::EntityKind>();
+        ecs.register_component::<basalt_core::Health>();
+        ecs.register_component::<basalt_core::Lifetime>();
+        ecs.register_component::<basalt_core::PickupDelay>();
+        ecs.register_component::<basalt_core::DroppedItem>();
+        ecs.register_component::<basalt_core::OpenContainer>();
+        ecs.register_component::<basalt_core::PlayerRef>();
+        ecs.register_component::<basalt_core::Inventory>();
         for system in plugin_systems {
             ecs.add_system(system);
         }
@@ -129,9 +126,12 @@ impl Server {
             basalt_ecs::SystemBuilder::new("lifetime")
                 .phase(basalt_ecs::Phase::Simulate)
                 .every(1)
-                .run(|ecs: &mut basalt_ecs::Ecs| {
-                    for (_, lt) in ecs.iter_mut::<basalt_ecs::Lifetime>() {
-                        if lt.remaining_ticks > 0 {
+                .run(|ctx: &mut dyn basalt_core::SystemContext| {
+                    use basalt_core::SystemContextExt;
+                    for id in ctx.query::<basalt_core::Lifetime>() {
+                        if let Some(lt) = ctx.get_mut::<basalt_core::Lifetime>(id)
+                            && lt.remaining_ticks > 0
+                        {
                             lt.remaining_ticks -= 1;
                         }
                     }
@@ -141,9 +141,12 @@ impl Server {
             basalt_ecs::SystemBuilder::new("pickup_delay")
                 .phase(basalt_ecs::Phase::Simulate)
                 .every(1)
-                .run(|ecs: &mut basalt_ecs::Ecs| {
-                    for (_, delay) in ecs.iter_mut::<basalt_ecs::PickupDelay>() {
-                        if delay.remaining_ticks > 0 {
+                .run(|ctx: &mut dyn basalt_core::SystemContext| {
+                    use basalt_core::SystemContextExt;
+                    for id in ctx.query::<basalt_core::PickupDelay>() {
+                        if let Some(delay) = ctx.get_mut::<basalt_core::PickupDelay>(id)
+                            && delay.remaining_ticks > 0
+                        {
                             delay.remaining_ticks -= 1;
                         }
                     }
