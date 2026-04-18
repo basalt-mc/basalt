@@ -304,6 +304,12 @@ const ecs = [
   'ecs/components',
 ];
 
+const testkit = [
+  // Testing framework: PluginTestHarness, SystemTestContext, NoopContext.
+  // Example: "feat(testkit): add SystemTestContext for system plugin tests"
+  'testkit',
+];
+
 const physics = [
   // Physics plugin: gravity, AABB collision, movement resolution.
   // Example: "feat(physics): add AABB-vs-block collision"
@@ -382,7 +388,7 @@ const keywords = [
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...ecs, ...physics, ...item, ...container, ...keywords]],
+    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...ecs, ...testkit, ...physics, ...item, ...container, ...keywords]],
     'scope-empty': [2, 'never'],
   },
 };
