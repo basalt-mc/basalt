@@ -107,17 +107,23 @@ impl<'a> PluginRegistrar<'a> {
         &mut self,
         stage: Stage,
         priority: i32,
-        handler: impl Fn(&mut E, &ServerContext) + Send + Sync + 'static,
+        handler: impl Fn(&mut E, &dyn basalt_core::Context) + Send + Sync + 'static,
     ) where
         E: Event + EventRouting + 'static,
     {
+        // Wrap the handler to downcast from ServerContext to &dyn Context.
+        // The EventBus stores handlers typed on the concrete context (ServerContext),
+        // but plugins receive the abstract &dyn Context interface.
+        let wrapper = move |event: &mut E, ctx: &ServerContext| {
+            handler(event, ctx as &dyn basalt_core::Context);
+        };
         match E::BUS {
             BusKind::Instant => self
                 .instant_bus
-                .on::<E, ServerContext>(stage, priority, handler),
+                .on::<E, ServerContext>(stage, priority, wrapper),
             BusKind::Game => self
                 .game_bus
-                .on::<E, ServerContext>(stage, priority, handler),
+                .on::<E, ServerContext>(stage, priority, wrapper),
         }
     }
 

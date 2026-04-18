@@ -25,6 +25,8 @@ use std::sync::Arc;
 use basalt_api::context::ServerContext;
 use basalt_api::plugin::PluginRegistrar;
 use basalt_api::{EventBus, Plugin, Response};
+use basalt_core::PlayerInfo;
+use basalt_core::components::Rotation;
 use basalt_events::{Event, EventRouting, Stage};
 use basalt_types::Uuid;
 use basalt_world::World;
@@ -100,18 +102,21 @@ impl PluginTestHarness {
         &mut self,
         stage: Stage,
         priority: i32,
-        handler: impl Fn(&mut E, &ServerContext) + Send + Sync + 'static,
+        handler: impl Fn(&mut E, &dyn basalt_core::Context) + Send + Sync + 'static,
     ) where
         E: Event + EventRouting + 'static,
     {
+        let wrapper = move |event: &mut E, ctx: &ServerContext| {
+            handler(event, ctx as &dyn basalt_core::Context);
+        };
         match E::BUS {
             basalt_events::BusKind::Instant => {
                 self.instant_bus
-                    .on::<E, ServerContext>(stage, priority, handler);
+                    .on::<E, ServerContext>(stage, priority, wrapper);
             }
             basalt_events::BusKind::Game => {
                 self.game_bus
-                    .on::<E, ServerContext>(stage, priority, handler);
+                    .on::<E, ServerContext>(stage, priority, wrapper);
             }
         }
     }
@@ -120,11 +125,15 @@ impl PluginTestHarness {
     pub fn context(&self) -> ServerContext {
         ServerContext::new(
             Arc::clone(&self.world),
-            Uuid::default(),
-            1,
-            "Steve".into(),
-            0.0,
-            0.0,
+            PlayerInfo {
+                uuid: Uuid::default(),
+                entity_id: 1,
+                username: "Steve".into(),
+                rotation: Rotation {
+                    yaw: 0.0,
+                    pitch: 0.0,
+                },
+            },
         )
     }
 
@@ -132,11 +141,15 @@ impl PluginTestHarness {
     pub fn context_for(&self, uuid: Uuid, entity_id: i32, username: &str) -> ServerContext {
         ServerContext::new(
             Arc::clone(&self.world),
-            uuid,
-            entity_id,
-            username.to_string(),
-            0.0,
-            0.0,
+            PlayerInfo {
+                uuid,
+                entity_id,
+                username: username.to_string(),
+                rotation: Rotation {
+                    yaw: 0.0,
+                    pitch: 0.0,
+                },
+            },
         )
     }
 
@@ -146,8 +159,8 @@ impl PluginTestHarness {
         self.dispatch_routed(event, &ctx);
         let responses = ctx.drain_responses();
         for response in &responses {
-            if let Response::PersistChunk { cx, cz } = response {
-                self.world.persist_chunk(*cx, *cz);
+            if let Response::PersistChunk(chunk) = response {
+                self.world.persist_chunk(chunk.x, chunk.z);
             }
         }
         responses
