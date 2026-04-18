@@ -122,66 +122,72 @@ impl Component for PickupDelay {}
 
 /// Player inventory — 36 slots (27 main + 9 hotbar).
 ///
-/// Slot layout matches the Minecraft player inventory window:
-/// - Slots 0–26: main inventory (3 rows of 9)
-/// - Slots 27–35: hotbar (bottom row)
+/// Slot layout matches Minecraft's raw player inventory:
+/// - Slots 0–8: hotbar
+/// - Slots 9–35: main inventory (3 rows of 9)
 ///
-/// In the protocol window, these map to:
-/// - Protocol slots 9–35: main inventory (our 0–26)
-/// - Protocol slots 36–44: hotbar (our 27–35)
+/// This matches the `SetPlayerInventory` packet (1.21.4) directly —
+/// no slot conversion needed when syncing individual slots.
+///
+/// For the player inventory *window* (SetContainerContent), slots remap:
+/// window 9-35 = main (our 9-35, same), window 36-44 = hotbar (our 0-8).
 #[derive(Debug, Clone)]
 pub struct Inventory {
-    /// Currently selected hotbar index (0-8, relative to hotbar start).
+    /// Currently selected hotbar index (0-8).
     pub held_slot: u8,
-    /// All 36 inventory slots.
+    /// All 36 inventory slots (0-8 hotbar, 9-35 main).
     pub slots: [basalt_types::Slot; 36],
+    /// Item currently held on the mouse cursor (in an open window).
+    pub cursor: basalt_types::Slot,
 }
 
 impl Inventory {
     /// First hotbar slot index within `slots`.
-    pub const HOTBAR_START: usize = 27;
+    pub const HOTBAR_START: usize = 0;
+    /// First main inventory slot index within `slots`.
+    pub const MAIN_START: usize = 9;
 
     /// Creates an empty inventory with slot 0 selected.
     pub fn empty() -> Self {
         Self {
             held_slot: 0,
             slots: std::array::from_fn(|_| basalt_types::Slot::empty()),
+            cursor: basalt_types::Slot::empty(),
         }
     }
 
     /// Returns the currently held item (from the hotbar).
     pub fn held_item(&self) -> &basalt_types::Slot {
-        &self.slots[Self::HOTBAR_START + self.held_slot as usize]
+        &self.slots[self.held_slot as usize]
     }
 
     /// Returns a reference to the hotbar (9 slots).
     pub fn hotbar(&self) -> &[basalt_types::Slot] {
-        &self.slots[Self::HOTBAR_START..]
+        &self.slots[..9]
     }
 
     /// Returns a mutable reference to the hotbar (9 slots).
     pub fn hotbar_mut(&mut self) -> &mut [basalt_types::Slot] {
-        &mut self.slots[Self::HOTBAR_START..]
+        &mut self.slots[..9]
     }
 
-    /// Converts a protocol slot index to an internal slot index.
+    /// Converts a protocol window slot to an internal slot index.
     ///
-    /// Protocol layout: 9-35 = main, 36-44 = hotbar.
-    /// Internal layout: 0-26 = main, 27-35 = hotbar.
-    /// Returns `None` for out-of-range or non-inventory slots (0-8 = crafting/armor).
-    pub fn protocol_to_index(protocol_slot: i16) -> Option<usize> {
-        match protocol_slot {
-            9..=35 => Some((protocol_slot - 9) as usize), // main
-            36..=44 => Some((protocol_slot - 36 + 27) as usize), // hotbar
+    /// Window layout: 9-35 = main, 36-44 = hotbar.
+    /// Internal layout: 0-8 = hotbar, 9-35 = main.
+    pub fn window_to_index(window_slot: i16) -> Option<usize> {
+        match window_slot {
+            9..=35 => Some(window_slot as usize), // main: same numbering
+            36..=44 => Some((window_slot - 36) as usize), // hotbar: window 36-44 → 0-8
             _ => None,
         }
     }
 
-    /// Converts an internal slot index to a protocol slot index.
-    pub fn index_to_protocol(index: usize) -> Option<i16> {
+    /// Converts an internal slot index to a protocol window slot.
+    pub fn index_to_window(index: usize) -> Option<i16> {
         match index {
-            0..=26 => Some(index as i16 + 9),        // main
-            27..=35 => Some(index as i16 - 27 + 36), // hotbar
+            0..=8 => Some(index as i16 + 36), // hotbar → window 36-44
+            9..=35 => Some(index as i16),     // main: same numbering
             _ => None,
         }
     }
@@ -193,7 +199,7 @@ impl Inventory {
     /// Returns `Some(internal_index)` if inserted, `None` if full.
     pub fn try_insert(&mut self, item_id: i32, count: i32) -> Option<usize> {
         // Hotbar first, then main — matching stacks
-        let search_order = (Self::HOTBAR_START..36).chain(0..Self::HOTBAR_START);
+        let search_order = (0..9).chain(Self::MAIN_START..36);
         for i in search_order {
             let slot = &mut self.slots[i];
             if slot.item_id == Some(item_id) && slot.item_count < 64 {
@@ -206,7 +212,7 @@ impl Inventory {
             }
         }
         // Hotbar first, then main — empty slots
-        let search_order = (Self::HOTBAR_START..36).chain(0..Self::HOTBAR_START);
+        let search_order = (0..9).chain(Self::MAIN_START..36);
         for i in search_order {
             if self.slots[i].is_empty() {
                 self.slots[i] = basalt_types::Slot::new(item_id, count);
@@ -218,15 +224,15 @@ impl Inventory {
 
     /// Builds the 46-slot protocol representation for SetContainerContent.
     ///
-    /// Protocol slot layout for player inventory window (id=0):
+    /// Window slot layout for player inventory (id=0):
     /// 0 = crafting output, 1-4 = crafting grid, 5-8 = armor,
     /// 9-35 = main inventory, 36-44 = hotbar, 45 = offhand.
     pub fn to_protocol_slots(&self) -> Vec<basalt_types::Slot> {
         let mut protocol = vec![basalt_types::Slot::empty(); 46];
-        // Main inventory: internal 0-26 → protocol 9-35
-        protocol[9..36].clone_from_slice(&self.slots[..27]);
-        // Hotbar: internal 27-35 → protocol 36-44
-        protocol[36..45].clone_from_slice(&self.slots[27..]);
+        // Main: internal 9-35 → window 9-35 (same)
+        protocol[9..36].clone_from_slice(&self.slots[9..]);
+        // Hotbar: internal 0-8 → window 36-44
+        protocol[36..45].clone_from_slice(&self.slots[..9]);
         protocol
     }
 }
@@ -339,19 +345,19 @@ mod tests {
     }
 
     #[test]
-    fn inventory_protocol_slot_conversion() {
-        // Main: protocol 9-35 → internal 0-26
-        assert_eq!(Inventory::protocol_to_index(9), Some(0));
-        assert_eq!(Inventory::protocol_to_index(35), Some(26));
-        // Hotbar: protocol 36-44 → internal 27-35
-        assert_eq!(Inventory::protocol_to_index(36), Some(27));
-        assert_eq!(Inventory::protocol_to_index(44), Some(35));
+    fn inventory_slot_conversion() {
+        // Main: window 9-35 → internal 9-35 (same)
+        assert_eq!(Inventory::window_to_index(9), Some(9));
+        assert_eq!(Inventory::window_to_index(35), Some(35));
+        // Hotbar: window 36-44 → internal 0-8
+        assert_eq!(Inventory::window_to_index(36), Some(0));
+        assert_eq!(Inventory::window_to_index(44), Some(8));
         // Out of range
-        assert_eq!(Inventory::protocol_to_index(0), None);
-        assert_eq!(Inventory::protocol_to_index(45), None);
-        // Roundtrip
-        assert_eq!(Inventory::index_to_protocol(0), Some(9));
-        assert_eq!(Inventory::index_to_protocol(27), Some(36));
+        assert_eq!(Inventory::window_to_index(0), None);
+        assert_eq!(Inventory::window_to_index(45), None);
+        // Reverse
+        assert_eq!(Inventory::index_to_window(0), Some(36)); // hotbar 0 → window 36
+        assert_eq!(Inventory::index_to_window(9), Some(9)); // main 9 → window 9
     }
 
     #[test]
@@ -363,17 +369,17 @@ mod tests {
     #[test]
     fn inventory_to_protocol_slots_maps_correctly() {
         let mut inv = Inventory::empty();
-        inv.slots[0] = basalt_types::Slot::new(1, 1); // main slot 0
-        inv.slots[27] = basalt_types::Slot::new(2, 2); // hotbar slot 0
+        inv.slots[0] = basalt_types::Slot::new(1, 1); // hotbar slot 0
+        inv.slots[9] = basalt_types::Slot::new(2, 2); // main slot 0
         let proto = inv.to_protocol_slots();
-        assert_eq!(proto[9].item_id, Some(1)); // main → protocol 9
-        assert_eq!(proto[36].item_id, Some(2)); // hotbar → protocol 36
+        assert_eq!(proto[36].item_id, Some(1)); // hotbar 0 → window 36
+        assert_eq!(proto[9].item_id, Some(2)); // main 0 → window 9
     }
 
     #[test]
     fn inventory_held_item_and_hotbar() {
         let mut inv = Inventory::empty();
-        inv.slots[Inventory::HOTBAR_START + 3] = basalt_types::Slot::new(5, 10);
+        inv.slots[3] = basalt_types::Slot::new(5, 10); // hotbar slot 3
         inv.held_slot = 3;
         assert_eq!(inv.held_item().item_id, Some(5));
         assert_eq!(inv.hotbar().len(), 9);
@@ -383,21 +389,21 @@ mod tests {
     #[test]
     fn inventory_try_insert_main_when_hotbar_full() {
         let mut inv = Inventory::empty();
-        // Fill hotbar
+        // Fill hotbar (slots 0-8)
         for i in 0..9 {
-            inv.slots[Inventory::HOTBAR_START + i] = basalt_types::Slot::new(i as i32, 64);
+            inv.slots[i] = basalt_types::Slot::new(i as i32, 64);
         }
-        // Should go to main inventory (slot 0)
+        // Should go to main inventory (slot 9)
         let idx = inv.try_insert(999, 1);
-        assert_eq!(idx, Some(0));
-        assert_eq!(inv.slots[0].item_id, Some(999));
+        assert_eq!(idx, Some(Inventory::MAIN_START));
+        assert_eq!(inv.slots[Inventory::MAIN_START].item_id, Some(999));
     }
 
     #[test]
-    fn inventory_index_to_protocol_roundtrip() {
+    fn inventory_window_roundtrip() {
         for i in 0..36 {
-            let proto = Inventory::index_to_protocol(i).unwrap();
-            let back = Inventory::protocol_to_index(proto).unwrap();
+            let window = Inventory::index_to_window(i).unwrap();
+            let back = Inventory::window_to_index(window).unwrap();
             assert_eq!(back, i);
         }
     }

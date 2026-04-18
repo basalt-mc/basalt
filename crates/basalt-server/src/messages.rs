@@ -128,10 +128,25 @@ pub enum GameInput {
     SetCreativeSlot {
         /// UUID of the player.
         uuid: Uuid,
-        /// Inventory slot index.
+        /// Inventory slot index (protocol slot).
         slot: i16,
         /// The item to place in the slot.
         item: Slot,
+    },
+    /// Player clicked in their inventory window.
+    WindowClick {
+        /// UUID of the player.
+        uuid: Uuid,
+        /// Protocol slot that was clicked (-999 for outside window).
+        slot: i16,
+        /// Mouse button (0 = left, 1 = right).
+        button: i8,
+        /// Click mode (0 = normal, 1 = shift, 4 = drop).
+        mode: i32,
+        /// Slots changed by the client.
+        changed_slots: Vec<(i16, Slot)>,
+        /// Item on the cursor after the click.
+        cursor_item: Slot,
     },
 }
 
@@ -195,10 +210,15 @@ pub enum ServerOutput {
     },
     /// Update a single inventory slot on the client.
     SetSlot {
-        /// Protocol slot index (36-44 for hotbar).
+        /// Protocol slot index.
         slot: i16,
         /// The item in the slot.
         item: basalt_types::Slot,
+    },
+    /// Sync the full player inventory to the client.
+    SyncInventory {
+        /// All 46 protocol slots (crafting + armor + main + hotbar + offhand).
+        slots: Vec<basalt_types::Slot>,
     },
 
     // ── Chunk path (cache-based, zero alloc) ──────────────────────────

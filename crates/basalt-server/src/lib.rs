@@ -112,6 +112,8 @@ impl Server {
         ecs.register_component::<basalt_ecs::EntityKind>();
         ecs.register_component::<basalt_ecs::Health>();
         ecs.register_component::<basalt_ecs::Lifetime>();
+        ecs.register_component::<basalt_ecs::PickupDelay>();
+        ecs.register_component::<basalt_ecs::DroppedItem>();
         ecs.register_component::<basalt_ecs::PlayerRef>();
         ecs.register_component::<basalt_ecs::Inventory>();
         for reg in &plugin_components {
@@ -120,6 +122,32 @@ impl Server {
         for system in plugin_systems {
             ecs.add_system(system);
         }
+
+        // Core ECS systems (not plugins — infrastructure)
+        ecs.add_system(
+            basalt_ecs::SystemBuilder::new("lifetime")
+                .phase(basalt_ecs::Phase::Simulate)
+                .every(1)
+                .run(|ecs: &mut basalt_ecs::Ecs| {
+                    for (_, lt) in ecs.iter_mut::<basalt_ecs::Lifetime>() {
+                        if lt.remaining_ticks > 0 {
+                            lt.remaining_ticks -= 1;
+                        }
+                    }
+                }),
+        );
+        ecs.add_system(
+            basalt_ecs::SystemBuilder::new("pickup_delay")
+                .phase(basalt_ecs::Phase::Simulate)
+                .every(1)
+                .run(|ecs: &mut basalt_ecs::Ecs| {
+                    for (_, delay) in ecs.iter_mut::<basalt_ecs::PickupDelay>() {
+                        if delay.remaining_ticks > 0 {
+                            delay.remaining_ticks -= 1;
+                        }
+                    }
+                }),
+        );
 
         // Game loop — single dedicated OS thread
         let persistence_interval_ticks =

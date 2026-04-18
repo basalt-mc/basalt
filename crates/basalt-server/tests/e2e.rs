@@ -888,3 +888,210 @@ async fn e2e_movement_broadcast_to_other_player() {
     }
     assert!(got_movement, "should receive movement broadcast");
 }
+
+// -- Test helpers for async game loop synchronization --
+
+/// Reads packets from the stream until one with the given `target_id`
+/// is found. Returns all packets received (including the target).
+/// Uses a 5-second overall timeout — generous enough for any CI runner.
+///
+/// This replaces sleep-based polling: we block on the TCP read until
+/// the game loop has processed the request and sent the response.
+async fn read_until_packet(
+    client: &mut TcpStream,
+    target_id: i32,
+) -> Vec<basalt_net::framing::RawPacket> {
+    let mut collected = Vec::new();
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        match tokio::time::timeout(remaining, framing::read_raw_packet(client)).await {
+            Ok(Ok(Some(raw))) => {
+                let found = raw.id == target_id;
+                collected.push(raw);
+                if found {
+                    break;
+                }
+            }
+            _ => break,
+        }
+    }
+    collected
+}
+
+/// Helper: give an item to a connected player via SetCreativeSlot,
+/// then wait for the game loop to process it by reading until we
+/// see a SetPlayerInventory response confirming the slot was set.
+async fn give_creative_item(client: &mut TcpStream, protocol_slot: i16, item_id: i32, count: i32) {
+    use basalt_protocol::packets::play::ServerboundPlaySetCreativeSlot;
+    send_packet(
+        client,
+        ServerboundPlaySetCreativeSlot::PACKET_ID,
+        &ServerboundPlaySetCreativeSlot {
+            slot: protocol_slot,
+            item: basalt_types::Slot::new(item_id, count),
+        },
+    )
+    .await;
+    // The server doesn't send a response for SetCreativeSlot, so we
+    // need a small delay for the game loop to process it.
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    // Drain any packets that arrived during the wait
+    while let Ok(Ok(Some(_))) = tokio::time::timeout(
+        std::time::Duration::from_millis(10),
+        framing::read_raw_packet(client),
+    )
+    .await
+    {}
+}
+
+// -- Item drop e2e tests --
+
+#[tokio::test]
+async fn e2e_drop_single_item_q_key() {
+    use basalt_protocol::packets::play::inventory::ClientboundPlaySetPlayerInventory;
+    use basalt_protocol::packets::play::world::ServerboundPlayBlockDig;
+
+    let addr = spawn_server().await;
+    let mut client = connect_to_play(addr).await;
+
+    // Give 10 stone in hotbar slot 0 (window slot 36)
+    give_creative_item(&mut client, 36, 1, 10).await;
+
+    // Q key = BlockDig status 4 (drop single item)
+    send_packet(
+        &mut client,
+        ServerboundPlayBlockDig::PACKET_ID,
+        &ServerboundPlayBlockDig {
+            status: 4,
+            location: basalt_types::Position::new(0, 0, 0),
+            face: 0,
+            sequence: 0,
+        },
+    )
+    .await;
+
+    // Wait for SetPlayerInventory — the game loop sends it after processing
+    let packets =
+        read_until_packet(&mut client, ClientboundPlaySetPlayerInventory::PACKET_ID).await;
+
+    let inv_pkt = packets
+        .iter()
+        .find(|p| p.id == ClientboundPlaySetPlayerInventory::PACKET_ID)
+        .expect("should receive SetPlayerInventory after Q drop");
+
+    let mut cursor = inv_pkt.payload.as_slice();
+    let pkt = ClientboundPlaySetPlayerInventory::decode(&mut cursor).unwrap();
+    assert_eq!(pkt.slot_id, 0, "should update hotbar slot 0");
+    assert_eq!(
+        pkt.contents.item_count, 9,
+        "should have 9 after dropping 1 from 10"
+    );
+}
+
+#[tokio::test]
+async fn e2e_drop_full_stack_ctrl_q() {
+    use basalt_protocol::packets::play::inventory::ClientboundPlaySetPlayerInventory;
+    use basalt_protocol::packets::play::world::ServerboundPlayBlockDig;
+
+    let addr = spawn_server().await;
+    let mut client = connect_to_play(addr).await;
+
+    give_creative_item(&mut client, 36, 1, 32).await;
+
+    // Ctrl+Q = BlockDig status 3 (drop full stack)
+    send_packet(
+        &mut client,
+        ServerboundPlayBlockDig::PACKET_ID,
+        &ServerboundPlayBlockDig {
+            status: 3,
+            location: basalt_types::Position::new(0, 0, 0),
+            face: 0,
+            sequence: 0,
+        },
+    )
+    .await;
+
+    let packets =
+        read_until_packet(&mut client, ClientboundPlaySetPlayerInventory::PACKET_ID).await;
+
+    let inv_pkt = packets
+        .iter()
+        .find(|p| p.id == ClientboundPlaySetPlayerInventory::PACKET_ID)
+        .expect("should receive SetPlayerInventory after Ctrl+Q drop");
+
+    let mut cursor = inv_pkt.payload.as_slice();
+    let pkt = ClientboundPlaySetPlayerInventory::decode(&mut cursor).unwrap();
+    assert_eq!(pkt.slot_id, 0);
+    assert!(
+        pkt.contents.is_empty(),
+        "slot should be empty after full stack drop"
+    );
+}
+
+#[tokio::test]
+async fn e2e_block_break_spawns_item_entity() {
+    use basalt_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
+    use basalt_protocol::packets::play::world::{
+        ServerboundPlayBlockDig, ServerboundPlayBlockPlace,
+    };
+
+    let addr = spawn_server().await;
+    let mut client = connect_to_play(addr).await;
+
+    // Place a stone block so we have something guaranteed to break
+    give_creative_item(&mut client, 36, 1, 1).await;
+
+    send_packet(
+        &mut client,
+        ServerboundPlayBlockPlace::PACKET_ID,
+        &ServerboundPlayBlockPlace {
+            hand: 0,
+            location: basalt_types::Position::new(2, -60, 2),
+            direction: 1,
+            cursor_x: 0.5,
+            cursor_y: 1.0,
+            cursor_z: 0.5,
+            inside_block: false,
+            world_border_hit: false,
+            sequence: 50,
+        },
+    )
+    .await;
+
+    // Wait for block place to be processed (ack arrives)
+    use basalt_protocol::packets::play::world::ClientboundPlayAcknowledgePlayerDigging;
+    read_until_packet(
+        &mut client,
+        ClientboundPlayAcknowledgePlayerDigging::PACKET_ID,
+    )
+    .await;
+
+    // Break the placed block
+    send_packet(
+        &mut client,
+        ServerboundPlayBlockDig::PACKET_ID,
+        &ServerboundPlayBlockDig {
+            status: 0,
+            location: basalt_types::Position::new(2, -59, 2),
+            face: 1,
+            sequence: 51,
+        },
+    )
+    .await;
+
+    // Wait for SpawnEntity (the dropped item)
+    let packets = read_until_packet(&mut client, ClientboundPlaySpawnEntity::PACKET_ID).await;
+
+    let spawn_pkt = packets
+        .iter()
+        .find(|p| p.id == ClientboundPlaySpawnEntity::PACKET_ID)
+        .expect("breaking a block should spawn an item entity");
+
+    let mut cursor = spawn_pkt.payload.as_slice();
+    let pkt = ClientboundPlaySpawnEntity::decode(&mut cursor).unwrap();
+    assert_eq!(pkt.r#type, 68, "spawned entity should be type 68 (item)");
+}
