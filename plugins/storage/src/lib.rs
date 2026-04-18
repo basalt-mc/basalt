@@ -40,8 +40,8 @@ impl Plugin for StoragePlugin {
 
 #[cfg(test)]
 mod tests {
+    use basalt_api::components::BlockPosition;
     use basalt_testkit::PluginTestHarness;
-    use basalt_types::Uuid;
 
     use super::*;
 
@@ -52,12 +52,9 @@ mod tests {
         harness.register(StoragePlugin);
 
         let mut event = BlockPlacedEvent {
-            x: 5,
-            y: 100,
-            z: 3,
-            block_state: basalt_world::block::STONE,
+            position: BlockPosition { x: 5, y: 100, z: 3 },
+            block_state: basalt_api::world::block::STONE,
             sequence: 1,
-            player_uuid: Uuid::default(),
             cancelled: false,
         };
 
@@ -66,7 +63,7 @@ mod tests {
         // Block should be set (by BlockPlugin)
         assert_eq!(
             harness.world().get_block(5, 100, 3),
-            basalt_world::block::STONE
+            basalt_api::world::block::STONE
         );
         // Chunk should be dirty (set_block marks it)
         let dirty = harness.world().dirty_chunks();
@@ -83,19 +80,16 @@ mod tests {
         harness.register(StoragePlugin);
 
         let mut event = BlockPlacedEvent {
-            x: 5,
-            y: 100,
-            z: 3,
-            block_state: basalt_world::block::STONE,
+            position: BlockPosition { x: 5, y: 100, z: 3 },
+            block_state: basalt_api::world::block::STONE,
             sequence: 1,
-            player_uuid: Uuid::default(),
             cancelled: false,
         };
 
         harness.dispatch(&mut event);
         assert_eq!(
             harness.world().get_block(5, 100, 3),
-            basalt_world::block::STONE
+            basalt_api::world::block::STONE
         );
     }
 }

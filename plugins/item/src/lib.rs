@@ -9,7 +9,7 @@
 //! DroppedItem, and EntityKind components.
 
 use basalt_api::prelude::*;
-use basalt_world::block;
+use basalt_api::world::block;
 
 /// Spawns dropped item entities when blocks are broken.
 ///
@@ -31,8 +31,13 @@ impl Plugin for ItemPlugin {
     fn on_enable(&self, registrar: &mut PluginRegistrar) {
         registrar.on::<BlockBrokenEvent>(Stage::Post, 0, |event, ctx| {
             if let Some(item_id) = block::block_state_to_item_id(event.block_state) {
-                ctx.entities()
-                    .spawn_dropped_item(event.x, event.y, event.z, item_id, 1);
+                ctx.entities().spawn_dropped_item(
+                    event.position.x,
+                    event.position.y,
+                    event.position.z,
+                    item_id,
+                    1,
+                );
             }
         });
     }
@@ -40,8 +45,8 @@ impl Plugin for ItemPlugin {
 
 #[cfg(test)]
 mod tests {
+    use basalt_api::components::BlockPosition;
     use basalt_testkit::PluginTestHarness;
-    use basalt_types::Uuid;
 
     use super::*;
 
@@ -55,12 +60,9 @@ mod tests {
         harness.world().set_block(5, 64, 3, block::STONE);
 
         let mut event = BlockBrokenEvent {
-            x: 5,
-            y: 64,
-            z: 3,
+            position: BlockPosition { x: 5, y: 64, z: 3 },
             block_state: block::STONE,
             sequence: 1,
-            player_uuid: Uuid::default(),
             cancelled: false,
         };
 
@@ -89,12 +91,9 @@ mod tests {
         harness.register(ItemPlugin);
 
         let mut event = BlockBrokenEvent {
-            x: 5,
-            y: 64,
-            z: 3,
+            position: BlockPosition { x: 5, y: 64, z: 3 },
             block_state: block::AIR,
             sequence: 1,
-            player_uuid: Uuid::default(),
             cancelled: false,
         };
 

@@ -10,4 +10,3 @@ basalt-api = { workspace = true }
 
 [dev-dependencies]
 basalt-testkit = { workspace = true }
-basalt-types = { workspace = true }

@@ -4,7 +4,7 @@
 //! handling is in the separate `basalt-plugin-command` crate.
 
 use basalt_api::prelude::*;
-use basalt_types::{NamedColor, TextColor, TextComponent};
+use basalt_api::types::{NamedColor, TextColor, TextComponent};
 
 /// Broadcasts chat messages to all connected players.
 ///
@@ -23,7 +23,7 @@ impl Plugin for ChatPlugin {
 
     fn on_enable(&self, registrar: &mut PluginRegistrar) {
         registrar.on::<ChatMessageEvent>(Stage::Post, 0, |event, ctx| {
-            let component = build_chat_component(&event.username, &event.message);
+            let component = build_chat_component(ctx.player().username(), &event.message);
             ctx.chat().broadcast_component(&component);
         });
     }
@@ -50,7 +50,6 @@ mod tests {
         harness.register(ChatPlugin);
 
         let mut event = ChatMessageEvent {
-            username: "Steve".into(),
             message: "hello".into(),
             cancelled: false,
         };
@@ -72,7 +71,6 @@ mod tests {
         harness.register(ChatPlugin);
 
         let mut event = ChatMessageEvent {
-            username: "Steve".into(),
             message: "spam".into(),
             cancelled: false,
         };
@@ -87,7 +85,6 @@ mod tests {
         harness.register(ChatPlugin);
 
         let mut event = ChatMessageEvent {
-            username: "Steve".into(),
             message: String::new(),
             cancelled: false,
         };

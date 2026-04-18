@@ -23,9 +23,9 @@ impl Plugin for WorldPlugin {
 
     fn on_enable(&self, registrar: &mut PluginRegistrar) {
         registrar.on::<PlayerMovedEvent>(Stage::Process, 0, |event, ctx| {
-            let new_cx = (event.x.floor() as i32) >> 4;
-            let new_cz = (event.z.floor() as i32) >> 4;
-            if new_cx != event.old_cx || new_cz != event.old_cz {
+            let new_cx = (event.position.x.floor() as i32) >> 4;
+            let new_cz = (event.position.z.floor() as i32) >> 4;
+            if new_cx != event.old_chunk.x || new_cz != event.old_chunk.z {
                 ctx.world_ctx().stream_chunks(new_cx, new_cz);
             }
         });
@@ -35,6 +35,7 @@ impl Plugin for WorldPlugin {
 #[cfg(test)]
 mod tests {
     use basalt_api::Response;
+    use basalt_api::components::{ChunkPosition, Position, Rotation};
     use basalt_testkit::PluginTestHarness;
 
     use super::*;
@@ -45,15 +46,17 @@ mod tests {
         harness.register(WorldPlugin);
 
         let mut event = PlayerMovedEvent {
-            entity_id: 1,
-            x: 16.0,
-            y: 64.0,
-            z: 0.0,
-            yaw: 0.0,
-            pitch: 0.0,
+            position: Position {
+                x: 16.0,
+                y: 64.0,
+                z: 0.0,
+            },
+            rotation: Rotation {
+                yaw: 0.0,
+                pitch: 0.0,
+            },
             on_ground: true,
-            old_cx: 0,
-            old_cz: 0,
+            old_chunk: ChunkPosition { x: 0, z: 0 },
         };
 
         let responses = harness.dispatch(&mut event);
@@ -74,15 +77,17 @@ mod tests {
 
         // x=-0.5 is in chunk -1, not chunk 0 (floor before shift)
         let mut event = PlayerMovedEvent {
-            entity_id: 1,
-            x: -0.5,
-            y: 64.0,
-            z: -0.5,
-            yaw: 0.0,
-            pitch: 0.0,
+            position: Position {
+                x: -0.5,
+                y: 64.0,
+                z: -0.5,
+            },
+            rotation: Rotation {
+                yaw: 0.0,
+                pitch: 0.0,
+            },
             on_ground: true,
-            old_cx: 0,
-            old_cz: 0,
+            old_chunk: ChunkPosition { x: 0, z: 0 },
         };
 
         let responses = harness.dispatch(&mut event);
@@ -102,15 +107,17 @@ mod tests {
         harness.register(WorldPlugin);
 
         let mut event = PlayerMovedEvent {
-            entity_id: 1,
-            x: 5.0,
-            y: 64.0,
-            z: 5.0,
-            yaw: 0.0,
-            pitch: 0.0,
+            position: Position {
+                x: 5.0,
+                y: 64.0,
+                z: 5.0,
+            },
+            rotation: Rotation {
+                yaw: 0.0,
+                pitch: 0.0,
+            },
             on_ground: true,
-            old_cx: 0,
-            old_cz: 0,
+            old_chunk: ChunkPosition { x: 0, z: 0 },
         };
 
         assert!(harness.dispatch(&mut event).is_empty());

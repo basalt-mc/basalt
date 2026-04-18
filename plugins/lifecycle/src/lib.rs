@@ -22,19 +22,12 @@ impl Plugin for LifecyclePlugin {
     }
 
     fn on_enable(&self, registrar: &mut PluginRegistrar) {
-        registrar.on::<PlayerJoinedEvent>(Stage::Post, 0, |event, ctx| {
-            ctx.entities()
-                .broadcast_raw(BroadcastMessage::PlayerJoined {
-                    info: event.info.clone(),
-                });
+        registrar.on::<PlayerJoinedEvent>(Stage::Post, 0, |_event, ctx| {
+            ctx.entities().broadcast_player_joined();
         });
 
-        registrar.on::<PlayerLeftEvent>(Stage::Post, 0, |event, ctx| {
-            ctx.entities().broadcast_raw(BroadcastMessage::PlayerLeft {
-                uuid: event.uuid,
-                entity_id: event.entity_id,
-                username: event.username.clone(),
-            });
+        registrar.on::<PlayerLeftEvent>(Stage::Post, 0, |_event, ctx| {
+            ctx.entities().broadcast_player_left();
         });
     }
 }
@@ -43,7 +36,6 @@ impl Plugin for LifecyclePlugin {
 mod tests {
     use basalt_api::Response;
     use basalt_testkit::PluginTestHarness;
-    use basalt_types::Uuid;
 
     use super::*;
 
@@ -52,19 +44,7 @@ mod tests {
         let mut harness = PluginTestHarness::new();
         harness.register(LifecyclePlugin);
 
-        let mut event = PlayerJoinedEvent {
-            info: PlayerSnapshot {
-                username: "Steve".into(),
-                uuid: Uuid::default(),
-                entity_id: 1,
-                x: 0.0,
-                y: 64.0,
-                z: 0.0,
-                yaw: 0.0,
-                pitch: 0.0,
-                skin_properties: vec![],
-            },
-        };
+        let mut event = PlayerJoinedEvent;
 
         let responses = harness.dispatch(&mut event);
         assert_eq!(responses.len(), 1);
@@ -79,11 +59,7 @@ mod tests {
         let mut harness = PluginTestHarness::new();
         harness.register(LifecyclePlugin);
 
-        let mut event = PlayerLeftEvent {
-            uuid: Uuid::default(),
-            entity_id: 1,
-            username: "Steve".into(),
-        };
+        let mut event = PlayerLeftEvent;
 
         let responses = harness.dispatch(&mut event);
         assert_eq!(responses.len(), 1);
