@@ -10,6 +10,7 @@
 //! streaming different chunks don't block each other.
 
 pub mod block;
+pub mod block_entity;
 pub mod chunk;
 pub mod collision;
 pub mod format;

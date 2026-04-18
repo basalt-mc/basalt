@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use basalt_storage::RegionStorage;
 use dashmap::DashMap;
 
+use crate::block_entity::BlockEntity;
 use crate::chunk::ChunkColumn;
 use crate::generator::FlatWorldGenerator;
 use crate::noise_gen::NoiseTerrainGenerator;
@@ -40,6 +41,11 @@ struct ChunkEntry {
 pub struct World {
     /// Concurrent chunk storage — each chunk independently lockable.
     chunks: DashMap<(i32, i32), ChunkEntry>,
+    /// Block entities keyed by absolute world position (x, y, z).
+    ///
+    /// Stores persistent per-block state such as chest inventories.
+    /// Separate from chunk data for independent locking.
+    block_entities: DashMap<(i32, i32, i32), BlockEntity>,
     /// The terrain generator used for new chunks.
     generator: Generator,
     /// The Y coordinate where players spawn.
@@ -67,6 +73,7 @@ impl World {
         let storage = RegionStorage::new(save_path.join("regions")).ok();
         Self {
             chunks: DashMap::new(),
+            block_entities: DashMap::new(),
             generator: Generator::Noise(Box::new(NoiseTerrainGenerator::new(seed))),
             spawn_y: NoiseTerrainGenerator::SPAWN_Y,
             storage,
@@ -85,6 +92,7 @@ impl World {
     pub fn new_memory_with_capacity(seed: u32, max_chunks: usize) -> Self {
         Self {
             chunks: DashMap::new(),
+            block_entities: DashMap::new(),
             generator: Generator::Noise(Box::new(NoiseTerrainGenerator::new(seed))),
             spawn_y: NoiseTerrainGenerator::SPAWN_Y,
             storage: None,
@@ -97,6 +105,7 @@ impl World {
     pub fn flat() -> Self {
         Self {
             chunks: DashMap::new(),
+            block_entities: DashMap::new(),
             generator: Generator::Flat(FlatWorldGenerator),
             spawn_y: FlatWorldGenerator::SPAWN_Y,
             storage: None,
@@ -144,6 +153,16 @@ impl World {
         entry.last_accessed = self.tick.fetch_add(1, Ordering::Relaxed);
     }
 
+    /// Marks a chunk as dirty for persistence.
+    ///
+    /// Call after modifying block entity contents (chest inventory, etc.)
+    /// to ensure the chunk is included in the next persistence flush.
+    pub fn mark_chunk_dirty(&self, cx: i32, cz: i32) {
+        if let Some(mut entry) = self.chunks.get_mut(&(cx, cz)) {
+            entry.dirty = true;
+        }
+    }
+
     /// Gets a block at absolute world coordinates.
     ///
     /// Loads the chunk if it isn't already in memory.
@@ -169,7 +188,10 @@ impl World {
         if let Some(s) = &self.storage
             && let Some(mut entry) = self.chunks.get_mut(&(cx, cz))
         {
-            let data = crate::format::serialize_chunk(&entry.column);
+            let mut data = crate::format::serialize_chunk(&entry.column);
+            // Append block entities for this chunk
+            let bes = self.block_entities_in_chunk(cx, cz);
+            crate::format::serialize_block_entities(&mut data, &bes, cx, cz);
             let _ = s.save_raw(cx, cz, &data);
             entry.dirty = false;
         }
@@ -187,6 +209,63 @@ impl World {
             .map(|e| *e.key())
             .collect()
     }
+
+    // ── Block entities ────────────────────────────────────────────
+
+    /// Returns a reference to the block entity at the given position.
+    pub fn get_block_entity(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> Option<dashmap::mapref::one::Ref<'_, (i32, i32, i32), BlockEntity>> {
+        self.block_entities.get(&(x, y, z))
+    }
+
+    /// Returns a mutable reference to the block entity at the given position.
+    pub fn get_block_entity_mut(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> Option<dashmap::mapref::one::RefMut<'_, (i32, i32, i32), BlockEntity>> {
+        self.block_entities.get_mut(&(x, y, z))
+    }
+
+    /// Sets a block entity at the given position.
+    pub fn set_block_entity(&self, x: i32, y: i32, z: i32, entity: BlockEntity) {
+        self.block_entities.insert((x, y, z), entity);
+    }
+
+    /// Removes the block entity at the given position.
+    pub fn remove_block_entity(&self, x: i32, y: i32, z: i32) {
+        self.block_entities.remove(&(x, y, z));
+    }
+
+    /// Returns all block entities within a chunk's boundaries.
+    ///
+    /// Used by the chunk packet builder to include block entity data
+    /// in the map chunk packet for client-side rendering.
+    pub fn block_entities_in_chunk(&self, cx: i32, cz: i32) -> Vec<(i32, i32, i32, BlockEntity)> {
+        let min_x = cx * 16;
+        let max_x = min_x + 15;
+        let min_z = cz * 16;
+        let max_z = min_z + 15;
+
+        self.block_entities
+            .iter()
+            .filter(|e| {
+                let &(x, _, z) = e.key();
+                x >= min_x && x <= max_x && z >= min_z && z <= max_z
+            })
+            .map(|e| {
+                let &(x, y, z) = e.key();
+                (x, y, z, e.value().clone())
+            })
+            .collect()
+    }
+
+    // ── Chunk queries ────────────────────────────────────────────
 
     /// Returns true if the chunk at (cx, cz) is in the memory cache.
     pub fn is_chunk_loaded(&self, cx: i32, cz: i32) -> bool {
@@ -208,8 +287,18 @@ impl World {
         // Try loading from disk
         if let Some(s) = &self.storage
             && let Ok(Some(data)) = s.load_raw(cx, cz)
-            && let Some(col) = crate::format::deserialize_chunk(&data, cx, cz)
+            && let Some((col, cursor_pos)) =
+                crate::format::deserialize_chunk_with_cursor(&data, cx, cz)
         {
+            // Restore block entities from the data after chunk sections
+            let mut cursor = cursor_pos;
+            let bes = crate::format::deserialize_block_entities(&data, &mut cursor);
+            for (local_x, y, local_z, be) in bes {
+                let abs_x = cx * 16 + local_x as i32;
+                let abs_z = cz * 16 + local_z as i32;
+                self.block_entities.insert((abs_x, y as i32, abs_z), be);
+            }
+
             let tick = self.tick.fetch_add(1, Ordering::Relaxed);
             self.chunks.insert(
                 (cx, cz),
