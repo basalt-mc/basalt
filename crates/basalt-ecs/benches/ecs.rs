@@ -3,9 +3,8 @@ extern crate test;
 
 use test::{Bencher, black_box};
 
-use basalt_ecs::{
-    BoundingBox, Ecs, Health, Inventory, Phase, Position, Rotation, SystemBuilder, Velocity,
-};
+use basalt_core::{BoundingBox, Position, SystemContextExt, Velocity};
+use basalt_ecs::{Ecs, Phase, SystemBuilder};
 
 /// Spawns N entities with Position + Velocity + BoundingBox.
 fn populated_ecs(n: u32) -> Ecs {
@@ -138,24 +137,6 @@ fn iter_position_10000(b: &mut Bencher) {
     });
 }
 
-// -- UUID lookup --
-
-#[bench]
-fn find_by_uuid_100_players(b: &mut Bencher) {
-    let mut ecs = Ecs::new();
-    let mut uuids = Vec::new();
-    for i in 0u32..100 {
-        let e = ecs.spawn();
-        let uuid = basalt_types::Uuid::from_bytes(i.to_le_bytes().repeat(4).try_into().unwrap());
-        ecs.index_uuid(uuid, e);
-        uuids.push(uuid);
-    }
-    let target = uuids[50];
-    b.iter(|| {
-        black_box(ecs.find_by_uuid(target));
-    });
-}
-
 // -- System dispatch --
 
 #[bench]
@@ -173,10 +154,10 @@ fn run_all_gravity_system_1000(b: &mut Bencher) {
         SystemBuilder::new("gravity")
             .phase(Phase::Simulate)
             .writes::<Velocity>()
-            .run(|ecs| {
-                let entities: Vec<_> = ecs.iter::<Velocity>().map(|(id, _)| id).collect();
+            .run(|ctx: &mut dyn basalt_core::SystemContext| {
+                let entities = ctx.query::<Velocity>();
                 for id in entities {
-                    if let Some(vel) = ecs.get_mut::<Velocity>(id) {
+                    if let Some(vel) = ctx.get_mut::<Velocity>(id) {
                         vel.dy -= 0.08;
                     }
                 }
@@ -195,13 +176,17 @@ fn run_all_movement_system_1000(b: &mut Bencher) {
             .phase(Phase::Simulate)
             .reads::<Velocity>()
             .writes::<Position>()
-            .run(|ecs| {
-                let updates: Vec<_> = ecs
-                    .iter::<Velocity>()
-                    .map(|(id, vel)| (id, vel.dx, vel.dy, vel.dz))
+            .run(|ctx: &mut dyn basalt_core::SystemContext| {
+                let updates: Vec<_> = ctx
+                    .query::<Velocity>()
+                    .into_iter()
+                    .filter_map(|id| {
+                        ctx.get::<Velocity>(id)
+                            .map(|vel| (id, vel.dx, vel.dy, vel.dz))
+                    })
                     .collect();
                 for (id, dx, dy, dz) in updates {
-                    if let Some(pos) = ecs.get_mut::<Position>(id) {
+                    if let Some(pos) = ctx.get_mut::<Position>(id) {
                         pos.x += dx;
                         pos.y += dy;
                         pos.z += dz;
