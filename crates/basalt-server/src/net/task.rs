@@ -236,6 +236,17 @@ async fn write_server_output(
             conn.write_packet_typed(ClientboundPlayPosition::PACKET_ID, &packet)
                 .await?;
         }
+        ServerOutput::SetSlot { slot, item } => {
+            use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+            let packet = ClientboundPlaySetSlot {
+                window_id: 0, // player inventory
+                state_id: 0,
+                slot: *slot,
+                item: item.clone(),
+            };
+            conn.write_packet_typed(ClientboundPlaySetSlot::PACKET_ID, &packet)
+                .await?;
+        }
         // ── Chunk path: cache-based ──────────────────────────────────
         ServerOutput::SendChunk { cx, cz } => {
             let bytes = chunk_cache.get_or_encode(*cx, *cz);
@@ -413,10 +424,23 @@ fn encode_broadcast(event: &BroadcastEvent) -> Vec<(i32, Vec<u8>)> {
                 encode_single(ClientboundPlayEntityMetadata::PACKET_ID, &meta_packet),
             ]
         }
+        BroadcastEvent::CollectItem {
+            collected_entity_id,
+            collector_entity_id,
+            count,
+        } => {
+            use basalt_protocol::packets::play::entity::ClientboundPlayCollect;
+
+            let packet = ClientboundPlayCollect {
+                collected_entity_id: *collected_entity_id,
+                collector_entity_id: *collector_entity_id,
+                pickup_item_count: *count,
+            };
+            vec![encode_single(ClientboundPlayCollect::PACKET_ID, &packet)]
+        }
     }
 }
 
-/// Encodes entity metadata for a dropped item entity.
 /// Encodes entity metadata entries for a dropped item entity.
 ///
 /// Produces the raw metadata bytes (without entity ID — that's in

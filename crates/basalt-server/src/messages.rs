@@ -193,6 +193,14 @@ pub enum ServerOutput {
         /// Target pitch (degrees).
         pitch: f32,
     },
+    /// Update a single inventory slot on the client.
+    SetSlot {
+        /// Protocol slot index (36-44 for hotbar).
+        slot: i16,
+        /// The item in the slot.
+        item: basalt_types::Slot,
+    },
+
     // ── Chunk path (cache-based, zero alloc) ──────────────────────────
     /// Send a chunk to the client. Net task looks up the ChunkPacketCache.
     SendChunk {
@@ -361,6 +369,15 @@ pub enum BroadcastEvent {
         /// Item ID.
         item_id: i32,
         /// Item count.
+        count: i32,
+    },
+    /// A player picked up an item. Net task sends CollectItem.
+    CollectItem {
+        /// Entity ID of the collected item.
+        collected_entity_id: i32,
+        /// Entity ID of the player who picked it up.
+        collector_entity_id: i32,
+        /// Number of items picked up.
         count: i32,
     },
 }

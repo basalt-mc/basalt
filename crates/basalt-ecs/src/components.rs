@@ -149,26 +149,28 @@ impl Inventory {
     /// Tries to insert an item into the hotbar.
     ///
     /// First looks for a matching slot (same item_id, count < 64),
-    /// then for an empty slot. Returns `true` if the item was inserted,
-    /// `false` if no space available.
-    pub fn try_insert(&mut self, item_id: i32, count: i32) -> bool {
+    /// then for an empty slot. Returns `Some(hotbar_index)` if inserted,
+    /// `None` if no space available.
+    pub fn try_insert(&mut self, item_id: i32, count: i32) -> Option<u8> {
         // First pass: stack with existing matching item
-        for slot in &mut self.hotbar {
+        for (i, slot) in self.hotbar.iter_mut().enumerate() {
             if slot.item_id == Some(item_id) && slot.item_count < 64 {
                 let space = 64 - slot.item_count;
                 let to_add = count.min(space);
                 slot.item_count += to_add;
-                return to_add == count;
+                if to_add == count {
+                    return Some(i as u8);
+                }
             }
         }
         // Second pass: empty slot
-        for slot in &mut self.hotbar {
+        for (i, slot) in self.hotbar.iter_mut().enumerate() {
             if slot.is_empty() {
                 *slot = basalt_types::Slot::new(item_id, count);
-                return true;
+                return Some(i as u8);
             }
         }
-        false
+        None
     }
 }
 impl Component for Inventory {}
