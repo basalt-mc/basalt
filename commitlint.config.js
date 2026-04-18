@@ -310,10 +310,16 @@ const physics = [
   'physics',
 ];
 
-const drops = [
-  // Drops plugin: item entity spawning on block break.
-  // Example: "feat(drops): spawn item entity on block break"
-  'drops',
+const item = [
+  // Item plugin: dropped item lifecycle (spawn, pickup, despawn).
+  // Example: "feat(item): add item merging for nearby stacks"
+  'item',
+];
+
+const container = [
+  // Container plugin: chest interaction, double chests, block entities.
+  // Example: "feat(container): add ender chest support"
+  'container',
 ];
 
 const keywords = [
@@ -376,7 +382,7 @@ const keywords = [
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...ecs, ...physics, ...drops, ...keywords]],
+    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...ecs, ...physics, ...item, ...container, ...keywords]],
     'scope-empty': [2, 'never'],
   },
 };
