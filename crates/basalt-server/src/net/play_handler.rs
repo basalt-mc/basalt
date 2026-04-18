@@ -80,7 +80,16 @@ pub(super) async fn handle_packet(
                 message: msg.message,
                 cancelled: false,
             };
-            instant_bus.dispatch(&mut event, &ctx);
+            if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                instant_bus.dispatch(&mut event, &ctx);
+            })) {
+                let msg = panic
+                    .downcast_ref::<&str>()
+                    .copied()
+                    .or_else(|| panic.downcast_ref::<String>().map(|s| s.as_str()))
+                    .unwrap_or("unknown panic");
+                log::error!(target: "basalt::net_task", "[{addr}] Plugin handler panicked on ChatMessage: {msg}");
+            }
             process_instant_responses(
                 &ctx.drain_responses(),
                 broadcast_tx,
@@ -116,7 +125,16 @@ pub(super) async fn handle_packet(
                 command: cmd.command,
                 cancelled: false,
             };
-            instant_bus.dispatch(&mut event, &ctx);
+            if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                instant_bus.dispatch(&mut event, &ctx);
+            })) {
+                let msg = panic
+                    .downcast_ref::<&str>()
+                    .copied()
+                    .or_else(|| panic.downcast_ref::<String>().map(|s| s.as_str()))
+                    .unwrap_or("unknown panic");
+                log::error!(target: "basalt::net_task", "[{addr}] Plugin handler panicked on Command: {msg}");
+            }
             process_instant_responses(
                 &ctx.drain_responses(),
                 broadcast_tx,

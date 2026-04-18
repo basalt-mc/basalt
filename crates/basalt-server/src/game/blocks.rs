@@ -42,7 +42,7 @@ impl GameLoop {
             sequence,
             cancelled: false,
         };
-        self.bus.dispatch(&mut event, &ctx);
+        self.dispatch_event(&mut event, &ctx);
 
         if event.is_cancelled() {
             if let Some(handle) = self.ecs.get::<OutputHandle>(eid) {
@@ -95,7 +95,7 @@ impl GameLoop {
                 sequence,
                 cancelled: false,
             };
-            self.bus.dispatch(&mut interact, &ctx);
+            self.dispatch_event(&mut interact, &ctx);
             self.process_responses(uuid, &ctx.drain_responses());
             if interact.is_cancelled() {
                 return;
@@ -145,7 +145,7 @@ impl GameLoop {
             sequence,
             cancelled: false,
         };
-        self.bus.dispatch(&mut event, &ctx);
+        self.dispatch_event(&mut event, &ctx);
 
         if event.is_cancelled() {
             if let Some(handle) = self.ecs.get::<OutputHandle>(eid) {

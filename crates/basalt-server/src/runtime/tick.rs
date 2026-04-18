@@ -122,7 +122,18 @@ impl TickLoop {
 
 impl Drop for TickLoop {
     fn drop(&mut self) {
-        self.stop();
+        self.running.store(false, Ordering::Relaxed);
+        if let Some(handle) = self.handle.take()
+            && let Err(panic) = handle.join()
+        {
+            let msg = panic
+                .downcast_ref::<&str>()
+                .copied()
+                .or_else(|| panic.downcast_ref::<String>().map(|s| s.as_str()))
+                .unwrap_or("unknown panic");
+            log::error!("Tick loop thread panicked: {msg}");
+            std::process::exit(1);
+        }
     }
 }
 

@@ -69,7 +69,7 @@ impl GameLoop {
                 z: old_cz,
             },
         };
-        self.bus.dispatch(&mut event, &ctx);
+        self.dispatch_event(&mut event, &ctx);
         let responses = ctx.drain_responses();
         self.process_responses(uuid, &responses);
 
