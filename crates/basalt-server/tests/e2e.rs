@@ -1095,3 +1095,236 @@ async fn e2e_block_break_spawns_item_entity() {
     let pkt = ClientboundPlaySpawnEntity::decode(&mut cursor).unwrap();
     assert_eq!(pkt.r#type, 68, "spawned entity should be type 68 (item)");
 }
+
+// -- Chest tests --
+
+/// Places a chest via creative slot + BlockPlace, waits for processing.
+async fn place_chest(client: &mut TcpStream, x: i32, y: i32, z: i32) {
+    use basalt_protocol::packets::play::world::ServerboundPlayBlockPlace;
+    // Give chest in hotbar slot 0 (item 313)
+    give_creative_item(client, 36, 313, 1).await;
+    send_packet(
+        client,
+        ServerboundPlayBlockPlace::PACKET_ID,
+        &ServerboundPlayBlockPlace {
+            hand: 0,
+            location: basalt_types::Position::new(x, y, z),
+            direction: 1, // top face
+            cursor_x: 0.5,
+            cursor_y: 1.0,
+            cursor_z: 0.5,
+            inside_block: false,
+            world_border_hit: false,
+            sequence: 100,
+        },
+    )
+    .await;
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+}
+
+#[tokio::test]
+async fn e2e_chest_opens_with_right_click() {
+    use basalt_protocol::packets::play::inventory::ClientboundPlayOpenWindow;
+
+    let addr = spawn_server().await;
+    let mut client = connect_to_play(addr).await;
+
+    // Place a chest
+    place_chest(&mut client, 2, -60, 2).await;
+
+    // Drain placement packets
+    while let Ok(Ok(Some(_))) = tokio::time::timeout(
+        std::time::Duration::from_millis(50),
+        framing::read_raw_packet(&mut client),
+    )
+    .await
+    {}
+
+    // Right-click the chest (BlockPlace on the chest position)
+    use basalt_protocol::packets::play::world::ServerboundPlayBlockPlace;
+    send_packet(
+        &mut client,
+        ServerboundPlayBlockPlace::PACKET_ID,
+        &ServerboundPlayBlockPlace {
+            hand: 0,
+            location: basalt_types::Position::new(2, -59, 2),
+            direction: 1,
+            cursor_x: 0.5,
+            cursor_y: 0.5,
+            cursor_z: 0.5,
+            inside_block: false,
+            world_border_hit: false,
+            sequence: 101,
+        },
+    )
+    .await;
+
+    // Should receive OpenWindow
+    let packets = read_until_packet(&mut client, ClientboundPlayOpenWindow::PACKET_ID).await;
+    let open_pkt = packets
+        .iter()
+        .find(|p| p.id == ClientboundPlayOpenWindow::PACKET_ID)
+        .expect("right-clicking chest should send OpenWindow");
+
+    let mut cursor = open_pkt.payload.as_slice();
+    let pkt = ClientboundPlayOpenWindow::decode(&mut cursor).unwrap();
+    assert_eq!(pkt.inventory_type, 2, "single chest = generic_9x3 (type 2)");
+}
+
+#[tokio::test]
+async fn e2e_chest_break_drops_contents_and_block() {
+    use basalt_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
+    use basalt_protocol::packets::play::world::ServerboundPlayBlockDig;
+
+    let addr = spawn_server().await;
+    let mut client = connect_to_play(addr).await;
+
+    // Place a chest
+    place_chest(&mut client, 3, -60, 3).await;
+
+    // Open the chest and put an item in it
+    use basalt_protocol::packets::play::inventory::ClientboundPlayOpenWindow;
+    use basalt_protocol::packets::play::world::ServerboundPlayBlockPlace;
+    send_packet(
+        &mut client,
+        ServerboundPlayBlockPlace::PACKET_ID,
+        &ServerboundPlayBlockPlace {
+            hand: 0,
+            location: basalt_types::Position::new(3, -59, 3),
+            direction: 1,
+            cursor_x: 0.5,
+            cursor_y: 0.5,
+            cursor_z: 0.5,
+            inside_block: false,
+            world_border_hit: false,
+            sequence: 102,
+        },
+    )
+    .await;
+    read_until_packet(&mut client, ClientboundPlayOpenWindow::PACKET_ID).await;
+
+    // Put stone in chest slot 0 via WindowClick
+    use basalt_protocol::packets::play::ServerboundPlayWindowClick;
+    use basalt_protocol::packets::play::ServerboundPlayWindowClickChangedslots;
+    send_packet(
+        &mut client,
+        ServerboundPlayWindowClick::PACKET_ID,
+        &ServerboundPlayWindowClick {
+            window_id: 1,
+            state_id: 0,
+            slot: 0,
+            mouse_button: 0,
+            mode: 0,
+            changed_slots: vec![ServerboundPlayWindowClickChangedslots {
+                location: 0,
+                item: basalt_types::Slot::new(1, 10),
+            }],
+            cursor_item: basalt_types::Slot::empty(),
+        },
+    )
+    .await;
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    // Close the chest
+    use basalt_protocol::packets::play::ServerboundPlayCloseWindow;
+    send_packet(
+        &mut client,
+        ServerboundPlayCloseWindow::PACKET_ID,
+        &ServerboundPlayCloseWindow { window_id: 1 },
+    )
+    .await;
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    // Drain all packets
+    while let Ok(Ok(Some(_))) = tokio::time::timeout(
+        std::time::Duration::from_millis(50),
+        framing::read_raw_packet(&mut client),
+    )
+    .await
+    {}
+
+    // Break the chest
+    send_packet(
+        &mut client,
+        ServerboundPlayBlockDig::PACKET_ID,
+        &ServerboundPlayBlockDig {
+            status: 0,
+            location: basalt_types::Position::new(3, -59, 3),
+            face: 1,
+            sequence: 103,
+        },
+    )
+    .await;
+
+    // Should receive multiple SpawnEntity for dropped items (contents + chest block)
+    // First wait for the initial spawn, then collect more
+    let mut all_packets =
+        read_until_packet(&mut client, ClientboundPlaySpawnEntity::PACKET_ID).await;
+    // Keep reading for additional spawns
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
+    while tokio::time::Instant::now() < deadline {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        match tokio::time::timeout(remaining, framing::read_raw_packet(&mut client)).await {
+            Ok(Ok(Some(raw))) => all_packets.push(raw),
+            _ => break,
+        }
+    }
+    let spawn_count = all_packets
+        .iter()
+        .filter(|p| p.id == ClientboundPlaySpawnEntity::PACKET_ID)
+        .count();
+    assert!(
+        spawn_count >= 2,
+        "should drop chest contents + chest block itself, got {spawn_count} spawns"
+    );
+}
+
+#[tokio::test]
+async fn e2e_double_chest_opens_54_slots() {
+    use basalt_protocol::packets::play::inventory::ClientboundPlayOpenWindow;
+
+    let addr = spawn_server().await;
+    let mut client = connect_to_play(addr).await;
+
+    // Place two adjacent chests to form a double
+    place_chest(&mut client, 4, -60, 4).await;
+    place_chest(&mut client, 5, -60, 4).await;
+
+    // Drain packets
+    while let Ok(Ok(Some(_))) = tokio::time::timeout(
+        std::time::Duration::from_millis(50),
+        framing::read_raw_packet(&mut client),
+    )
+    .await
+    {}
+
+    // Open one half
+    use basalt_protocol::packets::play::world::ServerboundPlayBlockPlace;
+    send_packet(
+        &mut client,
+        ServerboundPlayBlockPlace::PACKET_ID,
+        &ServerboundPlayBlockPlace {
+            hand: 0,
+            location: basalt_types::Position::new(4, -59, 4),
+            direction: 1,
+            cursor_x: 0.5,
+            cursor_y: 0.5,
+            cursor_z: 0.5,
+            inside_block: false,
+            world_border_hit: false,
+            sequence: 104,
+        },
+    )
+    .await;
+
+    let packets = read_until_packet(&mut client, ClientboundPlayOpenWindow::PACKET_ID).await;
+    let open_pkt = packets
+        .iter()
+        .find(|p| p.id == ClientboundPlayOpenWindow::PACKET_ID)
+        .expect("right-clicking double chest should send OpenWindow");
+
+    let mut cursor = open_pkt.payload.as_slice();
+    let pkt = ClientboundPlayOpenWindow::decode(&mut cursor).unwrap();
+    assert_eq!(pkt.inventory_type, 5, "double chest = generic_9x6 (type 5)");
+}
