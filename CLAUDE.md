@@ -85,7 +85,7 @@ Server features are implemented as plugin handlers registered on the event bus. 
 
 The API crate is the **sole dependency** for all plugins (built-in and external). It re-exports everything plugins need through focused modules:
 
-- **`prelude`** — essentials for every plugin: `Plugin`, `PluginRegistrar`, `ServerContext`, `Response`, context traits, `Stage`, `Event`, all event types, `BroadcastMessage`, `Gamemode`
+- **`prelude`** — essentials for every plugin: `Plugin`, `PluginRegistrar`, context traits, `Stage`, `Event`, all event types, `BroadcastMessage`, `Gamemode`
 - **`components`** — ECS component types: `Position`, `Velocity`, `BlockPosition`, etc.
 - **`system`** — system registration: `SystemContext`, `SystemContextExt`, `Phase`, `SystemBuilder`
 - **`command`** — command types: `Arg`, `CommandArgs`, `Validation`
@@ -95,7 +95,9 @@ The API crate is the **sole dependency** for all plugins (built-in and external)
 
 Events use structured types (`BlockPosition`, `Position`, `Rotation`, `ChunkPosition`) instead of inline fields. Player identity is never in events — always use `ctx.player()`.
 
-`Response` and `ResponseQueue` are `pub(crate)` — hidden behind `ServerContext` methods.
+Plugin handlers receive `&dyn Context` — they never reference `ServerContext` directly. `ServerContext` is an internal implementation detail shared between basalt-api, basalt-server, and basalt-testkit. Its implementation is split into domain sub-modules: `context/player.rs`, `context/chat.rs`, `context/world.rs`, `context/entity.rs`, `context/container.rs`, `context/response.rs`.
+
+`ServerContext` stores a `PlayerInfo` struct (uuid, entity_id, username, rotation) instead of inline fields. `Response` variants use structured types (`Position`, `Rotation`, `BlockPosition`, `ChunkPosition`).
 
 ### Plugin development rules
 
