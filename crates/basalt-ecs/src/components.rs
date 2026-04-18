@@ -109,6 +109,17 @@ pub struct DroppedItem {
 }
 impl Component for DroppedItem {}
 
+/// Pickup delay before a dropped item can be collected.
+///
+/// Decremented each tick. While remaining > 0, the item cannot be
+/// picked up by any player. Default: 10 ticks (0.5s) for block drops.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PickupDelay {
+    /// Remaining ticks before the item is pickable.
+    pub remaining_ticks: u32,
+}
+impl Component for PickupDelay {}
+
 /// Player hotbar inventory.
 ///
 /// Tracks the 9 hotbar slots and which one is currently selected.
@@ -133,6 +144,31 @@ impl Inventory {
     /// Returns the currently held item.
     pub fn held_item(&self) -> &basalt_types::Slot {
         &self.hotbar[self.held_slot as usize]
+    }
+
+    /// Tries to insert an item into the hotbar.
+    ///
+    /// First looks for a matching slot (same item_id, count < 64),
+    /// then for an empty slot. Returns `true` if the item was inserted,
+    /// `false` if no space available.
+    pub fn try_insert(&mut self, item_id: i32, count: i32) -> bool {
+        // First pass: stack with existing matching item
+        for slot in &mut self.hotbar {
+            if slot.item_id == Some(item_id) && slot.item_count < 64 {
+                let space = 64 - slot.item_count;
+                let to_add = count.min(space);
+                slot.item_count += to_add;
+                return to_add == count;
+            }
+        }
+        // Second pass: empty slot
+        for slot in &mut self.hotbar {
+            if slot.is_empty() {
+                *slot = basalt_types::Slot::new(item_id, count);
+                return true;
+            }
+        }
+        false
     }
 }
 impl Component for Inventory {}
