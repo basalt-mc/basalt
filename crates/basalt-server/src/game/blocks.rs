@@ -3,12 +3,12 @@
 use std::sync::Arc;
 
 use basalt_api::context::ServerContext;
-use basalt_api::events::{BlockBrokenEvent, BlockPlacedEvent};
+use basalt_api::events::{BlockBrokenEvent, BlockPlacedEvent, PlayerInteractEvent};
 use basalt_events::Event;
 use basalt_types::Uuid;
 
 use super::{GameLoop, OutputHandle, Sneaking};
-use crate::messages::{BroadcastEvent, ServerOutput, SharedBroadcast};
+use crate::messages::ServerOutput;
 
 impl GameLoop {
     /// Handles a block dig (break).
@@ -49,58 +49,6 @@ impl GameLoop {
         }
 
         self.process_responses(uuid, &ctx.drain_responses());
-
-        // Collect items to drop from block entity before removing it
-        let items_to_drop: Vec<(i32, i32)> = self
-            .world
-            .get_block_entity(x, y, z)
-            .map(|be| match &*be {
-                basalt_world::block_entity::BlockEntity::Chest { slots } => slots
-                    .iter()
-                    .filter_map(|s| s.item_id.map(|id| (id, s.item_count)))
-                    .collect(),
-            })
-            .unwrap_or_default();
-
-        self.world.remove_block_entity(x, y, z);
-
-        // Spawn dropped items for chest contents
-        for (item_id, count) in items_to_drop {
-            self.spawn_item_entity(x, y, z, item_id, count);
-        }
-
-        // If this was part of a double chest, revert the other half to single
-        if basalt_world::block::is_chest(original_state)
-            && basalt_world::block::chest_type(original_state) != 0
-        {
-            let facing = basalt_world::block::chest_facing(original_state);
-            let offsets = basalt_world::block::chest_adjacent_offsets(facing);
-            for (dx, dz) in offsets {
-                let nx = x + dx;
-                let nz = z + dz;
-                let neighbor = self.world.get_block(nx, y, nz);
-                if basalt_world::block::is_chest(neighbor)
-                    && basalt_world::block::chest_facing(neighbor) == facing
-                    && basalt_world::block::chest_type(neighbor) != 0
-                {
-                    let single = basalt_world::block::chest_state(facing, 0);
-                    self.world.set_block(nx, y, nz, single);
-                    self.chunk_cache.invalidate(nx >> 4, nz >> 4);
-                    let bc = Arc::new(SharedBroadcast::new(BroadcastEvent::BlockChanged {
-                        x: nx,
-                        y,
-                        z: nz,
-                        state: i32::from(single),
-                    }));
-                    for (e, _) in self.ecs.iter::<OutputHandle>() {
-                        self.send_to(e, |tx| {
-                            let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&bc)));
-                        });
-                    }
-                    break;
-                }
-            }
-        }
     }
 
     /// Handles a block place.
@@ -117,13 +65,36 @@ impl GameLoop {
             return;
         };
 
-        // Check if the clicked block is an interactable container
-        // Sneaking players skip interaction and place blocks instead
+        // Dispatch PlayerInteractEvent for the clicked block.
+        // Plugins (e.g., ContainerPlugin) can cancel to prevent placement.
         let is_sneaking = self.ecs.has::<Sneaking>(eid);
         let clicked_state = self.world.get_block(x, y, z);
-        if !is_sneaking && basalt_world::block::is_chest(clicked_state) {
-            self.open_chest(eid, x, y, z);
-            return;
+        if !is_sneaking {
+            let entity_id = eid as i32;
+            let username = self
+                .ecs
+                .get::<basalt_ecs::PlayerRef>(eid)
+                .map_or_else(String::new, |pr| pr.username.clone());
+            let (yaw, pitch) = self
+                .ecs
+                .get::<basalt_ecs::Rotation>(eid)
+                .map_or((0.0, 0.0), |r| (r.yaw, r.pitch));
+            let ctx = self.make_context(uuid, entity_id, &username, yaw, pitch);
+            let mut interact = PlayerInteractEvent {
+                x,
+                y,
+                z,
+                player_uuid: uuid,
+                block_state: clicked_state,
+                direction,
+                sequence,
+                cancelled: false,
+            };
+            self.bus.dispatch(&mut interact, &ctx);
+            self.process_responses(uuid, &ctx.drain_responses());
+            if interact.is_cancelled() {
+                return;
+            }
         }
 
         let (dx, dy, dz) = face_offset(direction);
@@ -136,25 +107,28 @@ impl GameLoop {
             let Some(item_id) = inv.held_item().item_id else {
                 return;
             };
-            let Some(mut block_state) = basalt_world::block::item_to_default_block_state(item_id)
+            let Some(block_state) = basalt_world::block::item_to_default_block_state(item_id)
             else {
                 return;
             };
-            // Orient directional blocks based on player yaw
-            if basalt_world::block::is_chest(block_state) {
-                let yaw = self
-                    .ecs
-                    .get::<basalt_ecs::Rotation>(eid)
-                    .map_or(0.0, |r| r.yaw);
-                block_state = basalt_world::block::chest_state_for_yaw(yaw);
-            }
             let Some(pr) = self.ecs.get::<basalt_ecs::PlayerRef>(eid) else {
                 return;
             };
             (eid as i32, pr.username.clone(), block_state)
         };
 
-        let ctx = ServerContext::new(Arc::clone(&self.world), uuid, entity_id, username, 0.0, 0.0);
+        let (yaw, pitch) = self
+            .ecs
+            .get::<basalt_ecs::Rotation>(eid)
+            .map_or((0.0, 0.0), |r| (r.yaw, r.pitch));
+        let ctx = ServerContext::new(
+            Arc::clone(&self.world),
+            uuid,
+            entity_id,
+            username,
+            yaw,
+            pitch,
+        );
         let mut event = BlockPlacedEvent {
             x: px,
             y: py,
@@ -179,111 +153,8 @@ impl GameLoop {
         }
 
         self.process_responses(uuid, &ctx.drain_responses());
-
-        // Create block entity for interactive blocks (chests)
-        if basalt_world::block::is_chest(block_state) {
-            self.world.set_block_entity(
-                px,
-                py,
-                pz,
-                basalt_world::block_entity::BlockEntity::empty_chest(),
-            );
-
-            // Double chest pairing logic:
-            // - Not sneaking: scan adjacent blocks for a single chest to pair with
-            // - Sneaking + clicked a chest: pair only with the clicked chest
-            // - Sneaking + clicked non-chest: no pairing (single chest)
-            let facing = basalt_world::block::chest_facing(block_state);
-            let mut paired = false;
-
-            // Build candidate list: either all adjacent or just the clicked chest
-            let candidates: Vec<(i32, i32)> = if !is_sneaking {
-                basalt_world::block::chest_adjacent_offsets(facing)
-                    .iter()
-                    .map(|&(ddx, ddz)| (px + ddx, pz + ddz))
-                    .collect()
-            } else if basalt_world::block::is_chest(clicked_state) {
-                // Sneaking on a chest: pair only if new chest is lateral (left/right)
-                let valid_offsets = basalt_world::block::chest_adjacent_offsets(facing);
-                let actual_offset = (px - x, pz - z);
-                if valid_offsets.contains(&actual_offset) {
-                    vec![(x, z)]
-                } else {
-                    vec![] // front/back placement: no pairing
-                }
-            } else {
-                vec![] // sneaking on non-chest: no pairing
-            };
-
-            for &(nx, nz) in &candidates {
-                let neighbor = self.world.get_block(nx, py, nz);
-                if basalt_world::block::is_single_chest(neighbor)
-                    && basalt_world::block::chest_facing(neighbor) == facing
-                {
-                    // Compute offset from new chest to neighbor
-                    let ddx = nx - px;
-                    let ddz = nz - pz;
-                    let (new_type, existing_type) =
-                        basalt_world::block::chest_double_types(facing, ddx, ddz);
-                    let new_state = basalt_world::block::chest_state(facing, new_type);
-                    self.world.set_block(px, py, pz, new_state);
-                    let neighbor_state = basalt_world::block::chest_state(facing, existing_type);
-                    self.world.set_block(nx, py, nz, neighbor_state);
-                    self.chunk_cache.invalidate(px >> 4, pz >> 4);
-                    self.chunk_cache.invalidate(nx >> 4, nz >> 4);
-                    for (e, _) in self.ecs.iter::<OutputHandle>() {
-                        self.send_to(e, |tx| {
-                            let _ = tx.try_send(ServerOutput::BlockChanged {
-                                x: px,
-                                y: py,
-                                z: pz,
-                                state: i32::from(new_state),
-                            });
-                            let _ = tx.try_send(ServerOutput::BlockEntityData {
-                                x: px,
-                                y: py,
-                                z: pz,
-                                action: 2,
-                            });
-                            let _ = tx.try_send(ServerOutput::BlockChanged {
-                                x: nx,
-                                y: py,
-                                z: nz,
-                                state: i32::from(neighbor_state),
-                            });
-                            let _ = tx.try_send(ServerOutput::BlockEntityData {
-                                x: nx,
-                                y: py,
-                                z: nz,
-                                action: 2,
-                            });
-                        });
-                    }
-                    paired = true;
-                    break;
-                }
-            }
-
-            if !paired {
-                // Single chest — broadcast normally
-                for (e, _) in self.ecs.iter::<OutputHandle>() {
-                    self.send_to(e, |tx| {
-                        let _ = tx.try_send(ServerOutput::BlockChanged {
-                            x: px,
-                            y: py,
-                            z: pz,
-                            state: i32::from(block_state),
-                        });
-                        let _ = tx.try_send(ServerOutput::BlockEntityData {
-                            x: px,
-                            y: py,
-                            z: pz,
-                            action: 2,
-                        });
-                    });
-                }
-            }
-        }
+        // Block entity creation, chest orientation, and double chest
+        // pairing are handled by ContainerPlugin via BlockPlacedEvent Post.
     }
 }
 
