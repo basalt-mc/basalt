@@ -237,14 +237,24 @@ async fn write_server_output(
                 .await?;
         }
         ServerOutput::SetSlot { slot, item } => {
-            use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
-            let packet = ClientboundPlaySetSlot {
-                window_id: 0, // player inventory
-                state_id: 0,
-                slot: *slot,
-                item: item.clone(),
+            use basalt_protocol::packets::play::inventory::ClientboundPlaySetPlayerInventory;
+            // Internal slot = raw MC slot (0-8 hotbar, 9-35 main), no conversion needed
+            let packet = ClientboundPlaySetPlayerInventory {
+                slot_id: i32::from(*slot),
+                contents: item.clone(),
             };
-            conn.write_packet_typed(ClientboundPlaySetSlot::PACKET_ID, &packet)
+            conn.write_packet_typed(ClientboundPlaySetPlayerInventory::PACKET_ID, &packet)
+                .await?;
+        }
+        ServerOutput::SyncInventory { slots } => {
+            use basalt_protocol::packets::play::inventory::ClientboundPlayWindowItems;
+            let packet = ClientboundPlayWindowItems {
+                window_id: 0,
+                state_id: 0,
+                items: slots.clone(),
+                carried_item: basalt_types::Slot::empty(),
+            };
+            conn.write_packet_typed(ClientboundPlayWindowItems::PACKET_ID, &packet)
                 .await?;
         }
         // ── Chunk path: cache-based ──────────────────────────────────
@@ -631,6 +641,22 @@ async fn handle_packet(
                 uuid,
                 slot: creative.slot,
                 item: creative.item,
+            });
+        }
+
+        // -- Game loop: window click --
+        ServerboundPlayPacket::WindowClick(click) => {
+            let _ = game_tx.send(GameInput::WindowClick {
+                uuid,
+                slot: click.slot,
+                button: click.mouse_button,
+                mode: click.mode,
+                changed_slots: click
+                    .changed_slots
+                    .into_iter()
+                    .map(|cs| (cs.location, cs.item))
+                    .collect(),
+                cursor_item: click.cursor_item,
             });
         }
 
