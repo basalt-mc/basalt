@@ -120,57 +120,114 @@ pub struct PickupDelay {
 }
 impl Component for PickupDelay {}
 
-/// Player hotbar inventory.
+/// Player inventory — 36 slots (27 main + 9 hotbar).
 ///
-/// Tracks the 9 hotbar slots and which one is currently selected.
-/// The held item determines block placement state.
+/// Slot layout matches the Minecraft player inventory window:
+/// - Slots 0–26: main inventory (3 rows of 9)
+/// - Slots 27–35: hotbar (bottom row)
+///
+/// In the protocol window, these map to:
+/// - Protocol slots 9–35: main inventory (our 0–26)
+/// - Protocol slots 36–44: hotbar (our 27–35)
 #[derive(Debug, Clone)]
 pub struct Inventory {
-    /// Currently selected hotbar slot (0-8).
+    /// Currently selected hotbar index (0-8, relative to hotbar start).
     pub held_slot: u8,
-    /// Hotbar items (slots 0-8).
-    pub hotbar: [basalt_types::Slot; 9],
+    /// All 36 inventory slots.
+    pub slots: [basalt_types::Slot; 36],
 }
 
 impl Inventory {
+    /// First hotbar slot index within `slots`.
+    pub const HOTBAR_START: usize = 27;
+
     /// Creates an empty inventory with slot 0 selected.
     pub fn empty() -> Self {
         Self {
             held_slot: 0,
-            hotbar: std::array::from_fn(|_| basalt_types::Slot::empty()),
+            slots: std::array::from_fn(|_| basalt_types::Slot::empty()),
         }
     }
 
-    /// Returns the currently held item.
+    /// Returns the currently held item (from the hotbar).
     pub fn held_item(&self) -> &basalt_types::Slot {
-        &self.hotbar[self.held_slot as usize]
+        &self.slots[Self::HOTBAR_START + self.held_slot as usize]
     }
 
-    /// Tries to insert an item into the hotbar.
+    /// Returns a reference to the hotbar (9 slots).
+    pub fn hotbar(&self) -> &[basalt_types::Slot] {
+        &self.slots[Self::HOTBAR_START..]
+    }
+
+    /// Returns a mutable reference to the hotbar (9 slots).
+    pub fn hotbar_mut(&mut self) -> &mut [basalt_types::Slot] {
+        &mut self.slots[Self::HOTBAR_START..]
+    }
+
+    /// Converts a protocol slot index to an internal slot index.
     ///
-    /// First looks for a matching slot (same item_id, count < 64),
-    /// then for an empty slot. Returns `Some(hotbar_index)` if inserted,
-    /// `None` if no space available.
-    pub fn try_insert(&mut self, item_id: i32, count: i32) -> Option<u8> {
-        // First pass: stack with existing matching item
-        for (i, slot) in self.hotbar.iter_mut().enumerate() {
+    /// Protocol layout: 9-35 = main, 36-44 = hotbar.
+    /// Internal layout: 0-26 = main, 27-35 = hotbar.
+    /// Returns `None` for out-of-range or non-inventory slots (0-8 = crafting/armor).
+    pub fn protocol_to_index(protocol_slot: i16) -> Option<usize> {
+        match protocol_slot {
+            9..=35 => Some((protocol_slot - 9) as usize), // main
+            36..=44 => Some((protocol_slot - 36 + 27) as usize), // hotbar
+            _ => None,
+        }
+    }
+
+    /// Converts an internal slot index to a protocol slot index.
+    pub fn index_to_protocol(index: usize) -> Option<i16> {
+        match index {
+            0..=26 => Some(index as i16 + 9),        // main
+            27..=35 => Some(index as i16 - 27 + 36), // hotbar
+            _ => None,
+        }
+    }
+
+    /// Tries to insert an item into the inventory.
+    ///
+    /// Searches hotbar first (for convenience), then main inventory.
+    /// Tries matching stacks (count < 64) first, then empty slots.
+    /// Returns `Some(internal_index)` if inserted, `None` if full.
+    pub fn try_insert(&mut self, item_id: i32, count: i32) -> Option<usize> {
+        // Hotbar first, then main — matching stacks
+        let search_order = (Self::HOTBAR_START..36).chain(0..Self::HOTBAR_START);
+        for i in search_order {
+            let slot = &mut self.slots[i];
             if slot.item_id == Some(item_id) && slot.item_count < 64 {
                 let space = 64 - slot.item_count;
                 let to_add = count.min(space);
                 slot.item_count += to_add;
                 if to_add == count {
-                    return Some(i as u8);
+                    return Some(i);
                 }
             }
         }
-        // Second pass: empty slot
-        for (i, slot) in self.hotbar.iter_mut().enumerate() {
-            if slot.is_empty() {
-                *slot = basalt_types::Slot::new(item_id, count);
-                return Some(i as u8);
+        // Hotbar first, then main — empty slots
+        let search_order = (Self::HOTBAR_START..36).chain(0..Self::HOTBAR_START);
+        for i in search_order {
+            if self.slots[i].is_empty() {
+                self.slots[i] = basalt_types::Slot::new(item_id, count);
+                return Some(i);
             }
         }
         None
+    }
+
+    /// Builds the 46-slot protocol representation for SetContainerContent.
+    ///
+    /// Protocol slot layout for player inventory window (id=0):
+    /// 0 = crafting output, 1-4 = crafting grid, 5-8 = armor,
+    /// 9-35 = main inventory, 36-44 = hotbar, 45 = offhand.
+    pub fn to_protocol_slots(&self) -> Vec<basalt_types::Slot> {
+        let mut protocol = vec![basalt_types::Slot::empty(); 46];
+        // Main inventory: internal 0-26 → protocol 9-35
+        protocol[9..36].clone_from_slice(&self.slots[..27]);
+        // Hotbar: internal 27-35 → protocol 36-44
+        protocol[36..45].clone_from_slice(&self.slots[27..]);
+        protocol
     }
 }
 impl Component for Inventory {}
@@ -237,6 +294,13 @@ mod tests {
             },
         );
 
+        ecs.set(
+            e,
+            PickupDelay {
+                remaining_ticks: 10,
+            },
+        );
+
         assert!(ecs.has::<Position>(e));
         assert!(ecs.has::<Rotation>(e));
         assert!(ecs.has::<Velocity>(e));
@@ -245,5 +309,96 @@ mod tests {
         assert!(ecs.has::<Health>(e));
         assert!(ecs.has::<Lifetime>(e));
         assert!(ecs.has::<PlayerRef>(e));
+        assert!(ecs.has::<PickupDelay>(e));
+    }
+
+    #[test]
+    fn inventory_try_insert_empty_hotbar() {
+        let mut inv = Inventory::empty();
+        let idx = inv.try_insert(1, 1);
+        assert_eq!(idx, Some(Inventory::HOTBAR_START)); // first hotbar slot
+        assert_eq!(inv.slots[Inventory::HOTBAR_START].item_id, Some(1));
+    }
+
+    #[test]
+    fn inventory_try_insert_stacks() {
+        let mut inv = Inventory::empty();
+        inv.try_insert(1, 32);
+        let idx = inv.try_insert(1, 16);
+        assert_eq!(idx, Some(Inventory::HOTBAR_START)); // same slot
+        assert_eq!(inv.slots[Inventory::HOTBAR_START].item_count, 48);
+    }
+
+    #[test]
+    fn inventory_try_insert_full_returns_none() {
+        let mut inv = Inventory::empty();
+        for i in 0..36 {
+            inv.slots[i] = basalt_types::Slot::new(i as i32 + 100, 64);
+        }
+        assert_eq!(inv.try_insert(999, 1), None);
+    }
+
+    #[test]
+    fn inventory_protocol_slot_conversion() {
+        // Main: protocol 9-35 → internal 0-26
+        assert_eq!(Inventory::protocol_to_index(9), Some(0));
+        assert_eq!(Inventory::protocol_to_index(35), Some(26));
+        // Hotbar: protocol 36-44 → internal 27-35
+        assert_eq!(Inventory::protocol_to_index(36), Some(27));
+        assert_eq!(Inventory::protocol_to_index(44), Some(35));
+        // Out of range
+        assert_eq!(Inventory::protocol_to_index(0), None);
+        assert_eq!(Inventory::protocol_to_index(45), None);
+        // Roundtrip
+        assert_eq!(Inventory::index_to_protocol(0), Some(9));
+        assert_eq!(Inventory::index_to_protocol(27), Some(36));
+    }
+
+    #[test]
+    fn inventory_to_protocol_slots_length() {
+        let inv = Inventory::empty();
+        assert_eq!(inv.to_protocol_slots().len(), 46);
+    }
+
+    #[test]
+    fn inventory_to_protocol_slots_maps_correctly() {
+        let mut inv = Inventory::empty();
+        inv.slots[0] = basalt_types::Slot::new(1, 1); // main slot 0
+        inv.slots[27] = basalt_types::Slot::new(2, 2); // hotbar slot 0
+        let proto = inv.to_protocol_slots();
+        assert_eq!(proto[9].item_id, Some(1)); // main → protocol 9
+        assert_eq!(proto[36].item_id, Some(2)); // hotbar → protocol 36
+    }
+
+    #[test]
+    fn inventory_held_item_and_hotbar() {
+        let mut inv = Inventory::empty();
+        inv.slots[Inventory::HOTBAR_START + 3] = basalt_types::Slot::new(5, 10);
+        inv.held_slot = 3;
+        assert_eq!(inv.held_item().item_id, Some(5));
+        assert_eq!(inv.hotbar().len(), 9);
+        assert_eq!(inv.hotbar()[3].item_count, 10);
+    }
+
+    #[test]
+    fn inventory_try_insert_main_when_hotbar_full() {
+        let mut inv = Inventory::empty();
+        // Fill hotbar
+        for i in 0..9 {
+            inv.slots[Inventory::HOTBAR_START + i] = basalt_types::Slot::new(i as i32, 64);
+        }
+        // Should go to main inventory (slot 0)
+        let idx = inv.try_insert(999, 1);
+        assert_eq!(idx, Some(0));
+        assert_eq!(inv.slots[0].item_id, Some(999));
+    }
+
+    #[test]
+    fn inventory_index_to_protocol_roundtrip() {
+        for i in 0..36 {
+            let proto = Inventory::index_to_protocol(i).unwrap();
+            let back = Inventory::protocol_to_index(proto).unwrap();
+            assert_eq!(back, i);
+        }
     }
 }
