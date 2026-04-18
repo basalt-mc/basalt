@@ -80,10 +80,20 @@ pub(crate) struct GameLoop {
     io_tx: mpsc::UnboundedSender<crate::runtime::io_thread::IoRequest>,
     /// Pre-built DeclareCommands packet payload.
     declare_commands: Vec<u8>,
+    /// Chunks within simulation distance of any player.
+    ///
+    /// Updated when players connect, disconnect, or cross chunk boundaries.
+    /// ECS systems should only process entities in active chunks.
+    active_chunks: HashSet<(i32, i32)>,
+    /// Simulation distance in chunks around each player.
+    simulation_distance: i32,
+    /// How often to flush dirty chunks to disk, in ticks.
+    persistence_interval_ticks: u64,
 }
 
 impl GameLoop {
     /// Creates a new game loop.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         bus: EventBus,
         world: Arc<basalt_world::World>,
@@ -92,6 +102,8 @@ impl GameLoop {
         io_tx: mpsc::UnboundedSender<crate::runtime::io_thread::IoRequest>,
         ecs: basalt_ecs::Ecs,
         declare_commands: Vec<u8>,
+        simulation_distance: i32,
+        persistence_interval_ticks: u64,
     ) -> Self {
         Self {
             bus,
@@ -101,6 +113,9 @@ impl GameLoop {
             game_rx,
             io_tx,
             declare_commands,
+            active_chunks: HashSet::new(),
+            simulation_distance,
+            persistence_interval_ticks,
         }
     }
 
@@ -108,6 +123,55 @@ impl GameLoop {
     pub fn tick(&mut self, tick: u64) {
         self.drain_game_input();
         self.ecs.run_all(tick);
+        self.flush_dirty_chunks_if_due(tick);
+    }
+
+    /// Periodically flushes all dirty chunks to the I/O thread.
+    ///
+    /// Runs every `persistence_interval_ticks` ticks (~30s at 20 TPS).
+    /// Collects dirty chunks from the World and sends them as batch
+    /// persist requests to the I/O thread.
+    fn flush_dirty_chunks_if_due(&self, tick: u64) {
+        if self.persistence_interval_ticks == 0
+            || !tick.is_multiple_of(self.persistence_interval_ticks)
+        {
+            return;
+        }
+        let dirty = self.world.dirty_chunks();
+        if dirty.is_empty() {
+            return;
+        }
+        log::debug!(target: "basalt::game", "Flushing {} dirty chunks to disk", dirty.len());
+        for (cx, cz) in dirty {
+            let _ = self
+                .io_tx
+                .send(crate::runtime::io_thread::IoRequest::PersistChunk { cx, cz });
+        }
+    }
+
+    /// Recalculates the set of active chunks from all player positions.
+    ///
+    /// A chunk is active if it falls within `simulation_distance` of
+    /// any connected player.
+    fn rebuild_active_chunks(&mut self) {
+        self.active_chunks.clear();
+        let sd = self.simulation_distance;
+        for (_, pos) in self.ecs.iter::<basalt_ecs::Position>() {
+            // Only count entities that are players
+            let cx = (pos.x as i32) >> 4;
+            let cz = (pos.z as i32) >> 4;
+            for dx in -sd..=sd {
+                for dz in -sd..=sd {
+                    self.active_chunks.insert((cx + dx, cz + dz));
+                }
+            }
+        }
+    }
+
+    /// Returns whether the chunk at (cx, cz) is within simulation distance.
+    #[allow(dead_code)]
+    pub fn is_chunk_active(&self, cx: i32, cz: i32) -> bool {
+        self.active_chunks.contains(&(cx, cz))
     }
 
     /// Drains all pending messages from net tasks.
@@ -349,6 +413,7 @@ impl GameLoop {
         let mut event = PlayerJoinedEvent { info: snapshot };
         self.bus.dispatch(&mut event, &ctx);
         self.process_responses(uuid, &ctx.drain_responses());
+        self.rebuild_active_chunks();
     }
 
     /// Sends the initial world data to a newly connected player.
@@ -492,6 +557,7 @@ impl GameLoop {
         self.process_responses(uuid, &ctx.drain_responses());
 
         self.ecs.despawn(eid);
+        self.rebuild_active_chunks();
 
         // Broadcast leave to remaining players
         let remove_players = Arc::new(SharedBroadcast::new(BroadcastEvent::RemovePlayers {
@@ -607,6 +673,7 @@ impl GameLoop {
         let new_cz = (z as i32) >> 4;
         if new_cx != old_cx || new_cz != old_cz {
             self.stream_chunks(eid, new_cx, new_cz);
+            self.rebuild_active_chunks();
         }
     }
 
@@ -1017,7 +1084,17 @@ mod tests {
         }
 
         let ecs = basalt_ecs::Ecs::new();
-        let game_loop = GameLoop::new(bus, world, chunk_cache, game_rx, io_tx, ecs, Vec::new());
+        let game_loop = GameLoop::new(
+            bus,
+            world,
+            chunk_cache,
+            game_rx,
+            io_tx,
+            ecs,
+            Vec::new(),
+            8,
+            0,
+        );
         (game_loop, game_tx, io_rx)
     }
 
