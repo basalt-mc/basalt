@@ -50,20 +50,20 @@ fn palette_encode_diverse(b: &mut Bencher) {
 }
 
 #[bench]
-fn chunk_to_packet_flat(b: &mut Bencher) {
+fn chunk_encode_sections_flat(b: &mut Bencher) {
     let mut col = ChunkColumn::new(0, 0);
     FlatWorldGenerator.generate(&mut col);
     b.iter(|| {
-        black_box(col.to_packet());
+        black_box(col.encode_sections());
     });
 }
 
 #[bench]
-fn chunk_to_packet_noise(b: &mut Bencher) {
+fn chunk_encode_sections_noise(b: &mut Bencher) {
     let noise = NoiseTerrainGenerator::new(42);
     let mut col = ChunkColumn::new(0, 0);
     noise.generate(&mut col);
     b.iter(|| {
-        black_box(col.to_packet());
+        black_box(col.encode_sections());
     });
 }

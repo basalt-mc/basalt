@@ -91,6 +91,9 @@ impl Server {
         // Wrap the instant bus in Arc for sharing across net tasks
         let instant_bus = Arc::new(instant_bus);
 
+        // Shared chunk packet cache — net tasks encode on miss, game loop invalidates
+        let chunk_cache = Arc::new(net::chunk_cache::ChunkPacketCache::new(Arc::clone(&world)));
+
         // I/O thread — dedicated OS thread for async chunk persistence
         let io_thread = runtime::io_thread::IoThread::start(Arc::clone(&world));
 
@@ -116,6 +119,7 @@ impl Server {
         let mut game_loop_inst = game::GameLoop::new(
             game_bus,
             Arc::clone(&world),
+            Arc::clone(&chunk_cache),
             shared.game_rx,
             io_thread.sender(),
             ecs,
@@ -155,6 +159,7 @@ impl Server {
             let broadcast_tx = broadcast_tx.clone();
             let player_registry = Arc::clone(&player_registry);
             let world = Arc::clone(&world);
+            let chunk_cache = Arc::clone(&chunk_cache);
             tokio::spawn(async move {
                 if let Err(e) = net::connection::handle_connection(
                     stream,
@@ -165,6 +170,7 @@ impl Server {
                     broadcast_tx,
                     player_registry,
                     world,
+                    chunk_cache,
                 )
                 .await
                 {

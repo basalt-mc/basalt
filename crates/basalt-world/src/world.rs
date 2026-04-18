@@ -23,8 +23,6 @@ enum Generator {
 struct ChunkEntry {
     /// The chunk column data.
     column: ChunkColumn,
-    /// Cached encoded packet. Invalidated (set to `None`) when a block changes.
-    cached_packet: Option<basalt_protocol::packets::play::world::ClientboundPlayMapChunk>,
     /// Whether this chunk has been modified since the last persist to disk.
     dirty: bool,
     /// Monotonic access counter for approximate LRU eviction.
@@ -114,33 +112,24 @@ impl World {
 
     /// Returns a protocol packet for the chunk at (cx, cz).
     ///
-    /// Load order: packet cache -> encode from chunk -> disk -> generate.
-    /// Newly generated chunks are saved to disk, stored in memory,
-    /// and their encoded packets are cached.
-    pub fn get_chunk_packet(
-        &self,
-        cx: i32,
-        cz: i32,
-    ) -> basalt_protocol::packets::play::world::ClientboundPlayMapChunk {
+    /// Calls a closure with a reference to the chunk column at (cx, cz).
+    ///
+    /// Ensures the chunk is loaded (generating or reading from disk if
+    /// needed), bumps the LRU counter, and passes a reference to the
+    /// [`ChunkColumn`] into the closure. The return value of the closure
+    /// is forwarded to the caller.
+    pub fn with_chunk<R>(&self, cx: i32, cz: i32, f: impl FnOnce(&ChunkColumn) -> R) -> R {
         self.ensure_loaded(cx, cz);
 
         let mut entry = self.chunks.get_mut(&(cx, cz)).unwrap();
         entry.last_accessed = self.tick.fetch_add(1, Ordering::Relaxed);
-
-        if let Some(ref packet) = entry.cached_packet {
-            return packet.clone();
-        }
-
-        let packet = entry.column.to_packet();
-        entry.cached_packet = Some(packet.clone());
-        packet
+        f(&entry.column)
     }
 
     /// Sets a block at absolute world coordinates.
     ///
-    /// Loads the chunk if it isn't already in memory. Invalidates the
-    /// packet cache for the affected chunk so the next `get_chunk_packet`
-    /// call re-encodes it. Marks the chunk as dirty for persist-before-evict.
+    /// Loads the chunk if it isn't already in memory. Marks the chunk
+    /// as dirty for persist-before-evict.
     pub fn set_block(&self, x: i32, y: i32, z: i32, state: u16) {
         let cx = x >> 4;
         let cz = z >> 4;
@@ -151,7 +140,6 @@ impl World {
 
         let mut entry = self.chunks.get_mut(&(cx, cz)).unwrap();
         entry.column.set_block(local_x, y, local_z, state);
-        entry.cached_packet = None;
         entry.dirty = true;
         entry.last_accessed = self.tick.fetch_add(1, Ordering::Relaxed);
     }
@@ -214,7 +202,6 @@ impl World {
                 (cx, cz),
                 ChunkEntry {
                     column: col,
-                    cached_packet: None,
                     dirty: false,
                     last_accessed: tick,
                 },
@@ -241,7 +228,6 @@ impl World {
             (cx, cz),
             ChunkEntry {
                 column: col,
-                cached_packet: None,
                 dirty: false,
                 last_accessed: tick,
             },
@@ -301,26 +287,27 @@ mod tests {
         let world = World::new_memory(42);
         assert!(!world.is_chunk_loaded(0, 0));
 
-        let packet = world.get_chunk_packet(0, 0);
-        assert_eq!(packet.x, 0);
-        assert_eq!(packet.z, 0);
+        world.with_chunk(0, 0, |col| {
+            assert_eq!(col.x, 0);
+            assert_eq!(col.z, 0);
+        });
         assert!(world.is_chunk_loaded(0, 0));
     }
 
     #[test]
     fn world_caches_chunks() {
         let world = World::new_memory(42);
-        world.get_chunk_packet(0, 0);
-        world.get_chunk_packet(0, 0);
+        world.with_chunk(0, 0, |_| {});
+        world.with_chunk(0, 0, |_| {});
         assert_eq!(world.chunk_count(), 1);
     }
 
     #[test]
     fn world_generates_different_coords() {
         let world = World::new_memory(42);
-        world.get_chunk_packet(0, 0);
-        world.get_chunk_packet(1, 0);
-        world.get_chunk_packet(0, 1);
+        world.with_chunk(0, 0, |_| {});
+        world.with_chunk(1, 0, |_| {});
+        world.with_chunk(0, 1, |_| {});
         assert_eq!(world.chunk_count(), 3);
     }
 
@@ -336,13 +323,13 @@ mod tests {
         let world = World::new(42, dir.path());
 
         // Generate and save
-        world.get_chunk_packet(0, 0);
-        world.get_chunk_packet(1, 1);
+        world.with_chunk(0, 0, |_| {});
+        world.with_chunk(1, 1, |_| {});
 
         // Create a new world from the same directory — should load from disk
         let world2 = World::new(42, dir.path());
         assert!(!world2.is_chunk_loaded(0, 0)); // not in memory yet
-        world2.get_chunk_packet(0, 0); // loads from disk
+        world2.with_chunk(0, 0, |_| {}); // loads from disk
         assert!(world2.is_chunk_loaded(0, 0));
     }
 
@@ -350,20 +337,10 @@ mod tests {
     fn set_block_modifies_chunk() {
         let world = World::new_memory(42);
         // Load chunk first
-        world.get_chunk_packet(0, 0);
+        world.with_chunk(0, 0, |_| {});
         // Modify a block
         world.set_block(5, 64, 3, crate::block::STONE);
         assert_eq!(world.get_block(5, 64, 3), crate::block::STONE);
-    }
-
-    #[test]
-    fn set_block_invalidates_packet_cache() {
-        let world = World::new_memory(42);
-        let packet1 = world.get_chunk_packet(0, 0);
-        world.set_block(0, 64, 0, crate::block::STONE);
-        let packet2 = world.get_chunk_packet(0, 0);
-        // The re-encoded packet should reflect the new block
-        assert_ne!(packet1.chunk_data, packet2.chunk_data);
     }
 
     #[test]
@@ -421,7 +398,7 @@ mod tests {
 
         // Load 6 chunks — should trigger eviction
         for i in 0..6 {
-            world.get_chunk_packet(i, 0);
+            world.with_chunk(i, 0, |_| {});
         }
 
         // Should have evicted down to ~4-5 (90% of 5 = 4)
@@ -439,7 +416,7 @@ mod tests {
 
         // Load 4 more chunks to trigger eviction of (0,0)
         for i in 1..5 {
-            world.get_chunk_packet(i, 0);
+            world.with_chunk(i, 0, |_| {});
         }
 
         // (0,0) should have been evicted and persisted
@@ -453,15 +430,15 @@ mod tests {
 
         // Load 5 chunks
         for i in 0..5 {
-            world.get_chunk_packet(i, 0);
+            world.with_chunk(i, 0, |_| {});
         }
 
         // Re-access chunk (0,0) to refresh its timestamp
-        world.get_chunk_packet(0, 0);
+        world.with_chunk(0, 0, |_| {});
 
         // Load 2 more to trigger eviction
-        world.get_chunk_packet(5, 0);
-        world.get_chunk_packet(6, 0);
+        world.with_chunk(5, 0, |_| {});
+        world.with_chunk(6, 0, |_| {});
 
         // (0,0) should survive — it was recently accessed
         assert!(world.is_chunk_loaded(0, 0));

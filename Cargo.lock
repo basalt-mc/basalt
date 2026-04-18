@@ -318,7 +318,6 @@ dependencies = [
 name = "basalt-world"
 version = "0.1.0"
 dependencies = [
- "basalt-protocol",
  "basalt-storage",
  "basalt-types",
  "dashmap",

@@ -52,6 +52,7 @@ pub(crate) async fn handle_connection(
     broadcast_tx: broadcast::Sender<ServerOutput>,
     player_registry: Arc<DashMap<Uuid, mpsc::Sender<ServerOutput>>>,
     world: Arc<basalt_world::World>,
+    chunk_cache: Arc<crate::net::chunk_cache::ChunkPacketCache>,
 ) -> crate::error::Result<()> {
     let conn = Connection::<Handshake>::accept(stream);
 
@@ -71,6 +72,7 @@ pub(crate) async fn handle_connection(
                 broadcast_tx,
                 player_registry,
                 world,
+                chunk_cache,
             )
             .await
         }
@@ -115,6 +117,7 @@ async fn handle_login(
     broadcast_tx: broadcast::Sender<ServerOutput>,
     player_registry: Arc<DashMap<Uuid, mpsc::Sender<ServerOutput>>>,
     world: Arc<basalt_world::World>,
+    chunk_cache: Arc<crate::net::chunk_cache::ChunkPacketCache>,
 ) -> crate::error::Result<()> {
     let (username, player_uuid) = match conn.read_packet().await? {
         ServerboundLoginPacket::LoginStart(login) => {
@@ -147,6 +150,7 @@ async fn handle_login(
         broadcast_tx,
         player_registry,
         world,
+        chunk_cache,
     )
     .await
 }
@@ -164,6 +168,7 @@ async fn handle_configuration(
     broadcast_tx: broadcast::Sender<ServerOutput>,
     player_registry: Arc<DashMap<Uuid, mpsc::Sender<ServerOutput>>>,
     world: Arc<basalt_world::World>,
+    chunk_cache: Arc<crate::net::chunk_cache::ChunkPacketCache>,
 ) -> crate::error::Result<()> {
     let skin_username = username.to_string();
     let skin_task =
@@ -215,6 +220,7 @@ async fn handle_configuration(
             broadcast_tx,
             player_registry: Arc::clone(&player_registry),
             world,
+            chunk_cache,
             command_args: state.command_args.clone(),
         },
         output_rx,
