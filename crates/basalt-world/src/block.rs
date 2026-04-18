@@ -13,8 +13,8 @@ pub const STONE: u16 = 1;
 /// Dirt — soil block without grass.
 pub const DIRT: u16 = 10;
 
-/// Grass block — dirt with grass on top (non-snowy variant).
-pub const GRASS_BLOCK: u16 = 8;
+/// Grass block — dirt with grass on top (default: snowy=false).
+pub const GRASS_BLOCK: u16 = 9;
 
 /// Bedrock — indestructible bottom layer.
 pub const BEDROCK: u16 = 85;
@@ -153,6 +153,23 @@ pub fn item_to_default_block_state(item_id: i32) -> Option<u16> {
     if state == u16::MAX { None } else { Some(state) }
 }
 
+/// Returns the item ID that a block state drops when broken.
+///
+/// Performs a reverse lookup of the [`item_to_default_block_state`]
+/// table. Returns `None` for block states with no matching item
+/// (e.g., air, technical blocks) or non-default block state variants.
+pub fn block_state_to_item_id(state: u16) -> Option<i32> {
+    if state == 0 {
+        return None; // air drops nothing
+    }
+    for (item_id, &block_state) in ITEM_TO_BLOCK_STATE.iter().enumerate() {
+        if block_state == state {
+            return Some(item_id as i32);
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -192,5 +209,34 @@ mod tests {
     #[test]
     fn bedrock_mapping() {
         assert_eq!(item_to_default_block_state(58), Some(BEDROCK));
+    }
+
+    #[test]
+    fn stone_block_drops_stone_item() {
+        assert_eq!(block_state_to_item_id(STONE), Some(1));
+    }
+
+    #[test]
+    fn air_drops_nothing() {
+        assert_eq!(block_state_to_item_id(AIR), None);
+    }
+
+    #[test]
+    fn all_terrain_blocks_have_reverse_mapping() {
+        // Every block the terrain generators use must produce a drop
+        assert!(block_state_to_item_id(STONE).is_some(), "stone");
+        assert!(block_state_to_item_id(DIRT).is_some(), "dirt");
+        assert!(block_state_to_item_id(GRASS_BLOCK).is_some(), "grass_block");
+        assert!(block_state_to_item_id(SAND).is_some(), "sand");
+        assert!(block_state_to_item_id(GRAVEL).is_some(), "gravel");
+        assert!(block_state_to_item_id(BEDROCK).is_some(), "bedrock");
+        assert!(block_state_to_item_id(SNOW_BLOCK).is_some(), "snow_block");
+    }
+
+    #[test]
+    fn roundtrip_item_to_block_to_item() {
+        // Stone: item 1 -> block state 1 -> item 1
+        let state = item_to_default_block_state(1).unwrap();
+        assert_eq!(block_state_to_item_id(state), Some(1));
     }
 }
