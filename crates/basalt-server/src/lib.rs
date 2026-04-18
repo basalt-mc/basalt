@@ -122,6 +122,8 @@ impl Server {
         }
 
         // Game loop — single dedicated OS thread
+        let persistence_interval_ticks =
+            u64::from(self.config.server.persistence_interval_seconds) * u64::from(tps);
         let mut game_loop_inst = game::GameLoop::new(
             game_bus,
             Arc::clone(&world),
@@ -130,6 +132,8 @@ impl Server {
             io_thread.sender(),
             ecs,
             server_state.declare_commands.clone(),
+            self.config.server.simulation_distance,
+            persistence_interval_ticks,
         );
         let _game_loop = runtime::tick::TickLoop::start("game-loop", tps, move |tick| {
             if crash_on_panic {

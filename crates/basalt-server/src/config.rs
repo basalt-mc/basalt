@@ -48,6 +48,19 @@ pub struct ServerSection {
     ///   server continues operating. The network loop is unaffected
     ///   regardless of this setting.
     pub crash_on_plugin_panic: bool,
+    /// Simulation distance in chunks around each player.
+    ///
+    /// Only chunks within this radius of any player are "active" and
+    /// receive tick processing (entity simulation, future block updates).
+    /// Separate from view distance (which controls what the client sees).
+    /// Default: 8 chunks.
+    pub simulation_distance: i32,
+    /// Interval in seconds between dirty chunk flushes to disk.
+    ///
+    /// Modified chunks are batched and persisted periodically instead
+    /// of on every block change. Maximum data loss on crash equals
+    /// this interval. Default: 30 seconds.
+    pub persistence_interval_seconds: u32,
     /// Performance tuning.
     pub performance: PerformanceSection,
 }
@@ -188,6 +201,8 @@ impl Default for ServerSection {
             log_format: LogFormat::Pretty,
             tick_rate: 20,
             crash_on_plugin_panic: true,
+            simulation_distance: 8,
+            persistence_interval_seconds: 30,
             performance: PerformanceSection::default(),
         }
     }

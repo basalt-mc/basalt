@@ -1,19 +1,25 @@
-//! Storage plugin for chunk persistence.
+//! Storage plugin for chunk persistence configuration.
 //!
-//! Persists modified chunks to disk after block changes. Disabling
-//! this plugin means zero disk I/O on block changes — useful for
-//! lobby servers with read-only worlds.
+//! Chunk persistence is handled by the game loop's periodic flush
+//! system, which batches dirty chunks and sends them to the I/O thread
+//! every ~30 seconds (configurable via `persistence_interval_seconds`).
+//!
+//! This plugin exists as a feature flag: when disabled (read-only or
+//! lobby servers), the periodic flush is still active but `set_block`
+//! is the only code that marks chunks dirty — and without the block
+//! plugin, no mutations occur.
+//!
+//! The `PersistChunk` response is retained for explicit persistence
+//! requests (e.g., graceful shutdown), but is no longer used for
+//! per-mutation persistence.
 
 use basalt_api::prelude::*;
 
-/// Persists chunks to disk after block modifications.
+/// Chunk persistence feature flag.
 ///
-/// - **Post BlockBrokenEvent**: persists the affected chunk
-/// - **Post BlockPlacedEvent**: persists the affected chunk
-///
-/// Uses priority 10 to run after BlockPlugin's Post handlers
-/// (priority 0), ensuring the block change is committed before
-/// persistence.
+/// When registered, confirms that the server should persist block
+/// changes to disk. The actual persistence is handled by the game
+/// loop's batch flush system, not by per-event handlers.
 pub struct StoragePlugin;
 
 impl Plugin for StoragePlugin {
@@ -26,14 +32,9 @@ impl Plugin for StoragePlugin {
         }
     }
 
-    fn on_enable(&self, registrar: &mut PluginRegistrar) {
-        registrar.on::<BlockBrokenEvent>(Stage::Post, 10, |event, ctx| {
-            ctx.persist_chunk(event.x >> 4, event.z >> 4);
-        });
-
-        registrar.on::<BlockPlacedEvent>(Stage::Post, 10, |event, ctx| {
-            ctx.persist_chunk(event.x >> 4, event.z >> 4);
-        });
+    fn on_enable(&self, _registrar: &mut PluginRegistrar) {
+        // Persistence is handled by the game loop's periodic dirty
+        // chunk flush. No per-event handlers needed.
     }
 }
 
@@ -45,12 +46,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn storage_persists_to_disk() {
-        let dir = tempfile::tempdir().unwrap();
-        let world = std::sync::Arc::new(basalt_world::World::new(42, dir.path()));
-
-        let mut harness = PluginTestHarness::with_world(world);
-        // Block plugin sets the block, storage plugin persists
+    fn block_changes_mark_chunks_dirty() {
+        let mut harness = PluginTestHarness::new();
         harness.register(basalt_plugin_block::BlockPlugin);
         harness.register(StoragePlugin);
 
@@ -66,14 +63,21 @@ mod tests {
 
         harness.dispatch(&mut event);
 
-        // Verify persisted — fresh world should see the block
-        let world2 = basalt_world::World::new(42, dir.path());
-        assert_eq!(world2.get_block(5, 100, 3), basalt_world::block::STONE);
+        // Block should be set (by BlockPlugin)
+        assert_eq!(
+            harness.world().get_block(5, 100, 3),
+            basalt_world::block::STONE
+        );
+        // Chunk should be dirty (set_block marks it)
+        let dirty = harness.world().dirty_chunks();
+        assert!(
+            dirty.contains(&(0, 0)),
+            "chunk (0,0) should be dirty after block change"
+        );
     }
 
     #[test]
     fn storage_with_memory_world_does_not_panic() {
-        // Memory-only world (no disk) — persist_chunk is a no-op
         let mut harness = PluginTestHarness::new();
         harness.register(basalt_plugin_block::BlockPlugin);
         harness.register(StoragePlugin);
@@ -88,7 +92,6 @@ mod tests {
             cancelled: false,
         };
 
-        // Should not panic even though there's no disk storage
         harness.dispatch(&mut event);
         assert_eq!(
             harness.world().get_block(5, 100, 3),
