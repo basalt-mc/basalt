@@ -43,6 +43,100 @@ impl basalt_ecs::Component for OutputHandle {}
 struct Sneaking;
 impl basalt_ecs::Component for Sneaking {}
 
+/// A part of a container backed by a block entity.
+///
+/// Each part maps a range of window slots to a block entity at a
+/// specific position. A single chest has one part (27 slots), a
+/// double chest has two (27 + 27 = 54).
+#[derive(Debug, Clone)]
+struct ContainerPart {
+    /// Block position of this container part.
+    position: (i32, i32, i32),
+    /// First window slot index for this part.
+    slot_offset: usize,
+    /// Number of slots in this part.
+    slot_count: usize,
+}
+
+/// Describes an open container window.
+///
+/// Abstracts single chests, double chests, and future container types.
+/// The game loop builds a `ContainerView` when opening a container,
+/// and uses it to route window clicks to the correct block entity.
+#[derive(Debug, Clone)]
+struct ContainerView {
+    /// Total number of container slots (before player inventory).
+    size: usize,
+    /// The parts that compose this container.
+    parts: Vec<ContainerPart>,
+    /// Minecraft window inventory type (2 = 9x3, 5 = 9x6, etc.).
+    inventory_type: i32,
+    /// Window title.
+    title: String,
+}
+
+impl ContainerView {
+    /// Creates a view for a single chest.
+    fn single_chest(pos: (i32, i32, i32)) -> Self {
+        Self {
+            size: 27,
+            parts: vec![ContainerPart {
+                position: pos,
+                slot_offset: 0,
+                slot_count: 27,
+            }],
+            inventory_type: 2, // generic_9x3
+            title: "Chest".into(),
+        }
+    }
+
+    /// Creates a view for a double chest (left half first).
+    fn double_chest(left: (i32, i32, i32), right: (i32, i32, i32)) -> Self {
+        Self {
+            size: 54,
+            parts: vec![
+                ContainerPart {
+                    position: left,
+                    slot_offset: 0,
+                    slot_count: 27,
+                },
+                ContainerPart {
+                    position: right,
+                    slot_offset: 27,
+                    slot_count: 27,
+                },
+            ],
+            inventory_type: 5, // generic_9x6
+            title: "Large Chest".into(),
+        }
+    }
+
+    /// Finds which part owns a window slot and returns (position, local_index).
+    fn slot_to_part(&self, window_slot: i16) -> Option<((i32, i32, i32), usize)> {
+        let ws = window_slot as usize;
+        for part in &self.parts {
+            if ws >= part.slot_offset && ws < part.slot_offset + part.slot_count {
+                return Some((part.position, ws - part.slot_offset));
+            }
+        }
+        None
+    }
+
+    /// Maps a window slot to a player inventory index (after container slots).
+    fn slot_to_player_inv(&self, window_slot: i16) -> Option<usize> {
+        let ws = window_slot as usize;
+        if ws >= self.size && ws < self.size + 27 {
+            // Main inventory: internal 9-35
+            Some(ws - self.size + 9)
+        } else if ws >= self.size + 27 && ws < self.size + 36 {
+            // Hotbar: internal 0-8
+            Some(ws - self.size - 27)
+        } else {
+            None
+        }
+    }
+}
+
 /// Mojang skin texture data.
 ///
 /// Server-internal component storing skin properties for broadcasting
@@ -509,6 +603,31 @@ impl GameLoop {
                                 item_id,
                                 cursor_item.item_count,
                             );
+                        }
+                        // Broadcast chest close animation if no other viewers
+                        if let Some(oc) = self.ecs.get::<basalt_ecs::OpenContainer>(eid) {
+                            let pos = oc.position;
+                            let remaining = self
+                                .ecs
+                                .iter::<basalt_ecs::OpenContainer>()
+                                .filter(|(id, oc2)| *id != eid && oc2.position == pos)
+                                .count() as u8;
+                            let view = self.build_chest_view(pos.0, pos.1, pos.2);
+                            for part in &view.parts {
+                                let (px, py, pz) = part.position;
+                                for (e, _) in self.ecs.iter::<OutputHandle>() {
+                                    self.send_to(e, |tx| {
+                                        let _ = tx.try_send(ServerOutput::BlockAction {
+                                            x: px,
+                                            y: py,
+                                            z: pz,
+                                            action_id: 1,
+                                            action_param: remaining,
+                                            block_id: 185,
+                                        });
+                                    });
+                                }
+                            }
                         }
                         self.ecs.remove_component::<basalt_ecs::OpenContainer>(eid);
                     }
@@ -1424,65 +1543,80 @@ impl GameLoop {
                 basalt_world::block_entity::BlockEntity::empty_chest(),
             );
 
-            // Check for adjacent single chest to form a double chest
-            // Sneaking prevents pairing (vanilla behavior)
+            // Double chest pairing logic:
+            // - Not sneaking: scan adjacent blocks for a single chest to pair with
+            // - Sneaking + clicked a chest: pair only with the clicked chest
+            // - Sneaking + clicked non-chest: no pairing (single chest)
             let facing = basalt_world::block::chest_facing(block_state);
-            let offsets = basalt_world::block::chest_adjacent_offsets(facing);
             let mut paired = false;
-            if !is_sneaking {
-                for (dx, dz) in offsets {
-                    let nx = px + dx;
-                    let nz = pz + dz;
-                    let neighbor = self.world.get_block(nx, py, nz);
-                    if basalt_world::block::is_single_chest(neighbor)
-                        && basalt_world::block::chest_facing(neighbor) == facing
-                    {
-                        let (new_type, existing_type) =
-                            basalt_world::block::chest_double_types(facing, dx, dz);
-                        // Update new chest to left/right
-                        let new_state = basalt_world::block::chest_state(facing, new_type);
-                        self.world.set_block(px, py, pz, new_state);
-                        // Update existing chest to the other type
-                        let neighbor_state =
-                            basalt_world::block::chest_state(facing, existing_type);
-                        self.world.set_block(nx, py, nz, neighbor_state);
-                        // Invalidate chunk caches
-                        self.chunk_cache.invalidate(px >> 4, pz >> 4);
-                        self.chunk_cache.invalidate(nx >> 4, nz >> 4);
-                        // Broadcast both block changes
-                        for (e, _) in self.ecs.iter::<OutputHandle>() {
-                            self.send_to(e, |tx| {
-                                let _ = tx.try_send(ServerOutput::BlockChanged {
-                                    x: px,
-                                    y: py,
-                                    z: pz,
-                                    state: i32::from(new_state),
-                                });
-                                let _ = tx.try_send(ServerOutput::BlockEntityData {
-                                    x: px,
-                                    y: py,
-                                    z: pz,
-                                    action: 2,
-                                });
-                                let _ = tx.try_send(ServerOutput::BlockChanged {
-                                    x: nx,
-                                    y: py,
-                                    z: nz,
-                                    state: i32::from(neighbor_state),
-                                });
-                                let _ = tx.try_send(ServerOutput::BlockEntityData {
-                                    x: nx,
-                                    y: py,
-                                    z: nz,
-                                    action: 2,
-                                });
-                            });
-                        }
-                        paired = true;
-                        break;
-                    }
+
+            // Build candidate list: either all adjacent or just the clicked chest
+            let candidates: Vec<(i32, i32)> = if !is_sneaking {
+                basalt_world::block::chest_adjacent_offsets(facing)
+                    .iter()
+                    .map(|&(ddx, ddz)| (px + ddx, pz + ddz))
+                    .collect()
+            } else if basalt_world::block::is_chest(clicked_state) {
+                // Sneaking on a chest: pair only if new chest is lateral (left/right)
+                let valid_offsets = basalt_world::block::chest_adjacent_offsets(facing);
+                let actual_offset = (px - x, pz - z);
+                if valid_offsets.contains(&actual_offset) {
+                    vec![(x, z)]
+                } else {
+                    vec![] // front/back placement: no pairing
                 }
-            } // end if !is_sneaking
+            } else {
+                vec![] // sneaking on non-chest: no pairing
+            };
+
+            for &(nx, nz) in &candidates {
+                let neighbor = self.world.get_block(nx, py, nz);
+                if basalt_world::block::is_single_chest(neighbor)
+                    && basalt_world::block::chest_facing(neighbor) == facing
+                {
+                    // Compute offset from new chest to neighbor
+                    let ddx = nx - px;
+                    let ddz = nz - pz;
+                    let (new_type, existing_type) =
+                        basalt_world::block::chest_double_types(facing, ddx, ddz);
+                    let new_state = basalt_world::block::chest_state(facing, new_type);
+                    self.world.set_block(px, py, pz, new_state);
+                    let neighbor_state = basalt_world::block::chest_state(facing, existing_type);
+                    self.world.set_block(nx, py, nz, neighbor_state);
+                    self.chunk_cache.invalidate(px >> 4, pz >> 4);
+                    self.chunk_cache.invalidate(nx >> 4, nz >> 4);
+                    for (e, _) in self.ecs.iter::<OutputHandle>() {
+                        self.send_to(e, |tx| {
+                            let _ = tx.try_send(ServerOutput::BlockChanged {
+                                x: px,
+                                y: py,
+                                z: pz,
+                                state: i32::from(new_state),
+                            });
+                            let _ = tx.try_send(ServerOutput::BlockEntityData {
+                                x: px,
+                                y: py,
+                                z: pz,
+                                action: 2,
+                            });
+                            let _ = tx.try_send(ServerOutput::BlockChanged {
+                                x: nx,
+                                y: py,
+                                z: nz,
+                                state: i32::from(neighbor_state),
+                            });
+                            let _ = tx.try_send(ServerOutput::BlockEntityData {
+                                x: nx,
+                                y: py,
+                                z: nz,
+                                action: 2,
+                            });
+                        });
+                    }
+                    paired = true;
+                    break;
+                }
+            }
 
             if !paired {
                 // Single chest — broadcast normally
@@ -1719,55 +1853,124 @@ impl GameLoop {
                 basalt_world::block_entity::BlockEntity::empty_chest(),
             );
         }
+        let view = self.build_chest_view(x, y, z);
+        self.open_container(eid, &view);
+    }
 
+    /// Opens a container window for a player using a generic ContainerView.
+    fn open_container(&mut self, eid: basalt_ecs::EntityId, view: &ContainerView) {
         let window_id = self.alloc_window_id();
+        let mut window_slots = Vec::with_capacity(view.size + 36);
 
-        // Build the container window slots: 27 chest + 36 player inventory
-        let mut window_slots = Vec::with_capacity(63);
-
-        // Chest slots (0-26)
-        if let Some(be) = self.world.get_block_entity(x, y, z) {
-            match &*be {
-                basalt_world::block_entity::BlockEntity::Chest { slots } => {
-                    window_slots.extend_from_slice(slots.as_ref());
+        // Container slots from block entities
+        for part in &view.parts {
+            let (px, py, pz) = part.position;
+            if self.world.get_block_entity(px, py, pz).is_none() {
+                self.world.set_block_entity(
+                    px,
+                    py,
+                    pz,
+                    basalt_world::block_entity::BlockEntity::empty_chest(),
+                );
+            }
+            if let Some(be) = self.world.get_block_entity(px, py, pz) {
+                match &*be {
+                    basalt_world::block_entity::BlockEntity::Chest { slots } => {
+                        window_slots.extend_from_slice(&slots[..part.slot_count.min(slots.len())]);
+                    }
                 }
             }
         }
 
-        // Player main inventory (window 27-53) = internal 9-35
-        // Player hotbar (window 54-62) = internal 0-8
+        // Player inventory
         if let Some(inv) = self.ecs.get::<basalt_ecs::Inventory>(eid) {
-            window_slots.extend_from_slice(&inv.slots[9..]); // main: 27 slots
-            window_slots.extend_from_slice(&inv.slots[..9]); // hotbar: 9 slots
+            window_slots.extend_from_slice(&inv.slots[9..]); // main
+            window_slots.extend_from_slice(&inv.slots[..9]); // hotbar
         }
 
-        // Set OpenContainer on the player
+        let container_pos = view.parts.first().map_or((0, 0, 0), |p| p.position);
         self.ecs.set(
             eid,
             basalt_ecs::OpenContainer {
                 window_id,
-                position: (x, y, z),
+                position: container_pos,
             },
         );
 
-        // Send OpenWindow + contents
-        let title = basalt_types::TextComponent::text("Chest").to_nbt();
         self.send_to(eid, |tx| {
             let _ = tx.try_send(ServerOutput::OpenWindow {
                 window_id,
-                inventory_type: 2, // generic_9x3
-                title,
+                inventory_type: view.inventory_type,
+                title: basalt_types::TextComponent::text(&view.title).to_nbt(),
                 slots: window_slots,
             });
         });
+
+        // Broadcast chest open animation to all players
+        // Count how many players are viewing each part
+        for part in &view.parts {
+            let (px, py, pz) = part.position;
+            let viewer_count = self
+                .ecs
+                .iter::<basalt_ecs::OpenContainer>()
+                .filter(|(_, oc)| oc.position == container_pos)
+                .count() as u8;
+            for (e, _) in self.ecs.iter::<OutputHandle>() {
+                self.send_to(e, |tx| {
+                    let _ = tx.try_send(ServerOutput::BlockAction {
+                        x: px,
+                        y: py,
+                        z: pz,
+                        action_id: 1,
+                        action_param: viewer_count.max(1),
+                        block_id: 185, // chest block registry ID
+                    });
+                });
+            }
+        }
+    }
+
+    /// Builds a ContainerView for a chest at the given position.
+    fn build_chest_view(&self, x: i32, y: i32, z: i32) -> ContainerView {
+        let state = self.world.get_block(x, y, z);
+        let ct = basalt_world::block::chest_type(state);
+        if ct == 0 {
+            return ContainerView::single_chest((x, y, z));
+        }
+        let facing = basalt_world::block::chest_facing(state);
+        let other = basalt_world::block::chest_adjacent_offsets(facing)
+            .iter()
+            .find_map(|&(dx, dz)| {
+                let nx = x + dx;
+                let nz = z + dz;
+                let n = self.world.get_block(nx, y, nz);
+                if basalt_world::block::is_chest(n)
+                    && basalt_world::block::chest_facing(n) == facing
+                    && basalt_world::block::chest_type(n) != 0
+                    && basalt_world::block::chest_type(n) != ct
+                {
+                    Some((nx, y, nz))
+                } else {
+                    None
+                }
+            });
+        match other {
+            Some(other_pos) => {
+                let (left, right) = if ct == 1 {
+                    ((x, y, z), other_pos)
+                } else {
+                    (other_pos, (x, y, z))
+                };
+                ContainerView::double_chest(left, right)
+            }
+            None => ContainerView::single_chest((x, y, z)),
+        }
     }
 
     /// Handles a WindowClick that targets an open container.
     ///
-    /// Container window slot layout for generic_9x3 (chest):
-    /// - 0-26: chest slots
-    /// - 27-53: player main inventory (our 9-35)
-    /// - 54-62: player hotbar (our 0-8)
+    /// Uses [`ContainerView`] to generically route slots to the correct
+    /// block entity or player inventory.
     fn handle_container_click(
         &mut self,
         eid: basalt_ecs::EntityId,
@@ -1775,38 +1978,29 @@ impl GameLoop {
         changed_slots: &[(i16, basalt_types::Slot)],
         cursor_item: basalt_types::Slot,
     ) {
-        let (cx, cy, cz) = container_pos;
+        let view = self.build_chest_view(container_pos.0, container_pos.1, container_pos.2);
 
         for (window_slot, item) in changed_slots {
-            let ws = *window_slot;
-            if (0..27).contains(&ws) {
-                // Chest slot
-                if let Some(mut be) = self.world.get_block_entity_mut(cx, cy, cz) {
+            if let Some((pos, local_idx)) = view.slot_to_part(*window_slot) {
+                // Container slot → update block entity
+                if let Some(mut be) = self.world.get_block_entity_mut(pos.0, pos.1, pos.2) {
                     match &mut *be {
                         basalt_world::block_entity::BlockEntity::Chest { slots } => {
-                            slots[ws as usize] = item.clone();
+                            if local_idx < slots.len() {
+                                slots[local_idx] = item.clone();
+                            }
                         }
                     }
                 }
-                // Mark chunk dirty for persistence
-                self.world.mark_chunk_dirty(cx >> 4, cz >> 4);
-                // Invalidate chunk cache (block entity data changed)
-                self.chunk_cache.invalidate(cx >> 4, cz >> 4);
-                // Notify other viewers
-                self.notify_container_viewers(container_pos, eid, ws, item);
-            } else if (27..54).contains(&ws) {
-                // Player main inventory: window 27-53 → internal 9-35
-                let idx = (ws - 27 + 9) as usize;
+                self.world.mark_chunk_dirty(pos.0 >> 4, pos.2 >> 4);
+                self.chunk_cache.invalidate(pos.0 >> 4, pos.2 >> 4);
+                self.notify_container_viewers(container_pos, eid, *window_slot, item);
+            } else if let Some(inv_idx) = view.slot_to_player_inv(*window_slot) {
+                // Player inventory slot
                 if let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid)
-                    && idx < 36
+                    && inv_idx < 36
                 {
-                    inv.slots[idx] = item.clone();
-                }
-            } else if (54..63).contains(&ws) {
-                // Player hotbar: window 54-62 → internal 0-8
-                let idx = (ws - 54) as usize;
-                if let Some(inv) = self.ecs.get_mut::<basalt_ecs::Inventory>(eid) {
-                    inv.slots[idx] = item.clone();
+                    inv.slots[inv_idx] = item.clone();
                 }
             }
         }
