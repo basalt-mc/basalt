@@ -66,7 +66,7 @@ impl GameLoop {
 /// Sends a PlayerInfo "add player" packet (manually encoded due to switch fields).
 pub(crate) fn send_player_info_add(
     output_tx: &mpsc::Sender<ServerOutput>,
-    info: &basalt_api::PlayerSnapshot,
+    info: &basalt_api::broadcast::PlayerSnapshot,
 ) {
     use basalt_protocol::packets::play::player::ClientboundPlayPlayerInfo;
 
@@ -100,7 +100,7 @@ pub(crate) fn send_player_info_add(
 /// Sends a SpawnEntity packet for a player entity.
 pub(crate) fn send_spawn_entity(
     output_tx: &mpsc::Sender<ServerOutput>,
-    info: &basalt_api::PlayerSnapshot,
+    info: &basalt_api::broadcast::PlayerSnapshot,
 ) {
     let packet = ClientboundPlaySpawnEntity {
         entity_id: info.entity_id,

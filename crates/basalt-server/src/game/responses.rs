@@ -13,7 +13,7 @@ impl GameLoop {
     pub(super) fn process_responses(&mut self, source_uuid: Uuid, responses: &[Response]) {
         for response in responses {
             match response {
-                Response::Broadcast(basalt_api::BroadcastMessage::BlockChanged {
+                Response::Broadcast(basalt_api::broadcast::BroadcastMessage::BlockChanged {
                     x,
                     y,
                     z,
@@ -33,7 +33,7 @@ impl GameLoop {
                         });
                     }
                 }
-                Response::Broadcast(basalt_api::BroadcastMessage::Chat { content }) => {
+                Response::Broadcast(basalt_api::broadcast::BroadcastMessage::Chat { content }) => {
                     let bc = Arc::new(SharedBroadcast::new(BroadcastEvent::SystemChat {
                         content: content.clone(),
                         action_bar: false,
@@ -46,7 +46,7 @@ impl GameLoop {
                 }
                 Response::Broadcast(_) => {}
                 Response::SendBlockAck { sequence } => {
-                    if let Some(eid) = self.ecs.find_by_uuid(source_uuid)
+                    if let Some(eid) = self.find_by_uuid(source_uuid)
                         && let Some(handle) = self.ecs.get::<OutputHandle>(eid)
                     {
                         let _ = handle.tx.try_send(ServerOutput::BlockAck {
@@ -58,7 +58,7 @@ impl GameLoop {
                     content,
                     action_bar,
                 } => {
-                    if let Some(eid) = self.ecs.find_by_uuid(source_uuid)
+                    if let Some(eid) = self.find_by_uuid(source_uuid)
                         && let Some(handle) = self.ecs.get::<OutputHandle>(eid)
                     {
                         let _ = handle.tx.try_send(ServerOutput::SystemChat {
@@ -75,8 +75,8 @@ impl GameLoop {
                     yaw,
                     pitch,
                 } => {
-                    if let Some(eid) = self.ecs.find_by_uuid(source_uuid) {
-                        if let Some(pos) = self.ecs.get_mut::<basalt_ecs::Position>(eid) {
+                    if let Some(eid) = self.find_by_uuid(source_uuid) {
+                        if let Some(pos) = self.ecs.get_mut::<basalt_core::Position>(eid) {
                             pos.x = *x;
                             pos.y = *y;
                             pos.z = *z;
@@ -94,12 +94,12 @@ impl GameLoop {
                     }
                 }
                 Response::StreamChunks { new_cx, new_cz } => {
-                    if let Some(eid) = self.ecs.find_by_uuid(source_uuid) {
+                    if let Some(eid) = self.find_by_uuid(source_uuid) {
                         self.stream_chunks(eid, *new_cx, *new_cz);
                     }
                 }
                 Response::SendGameStateChange { reason, value } => {
-                    if let Some(eid) = self.ecs.find_by_uuid(source_uuid)
+                    if let Some(eid) = self.find_by_uuid(source_uuid)
                         && let Some(handle) = self.ecs.get::<OutputHandle>(eid)
                     {
                         let _ = handle.tx.try_send(ServerOutput::GameStateChange {
@@ -126,7 +126,7 @@ impl GameLoop {
                     self.spawn_item_entity(*x, *y, *z, *item_id, *count);
                 }
                 Response::OpenChest { x, y, z } => {
-                    if let Some(eid) = self.ecs.find_by_uuid(source_uuid) {
+                    if let Some(eid) = self.find_by_uuid(source_uuid) {
                         self.open_chest(eid, *x, *y, *z);
                     }
                 }

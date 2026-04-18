@@ -31,28 +31,28 @@ impl GameLoop {
         self.ecs.spawn_with_id(eid);
         self.ecs.set(
             eid,
-            basalt_ecs::PlayerRef {
+            basalt_core::PlayerRef {
                 uuid,
                 username: username.clone(),
             },
         );
         self.ecs.set(
             eid,
-            basalt_ecs::Position {
+            basalt_core::Position {
                 x: position.0,
                 y: position.1,
                 z: position.2,
             },
         );
-        self.ecs.set(eid, basalt_ecs::Rotation { yaw, pitch });
+        self.ecs.set(eid, basalt_core::Rotation { yaw, pitch });
         self.ecs.set(
             eid,
-            basalt_ecs::BoundingBox {
+            basalt_core::BoundingBox {
                 width: 0.6,
                 height: 1.8,
             },
         );
-        self.ecs.set(eid, basalt_ecs::Inventory::empty());
+        self.ecs.set(eid, basalt_core::Inventory::empty());
         self.ecs.set(
             eid,
             SkinData {
@@ -61,13 +61,13 @@ impl GameLoop {
         );
         self.ecs.set(eid, ChunkView::empty());
         self.ecs.set(eid, OutputHandle { tx: output_tx });
-        self.ecs.index_uuid(uuid, eid);
+        self.index_uuid(uuid, eid);
 
         // Send initial world data
         self.send_initial_world(eid, entity_id, position);
 
         // Send existing players to the new player + broadcast join
-        let snapshot = basalt_api::PlayerSnapshot {
+        let snapshot = basalt_api::broadcast::PlayerSnapshot {
             username: username.clone(),
             uuid,
             entity_id,
@@ -85,7 +85,7 @@ impl GameLoop {
         // Send all existing players to the new player, and broadcast join to them
         let other_eids: Vec<basalt_ecs::EntityId> = self
             .ecs
-            .iter::<basalt_ecs::PlayerRef>()
+            .iter::<basalt_core::PlayerRef>()
             .filter(|&(id, _)| id != eid)
             .map(|(id, _)| id)
             .collect();
@@ -93,16 +93,16 @@ impl GameLoop {
         for other_eid in &other_eids {
             // Build snapshot of existing player
             if let (Some(pr), Some(pos), Some(rot)) = (
-                self.ecs.get::<basalt_ecs::PlayerRef>(*other_eid),
-                self.ecs.get::<basalt_ecs::Position>(*other_eid),
-                self.ecs.get::<basalt_ecs::Rotation>(*other_eid),
+                self.ecs.get::<basalt_core::PlayerRef>(*other_eid),
+                self.ecs.get::<basalt_core::Position>(*other_eid),
+                self.ecs.get::<basalt_core::Rotation>(*other_eid),
             ) {
                 let skin = self
                     .ecs
                     .get::<SkinData>(*other_eid)
                     .map(|s| s.properties.clone())
                     .unwrap_or_default();
-                let other_snapshot = basalt_api::PlayerSnapshot {
+                let other_snapshot = basalt_api::broadcast::PlayerSnapshot {
                     username: pr.username.clone(),
                     uuid: pr.uuid,
                     entity_id: *other_eid as i32,
@@ -146,7 +146,7 @@ impl GameLoop {
 
         // Dispatch PlayerJoinedEvent
         let ctx = self.make_context(uuid, entity_id, &username, yaw, pitch);
-        let mut event = PlayerJoinedEvent { info: snapshot };
+        let mut event = PlayerJoinedEvent;
         self.bus.dispatch(&mut event, &ctx);
         self.process_responses(uuid, &ctx.drain_responses());
         self.rebuild_active_chunks();
@@ -264,7 +264,7 @@ impl GameLoop {
         });
 
         // Sync full inventory
-        if let Some(inv) = self.ecs.get::<basalt_ecs::Inventory>(eid) {
+        if let Some(inv) = self.ecs.get::<basalt_core::Inventory>(eid) {
             let protocol_slots = inv.to_protocol_slots();
             self.send_to(eid, |tx| {
                 let _ = tx.try_send(ServerOutput::SyncInventory {
@@ -276,12 +276,12 @@ impl GameLoop {
 
     /// Handles a player disconnection.
     pub(super) fn handle_player_disconnected(&mut self, uuid: Uuid) {
-        let Some(eid) = self.ecs.find_by_uuid(uuid) else {
+        let Some(eid) = self.find_by_uuid(uuid) else {
             return;
         };
 
         let (entity_id, username) = {
-            let Some(pr) = self.ecs.get::<basalt_ecs::PlayerRef>(eid) else {
+            let Some(pr) = self.ecs.get::<basalt_core::PlayerRef>(eid) else {
                 return;
             };
             (eid as i32, pr.username.clone())
@@ -289,15 +289,12 @@ impl GameLoop {
 
         // Dispatch PlayerLeftEvent
         let ctx = self.make_context(uuid, entity_id, &username, 0.0, 0.0);
-        let mut event = PlayerLeftEvent {
-            uuid,
-            entity_id,
-            username: username.clone(),
-        };
+        let mut event = PlayerLeftEvent;
         self.bus.dispatch(&mut event, &ctx);
         self.process_responses(uuid, &ctx.drain_responses());
 
         self.ecs.despawn(eid);
+        self.remove_uuid(uuid);
         self.rebuild_active_chunks();
 
         // Broadcast leave to remaining players
@@ -336,11 +333,11 @@ mod tests {
         let (mut game_loop, game_tx, _io_rx) = super::super::tests::test_game_loop();
         let uuid = Uuid::from_bytes([1; 16]);
         let _rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
-        assert!(game_loop.ecs.find_by_uuid(uuid).is_some());
+        assert!(game_loop.find_by_uuid(uuid).is_some());
 
         let _ = game_tx.send(GameInput::PlayerDisconnected { uuid });
         game_loop.tick(1);
-        assert!(game_loop.ecs.find_by_uuid(uuid).is_none());
+        assert!(game_loop.find_by_uuid(uuid).is_none());
     }
 
     #[test]
@@ -362,12 +359,12 @@ mod tests {
         let uuid = Uuid::from_bytes([1; 16]);
         let _rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
 
-        let eid = game_loop.ecs.find_by_uuid(uuid).unwrap();
-        assert!(game_loop.ecs.has::<basalt_ecs::Position>(eid));
-        assert!(game_loop.ecs.has::<basalt_ecs::Rotation>(eid));
-        assert!(game_loop.ecs.has::<basalt_ecs::BoundingBox>(eid));
-        assert!(game_loop.ecs.has::<basalt_ecs::Inventory>(eid));
-        assert!(game_loop.ecs.has::<basalt_ecs::PlayerRef>(eid));
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
+        assert!(game_loop.ecs.has::<basalt_core::Position>(eid));
+        assert!(game_loop.ecs.has::<basalt_core::Rotation>(eid));
+        assert!(game_loop.ecs.has::<basalt_core::BoundingBox>(eid));
+        assert!(game_loop.ecs.has::<basalt_core::Inventory>(eid));
+        assert!(game_loop.ecs.has::<basalt_core::PlayerRef>(eid));
         assert!(game_loop.ecs.has::<super::super::SkinData>(eid));
         assert!(game_loop.ecs.has::<super::super::ChunkView>(eid));
         assert!(game_loop.ecs.has::<super::super::OutputHandle>(eid));
