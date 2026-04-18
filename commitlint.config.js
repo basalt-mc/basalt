@@ -310,6 +310,12 @@ const physics = [
   'physics',
 ];
 
+const drops = [
+  // Drops plugin: item entity spawning on block break.
+  // Example: "feat(drops): spawn item entity on block break"
+  'drops',
+];
+
 const keywords = [
   // Root workspace configuration: Cargo.toml workspace settings, workspace-wide
   // dependency versions, cross-crate build configuration.
@@ -370,7 +376,7 @@ const keywords = [
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...ecs, ...physics, ...keywords]],
+    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...ecs, ...physics, ...drops, ...keywords]],
     'scope-empty': [2, 'never'],
   },
 };
