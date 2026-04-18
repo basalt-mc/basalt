@@ -11,13 +11,14 @@
 //! harness.register(MyPlugin);
 //!
 //! // Dispatch an event
-//! let mut event = BlockBrokenEvent { x: 5, y: 64, z: 3, ... };
-//! let responses = harness.dispatch(&mut event);
-//! assert_eq!(responses.len(), 2);
+//! let mut event = BlockBrokenEvent { position: BlockPosition { x: 5, y: 64, z: 3 }, ... };
+//! let result = harness.dispatch(&mut event);
+//! assert_eq!(result.len(), 2);
+//! assert!(result.has_block_ack());
 //!
 //! // Execute a command
-//! let responses = harness.dispatch_command("tp 10 64 -5");
-//! assert!(matches!(responses[0], Response::SendPosition { .. }));
+//! let result = harness.dispatch_command("tp 10 64 -5");
+//! assert!(result.has_teleport());
 //! ```
 
 use std::sync::Arc;
@@ -153,8 +154,8 @@ impl PluginTestHarness {
         )
     }
 
-    /// Dispatches an event and returns the queued responses.
-    pub fn dispatch(&self, event: &mut dyn Event) -> Vec<Response> {
+    /// Dispatches an event and returns a [`DispatchResult`] for assertions.
+    pub fn dispatch(&self, event: &mut dyn Event) -> DispatchResult {
         let ctx = self.context();
         self.dispatch_routed(event, &ctx);
         let responses = ctx.drain_responses();
@@ -163,13 +164,15 @@ impl PluginTestHarness {
                 self.world.persist_chunk(chunk.x, chunk.z);
             }
         }
-        responses
+        DispatchResult { responses }
     }
 
-    /// Dispatches an event with a specific context and returns responses.
-    pub fn dispatch_with(&self, event: &mut dyn Event, ctx: &ServerContext) -> Vec<Response> {
+    /// Dispatches an event with a specific context and returns a [`DispatchResult`].
+    pub fn dispatch_with(&self, event: &mut dyn Event, ctx: &ServerContext) -> DispatchResult {
         self.dispatch_routed(event, ctx);
-        ctx.drain_responses()
+        DispatchResult {
+            responses: ctx.drain_responses(),
+        }
     }
 
     /// Executes a command by name and returns the responses.
@@ -182,7 +185,8 @@ impl PluginTestHarness {
     /// ```ignore
     /// let responses = harness.dispatch_command("tp 10 64 -5");
     /// ```
-    pub fn dispatch_command(&self, command: &str) -> Vec<Response> {
+    /// Executes a command by name and returns a [`DispatchResult`].
+    pub fn dispatch_command(&self, command: &str) -> DispatchResult {
         let ctx = self.context();
         ctx.set_command_list(
             self.commands
@@ -201,7 +205,9 @@ impl PluginTestHarness {
         {
             (entry.handler)(&parsed, &ctx);
         }
-        ctx.drain_responses()
+        DispatchResult {
+            responses: ctx.drain_responses(),
+        }
     }
 
     /// Returns a reference to the collected command entries.
@@ -221,6 +227,141 @@ impl PluginTestHarness {
 impl Default for PluginTestHarness {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Result of dispatching an event through the test harness.
+///
+/// Wraps the internal response queue and provides high-level assertion
+/// methods. Plugin tests use this instead of inspecting `Response`
+/// variants directly.
+pub struct DispatchResult {
+    responses: Vec<Response>,
+}
+
+impl DispatchResult {
+    /// Returns the number of queued responses.
+    pub fn len(&self) -> usize {
+        self.responses.len()
+    }
+
+    /// Returns true if no responses were queued.
+    pub fn is_empty(&self) -> bool {
+        self.responses.is_empty()
+    }
+
+    /// Returns true if any response is a block acknowledgement.
+    pub fn has_block_ack(&self) -> bool {
+        self.responses
+            .iter()
+            .any(|r| matches!(r, Response::SendBlockAck { .. }))
+    }
+
+    /// Returns true if any response is a block ack with the given sequence.
+    pub fn has_block_ack_seq(&self, seq: i32) -> bool {
+        self.responses
+            .iter()
+            .any(|r| matches!(r, Response::SendBlockAck { sequence } if *sequence == seq))
+    }
+
+    /// Returns true if any response is a system chat message.
+    pub fn has_system_chat(&self) -> bool {
+        self.responses
+            .iter()
+            .any(|r| matches!(r, Response::SendSystemChat { .. }))
+    }
+
+    /// Returns true if any response is a teleport.
+    pub fn has_teleport(&self) -> bool {
+        self.responses
+            .iter()
+            .any(|r| matches!(r, Response::SendPosition { .. }))
+    }
+
+    /// Returns true if any response is a game state change.
+    pub fn has_game_state_change(&self) -> bool {
+        self.responses
+            .iter()
+            .any(|r| matches!(r, Response::SendGameStateChange { .. }))
+    }
+
+    /// Returns true if any response is a chat broadcast.
+    pub fn has_chat_broadcast(&self) -> bool {
+        self.responses.iter().any(|r| {
+            matches!(
+                r,
+                Response::Broadcast(basalt_core::BroadcastMessage::Chat { .. })
+            )
+        })
+    }
+
+    /// Returns true if any response is a block change broadcast.
+    pub fn has_block_change_broadcast(&self) -> bool {
+        self.responses.iter().any(|r| {
+            matches!(
+                r,
+                Response::Broadcast(basalt_core::BroadcastMessage::BlockChanged { .. })
+            )
+        })
+    }
+
+    /// Returns true if any response is an entity moved broadcast.
+    pub fn has_entity_moved_broadcast(&self) -> bool {
+        self.responses.iter().any(|r| {
+            matches!(
+                r,
+                Response::Broadcast(basalt_core::BroadcastMessage::EntityMoved { .. })
+            )
+        })
+    }
+
+    /// Returns true if any response is a player joined broadcast.
+    pub fn has_player_joined_broadcast(&self) -> bool {
+        self.responses.iter().any(|r| {
+            matches!(
+                r,
+                Response::Broadcast(basalt_core::BroadcastMessage::PlayerJoined { .. })
+            )
+        })
+    }
+
+    /// Returns true if any response is a player left broadcast.
+    pub fn has_player_left_broadcast(&self) -> bool {
+        self.responses.iter().any(|r| {
+            matches!(
+                r,
+                Response::Broadcast(basalt_core::BroadcastMessage::PlayerLeft { .. })
+            )
+        })
+    }
+
+    /// Returns true if any response streams chunks to the given position.
+    pub fn has_stream_chunks(&self, x: i32, z: i32) -> bool {
+        self.responses.iter().any(|r| {
+            matches!(
+                r,
+                Response::StreamChunks(basalt_core::ChunkPosition { x: cx, z: cz })
+                if *cx == x && *cz == z
+            )
+        })
+    }
+
+    /// Returns true if any response spawns a dropped item with the given ID and count.
+    pub fn has_spawn_dropped_item(&self, item_id: i32, count: i32) -> bool {
+        self.responses.iter().any(|r| {
+            matches!(
+                r,
+                Response::SpawnDroppedItem { item_id: id, count: c, .. }
+                if *id == item_id && *c == count
+            )
+        })
+    }
+
+    /// Returns true if any response spawns any dropped item.
+    pub fn has_any_spawn_dropped_item(&self) -> bool {
+        self.responses
+            .iter()
+            .any(|r| matches!(r, Response::SpawnDroppedItem { .. }))
     }
 }
 
