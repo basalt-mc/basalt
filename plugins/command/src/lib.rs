@@ -183,8 +183,7 @@ impl Default for CommandPlugin {
 
 #[cfg(test)]
 mod tests {
-    use basalt_api::Response;
-    use basalt_testkit::PluginTestHarness;
+    use basalt_testkit::{DispatchResult, PluginTestHarness};
 
     use super::*;
 
@@ -194,89 +193,83 @@ mod tests {
         h
     }
 
-    fn dispatch_command(cmd: &str) -> Vec<Response> {
+    fn dispatch_command(cmd: &str) -> DispatchResult {
         harness().dispatch_command(cmd)
     }
 
     #[test]
     fn tp_coords() {
-        let responses = dispatch_command("tp 10 64 -5");
-        assert_eq!(responses.len(), 2);
-        assert!(matches!(responses[0], Response::SendPosition { .. }));
+        let result = dispatch_command("tp 10 64 -5");
+        assert_eq!(result.len(), 2);
+        assert!(result.has_teleport());
     }
 
     #[test]
     fn tp_player() {
-        let responses = dispatch_command("tp Steve");
-        assert_eq!(responses.len(), 1);
-        assert!(matches!(responses[0], Response::SendSystemChat { .. }));
+        let result = dispatch_command("tp Steve");
+        assert_eq!(result.len(), 1);
+        assert!(result.has_system_chat());
     }
 
     #[test]
     fn gamemode_creative() {
-        let responses = dispatch_command("gamemode creative");
-        assert_eq!(responses.len(), 2);
-        assert!(matches!(responses[0], Response::SendGameStateChange { .. }));
+        let result = dispatch_command("gamemode creative");
+        assert_eq!(result.len(), 2);
+        assert!(result.has_game_state_change());
     }
 
     #[test]
     fn say_message() {
-        let responses = dispatch_command("say hello world");
-        assert_eq!(responses.len(), 1);
-        assert!(matches!(
-            responses[0],
-            Response::Broadcast(BroadcastMessage::Chat { .. })
-        ));
+        let result = dispatch_command("say hello world");
+        assert_eq!(result.len(), 1);
+        assert!(result.has_chat_broadcast());
     }
 
     #[test]
     fn help_command() {
-        let responses = dispatch_command("help");
-        assert_eq!(responses.len(), 1);
-        assert!(matches!(responses[0], Response::SendSystemChat { .. }));
+        let result = dispatch_command("help");
+        assert_eq!(result.len(), 1);
+        assert!(result.has_system_chat());
     }
 
     #[test]
     fn stop_command() {
-        let responses = dispatch_command("stop");
-        assert_eq!(responses.len(), 1);
-        assert!(matches!(
-            responses[0],
-            Response::Broadcast(BroadcastMessage::Chat { .. })
-        ));
+        let result = dispatch_command("stop");
+        assert_eq!(result.len(), 1);
+        assert!(result.has_chat_broadcast());
     }
 
     #[test]
     fn kick_command() {
-        let responses = dispatch_command("kick Steve");
-        assert_eq!(responses.len(), 1);
-        assert!(matches!(responses[0], Response::SendSystemChat { .. }));
+        let result = dispatch_command("kick Steve");
+        assert_eq!(result.len(), 1);
+        assert!(result.has_system_chat());
     }
 
     #[test]
     fn list_command() {
-        let responses = dispatch_command("list");
-        assert_eq!(responses.len(), 1);
-        assert!(matches!(responses[0], Response::SendSystemChat { .. }));
+        let result = dispatch_command("list");
+        assert_eq!(result.len(), 1);
+        assert!(result.has_system_chat());
     }
 
     #[test]
     fn tp_invalid_coords() {
-        let responses = dispatch_command("tp abc def ghi");
-        assert_eq!(responses.len(), 1);
-        assert!(matches!(responses[0], Response::SendSystemChat { .. }));
+        let result = dispatch_command("tp abc def ghi");
+        assert_eq!(result.len(), 1);
+        assert!(result.has_system_chat());
     }
 
     #[test]
     fn gamemode_survival() {
-        let responses = dispatch_command("gamemode survival");
-        assert_eq!(responses.len(), 2);
-        assert!(matches!(responses[0], Response::SendGameStateChange { .. }));
+        let result = dispatch_command("gamemode survival");
+        assert_eq!(result.len(), 2);
+        assert!(result.has_game_state_change());
     }
 
     #[test]
     fn unknown_command_returns_empty() {
-        let responses = dispatch_command("foobar");
-        assert!(responses.is_empty());
+        let result = dispatch_command("foobar");
+        assert!(result.is_empty());
     }
 }

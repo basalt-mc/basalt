@@ -39,7 +39,6 @@ pub fn build_chat_component(username: &str, message: &str) -> TextComponent {
 
 #[cfg(test)]
 mod tests {
-    use basalt_api::Response;
     use basalt_testkit::PluginTestHarness;
 
     use super::*;
@@ -54,12 +53,9 @@ mod tests {
             cancelled: false,
         };
 
-        let responses = harness.dispatch(&mut event);
-        assert_eq!(responses.len(), 1);
-        assert!(matches!(
-            responses[0],
-            Response::Broadcast(BroadcastMessage::Chat { .. })
-        ));
+        let result = harness.dispatch(&mut event);
+        assert_eq!(result.len(), 1);
+        assert!(result.has_chat_broadcast());
     }
 
     #[test]
@@ -75,8 +71,8 @@ mod tests {
             cancelled: false,
         };
 
-        let responses = harness.dispatch(&mut event);
-        assert!(responses.is_empty());
+        let result = harness.dispatch(&mut event);
+        assert!(result.is_empty());
     }
 
     #[test]
@@ -89,7 +85,7 @@ mod tests {
             cancelled: false,
         };
 
-        let responses = harness.dispatch(&mut event);
-        assert_eq!(responses.len(), 1);
+        let result = harness.dispatch(&mut event);
+        assert_eq!(result.len(), 1);
     }
 }

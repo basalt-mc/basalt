@@ -34,7 +34,6 @@ impl Plugin for WorldPlugin {
 
 #[cfg(test)]
 mod tests {
-    use basalt_api::Response;
     use basalt_api::components::{ChunkPosition, Position, Rotation};
     use basalt_testkit::PluginTestHarness;
 
@@ -59,12 +58,9 @@ mod tests {
             old_chunk: ChunkPosition { x: 0, z: 0 },
         };
 
-        let responses = harness.dispatch(&mut event);
-        assert_eq!(responses.len(), 1);
-        assert!(matches!(
-            responses[0],
-            Response::StreamChunks(ChunkPosition { x: 1, z: 0 })
-        ));
+        let result = harness.dispatch(&mut event);
+        assert_eq!(result.len(), 1);
+        assert!(result.has_stream_chunks(1, 0));
     }
 
     #[test]
@@ -87,12 +83,9 @@ mod tests {
             old_chunk: ChunkPosition { x: 0, z: 0 },
         };
 
-        let responses = harness.dispatch(&mut event);
-        assert_eq!(responses.len(), 1);
-        assert!(matches!(
-            responses[0],
-            Response::StreamChunks(ChunkPosition { x: -1, z: -1 })
-        ));
+        let result = harness.dispatch(&mut event);
+        assert_eq!(result.len(), 1);
+        assert!(result.has_stream_chunks(-1, -1));
     }
 
     #[test]

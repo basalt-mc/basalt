@@ -66,20 +66,10 @@ mod tests {
             cancelled: false,
         };
 
-        let responses = harness.dispatch(&mut event);
+        let result = harness.dispatch(&mut event);
 
-        let has_spawn = responses.iter().any(|r| {
-            matches!(
-                r,
-                Response::SpawnDroppedItem {
-                    item_id: 1,
-                    count: 1,
-                    ..
-                }
-            )
-        });
         assert!(
-            has_spawn,
+            result.has_spawn_dropped_item(1, 1),
             "breaking stone should produce a SpawnDroppedItem response"
         );
     }
@@ -97,11 +87,11 @@ mod tests {
             cancelled: false,
         };
 
-        let responses = harness.dispatch(&mut event);
+        let result = harness.dispatch(&mut event);
 
-        let has_spawn = responses
-            .iter()
-            .any(|r| matches!(r, Response::SpawnDroppedItem { .. }));
-        assert!(!has_spawn, "breaking air should not produce a drop");
+        assert!(
+            !result.has_any_spawn_dropped_item(),
+            "breaking air should not produce a drop"
+        );
     }
 }
