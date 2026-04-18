@@ -76,6 +76,14 @@ pub struct PerformanceSection {
     /// Each chunk uses approximately 192 KB of memory.
     /// Default: 4096 (~768 MB).
     pub chunk_cache_max_entries: usize,
+    /// Maximum number of pre-encoded chunk packets kept in the network cache.
+    ///
+    /// When exceeded, the least recently accessed entries are evicted.
+    /// Evicted entries are simply re-encoded on next access (cheap).
+    ///
+    /// Each entry is typically 10-50 KB (encoded packet bytes).
+    /// Default: 2048 (~50-100 MB).
+    pub chunk_packet_cache_max_entries: usize,
 }
 
 /// Log output format.
@@ -189,6 +197,7 @@ impl Default for PerformanceSection {
     fn default() -> Self {
         Self {
             chunk_cache_max_entries: 4096,
+            chunk_packet_cache_max_entries: 2048,
         }
     }
 }

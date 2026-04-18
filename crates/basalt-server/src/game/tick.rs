@@ -995,7 +995,7 @@ mod tests {
         mpsc::UnboundedReceiver<crate::runtime::io_thread::IoRequest>,
     ) {
         let world = Arc::new(basalt_world::World::new_memory(42));
-        let chunk_cache = Arc::new(ChunkPacketCache::new(Arc::clone(&world)));
+        let chunk_cache = Arc::new(ChunkPacketCache::new(Arc::clone(&world), 256));
         let (game_tx, game_rx) = mpsc::unbounded_channel();
         let (io_tx, io_rx) = mpsc::unbounded_channel();
 
