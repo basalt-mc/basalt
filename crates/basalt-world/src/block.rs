@@ -75,9 +75,10 @@ pub fn chest_state(facing: u16, chest_type: u16) -> u16 {
 /// For east/west facing: checks north/south (±Z).
 /// Returns `(dx1, dz1, dx2, dz2)` — two candidate offsets to check.
 pub fn chest_adjacent_offsets(facing: u16) -> [(i32, i32); 2] {
+    // Right side first (vanilla pairing priority)
     match facing {
-        0 | 1 => [(-1, 0), (1, 0)], // north/south: check west/east
-        2 | 3 => [(0, -1), (0, 1)], // west/east: check north/south
+        0 | 1 => [(1, 0), (-1, 0)], // north/south: east first, then west
+        2 | 3 => [(0, 1), (0, -1)], // west/east: south first, then north
         _ => [(0, 0), (0, 0)],
     }
 }
