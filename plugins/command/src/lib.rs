@@ -39,20 +39,21 @@ impl Plugin for CommandPlugin {
             .variant(|v| v.arg("targets", Arg::Entity).arg("location", Arg::Vec3))
             .handler(|args, ctx| {
                 if let Some((x, y, z)) = args.get_vec3("location") {
-                    ctx.teleport(x, y, z, ctx.player_yaw(), ctx.player_pitch());
-                    ctx.send_message_component(
+                    ctx.player()
+                        .teleport(x, y, z, ctx.player().yaw(), ctx.player().pitch());
+                    ctx.chat().send_component(
                         &TextComponent::text(format!("Teleported to {x}, {y}, {z}"))
                             .color(TextColor::Named(NamedColor::Green)),
                     );
                 } else if let Some(target) = args.get_string("destination") {
-                    ctx.send_message_component(
+                    ctx.chat().send_component(
                         &TextComponent::text(format!(
                             "Teleport to player '{target}' not yet implemented"
                         ))
                         .color(TextColor::Named(NamedColor::Yellow)),
                     );
                 } else if args.get_string("targets").is_some() {
-                    ctx.send_message_component(
+                    ctx.chat().send_component(
                         &TextComponent::text("Teleport targets not yet implemented")
                             .color(TextColor::Named(NamedColor::Yellow)),
                     );
@@ -83,8 +84,8 @@ impl Plugin for CommandPlugin {
                     "adventure" => Gamemode::Adventure,
                     _ => Gamemode::Spectator,
                 };
-                ctx.set_gamemode(mode);
-                ctx.send_message_component(
+                ctx.player().set_gamemode(mode);
+                ctx.chat().send_component(
                     &TextComponent::text(format!("Game mode set to {mode}"))
                         .color(TextColor::Named(NamedColor::Green)),
                 );
@@ -103,7 +104,7 @@ impl Plugin for CommandPlugin {
                     .append(
                         TextComponent::text(message).color(TextColor::Named(NamedColor::White)),
                     );
-                ctx.broadcast_message_component(&msg);
+                ctx.chat().broadcast_component(&msg);
             });
 
         // /stop
@@ -111,7 +112,7 @@ impl Plugin for CommandPlugin {
             .command("stop")
             .description("Stop the server")
             .handler(|_args, ctx| {
-                ctx.broadcast_message_component(
+                ctx.chat().broadcast_component(
                     &TextComponent::text("Server is shutting down...")
                         .color(TextColor::Named(NamedColor::Red))
                         .bold(true),
@@ -131,7 +132,7 @@ impl Plugin for CommandPlugin {
                 log.info(format_args!(
                     "Kick issued for {target} — not yet implemented"
                 ));
-                ctx.send_message_component(
+                ctx.chat().send_component(
                     &TextComponent::text(format!("Kick not yet implemented: {target}"))
                         .color(TextColor::Named(NamedColor::Yellow)),
                 );
@@ -142,7 +143,7 @@ impl Plugin for CommandPlugin {
             .command("list")
             .description("List connected players")
             .handler(|_args, ctx| {
-                ctx.send_message_component(
+                ctx.chat().send_component(
                     &TextComponent::text("Player list not yet implemented")
                         .color(TextColor::Named(NamedColor::Yellow)),
                 );
@@ -155,7 +156,7 @@ impl Plugin for CommandPlugin {
             .handler(|_args, ctx| {
                 let mut msg = TextComponent::text("Available commands:")
                     .color(TextColor::Named(NamedColor::Gold));
-                let mut cmds = ctx.registered_commands();
+                let mut cmds = ctx.player().registered_commands();
                 cmds.sort_by(|(a, _), (b, _)| a.cmp(b));
                 for (name, desc) in &cmds {
                     msg = msg
@@ -168,7 +169,7 @@ impl Plugin for CommandPlugin {
                                 .color(TextColor::Named(NamedColor::Gray)),
                         );
                 }
-                ctx.send_message_component(&msg);
+                ctx.chat().send_component(&msg);
             });
     }
 }

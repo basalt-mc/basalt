@@ -16,6 +16,8 @@ pub mod gamemode;
 pub mod logger;
 
 pub use broadcast::{BroadcastMessage, PlayerSnapshot, ProfileProperty};
-pub use context::Context;
+pub use context::{
+    ChatContext, ContainerContext, Context, EntityContext, PlayerContext, WorldContext,
+};
 pub use gamemode::Gamemode;
 pub use logger::PluginLogger;

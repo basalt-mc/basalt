@@ -1758,6 +1758,11 @@ impl GameLoop {
                 } => {
                     self.spawn_item_entity(*x, *y, *z, *item_id, *count);
                 }
+                Response::OpenChest { x, y, z } => {
+                    if let Some(eid) = self.ecs.find_by_uuid(source_uuid) {
+                        self.open_chest(eid, *x, *y, *z);
+                    }
+                }
             }
         }
     }

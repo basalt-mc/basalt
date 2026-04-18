@@ -21,34 +21,38 @@ impl Plugin for BlockPlugin {
     fn on_enable(&self, registrar: &mut PluginRegistrar) {
         // Process: mutate world state
         registrar.on::<BlockBrokenEvent>(Stage::Process, 0, |event, ctx| {
-            ctx.world()
+            ctx.world_ctx()
+                .world()
                 .set_block(event.x, event.y, event.z, basalt_world::block::AIR);
         });
 
         registrar.on::<BlockPlacedEvent>(Stage::Process, 0, |event, ctx| {
-            ctx.world()
+            ctx.world_ctx()
+                .world()
                 .set_block(event.x, event.y, event.z, event.block_state);
         });
 
         // Post: acknowledge + broadcast
         registrar.on::<BlockBrokenEvent>(Stage::Post, 0, |event, ctx| {
-            ctx.send_block_ack(event.sequence);
-            ctx.broadcast(BroadcastMessage::BlockChanged {
-                x: event.x,
-                y: event.y,
-                z: event.z,
-                block_state: basalt_world::block::AIR as i32,
-            });
+            ctx.world_ctx().send_block_ack(event.sequence);
+            ctx.entities()
+                .broadcast_raw(BroadcastMessage::BlockChanged {
+                    x: event.x,
+                    y: event.y,
+                    z: event.z,
+                    block_state: basalt_world::block::AIR as i32,
+                });
         });
 
         registrar.on::<BlockPlacedEvent>(Stage::Post, 0, |event, ctx| {
-            ctx.send_block_ack(event.sequence);
-            ctx.broadcast(BroadcastMessage::BlockChanged {
-                x: event.x,
-                y: event.y,
-                z: event.z,
-                block_state: event.block_state as i32,
-            });
+            ctx.world_ctx().send_block_ack(event.sequence);
+            ctx.entities()
+                .broadcast_raw(BroadcastMessage::BlockChanged {
+                    x: event.x,
+                    y: event.y,
+                    z: event.z,
+                    block_state: event.block_state as i32,
+                });
         });
     }
 }

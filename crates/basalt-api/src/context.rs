@@ -11,7 +11,10 @@ use std::sync::atomic::{AtomicI32, Ordering};
 
 use basalt_core::broadcast::BroadcastMessage;
 use basalt_core::gamemode::Gamemode;
-use basalt_core::{Context, PluginLogger};
+use basalt_core::{
+    ChatContext, ContainerContext, Context, EntityContext, PlayerContext, PluginLogger,
+    WorldContext,
+};
 use basalt_types::nbt::NbtCompound;
 use basalt_types::{TextComponent, Uuid};
 
@@ -92,72 +95,22 @@ impl ServerContext {
     }
 }
 
-/// Implementation of [`Context`] for in-game player contexts.
-///
-/// All methods queue [`Response`] variants into the interior-mutable
-/// response queue. The play loop drains and executes them after
-/// event dispatch completes.
-impl Context for ServerContext {
-    fn player_uuid(&self) -> Uuid {
+impl PlayerContext for ServerContext {
+    fn uuid(&self) -> Uuid {
         self.player_uuid
     }
-
-    fn player_entity_id(&self) -> i32 {
+    fn entity_id(&self) -> i32 {
         self.player_entity_id
     }
-
-    fn player_username(&self) -> &str {
+    fn username(&self) -> &str {
         &self.player_username
     }
-
-    fn player_yaw(&self) -> f32 {
+    fn yaw(&self) -> f32 {
         self.player_yaw
     }
-
-    fn player_pitch(&self) -> f32 {
+    fn pitch(&self) -> f32 {
         self.player_pitch
     }
-
-    fn logger(&self) -> PluginLogger {
-        PluginLogger::new(&self.plugin_name.borrow())
-    }
-
-    fn world(&self) -> &basalt_world::World {
-        &self.world
-    }
-
-    fn send_message(&self, text: &str) {
-        let component = TextComponent::text(text);
-        self.send_message_component(&component);
-    }
-
-    fn send_message_component(&self, component: &TextComponent) {
-        self.responses.push(Response::SendSystemChat {
-            content: component.to_nbt(),
-            action_bar: false,
-        });
-    }
-
-    fn send_action_bar(&self, text: &str) {
-        let component = TextComponent::text(text);
-        self.responses.push(Response::SendSystemChat {
-            content: component.to_nbt(),
-            action_bar: true,
-        });
-    }
-
-    fn broadcast_message(&self, text: &str) {
-        let component = TextComponent::text(text);
-        self.broadcast_message_component(&component);
-    }
-
-    fn broadcast_message_component(&self, component: &TextComponent) {
-        self.responses
-            .push(Response::Broadcast(BroadcastMessage::Chat {
-                content: component.to_nbt(),
-            }));
-    }
-
     fn teleport(&self, x: f64, y: f64, z: f64, yaw: f32, pitch: f32) {
         let teleport_id = self.teleport_counter.fetch_add(1, Ordering::Relaxed);
         self.responses.push(Response::SendPosition {
@@ -169,34 +122,66 @@ impl Context for ServerContext {
             pitch,
         });
     }
-
     fn set_gamemode(&self, mode: Gamemode) {
         self.responses.push(Response::SendGameStateChange {
             reason: GAME_STATE_CHANGE_GAMEMODE,
             value: mode.id() as f32,
         });
     }
-
     fn registered_commands(&self) -> Vec<(String, String)> {
-        // Populated from ServerState command_args at dispatch time
         self.command_list.borrow().clone()
     }
+}
 
+impl ChatContext for ServerContext {
+    fn send(&self, text: &str) {
+        let component = TextComponent::text(text);
+        self.send_component(&component);
+    }
+    fn send_component(&self, component: &TextComponent) {
+        self.responses.push(Response::SendSystemChat {
+            content: component.to_nbt(),
+            action_bar: false,
+        });
+    }
+    fn action_bar(&self, text: &str) {
+        let component = TextComponent::text(text);
+        self.responses.push(Response::SendSystemChat {
+            content: component.to_nbt(),
+            action_bar: true,
+        });
+    }
+    fn broadcast(&self, text: &str) {
+        let component = TextComponent::text(text);
+        self.broadcast_component(&component);
+    }
+    fn broadcast_component(&self, component: &TextComponent) {
+        self.responses
+            .push(Response::Broadcast(BroadcastMessage::Chat {
+                content: component.to_nbt(),
+            }));
+    }
+}
+
+impl WorldContext for ServerContext {
+    fn world(&self) -> &basalt_world::World {
+        &self.world
+    }
     fn send_block_ack(&self, sequence: i32) {
         self.responses.push(Response::SendBlockAck { sequence });
     }
-
     fn stream_chunks(&self, cx: i32, cz: i32) {
         self.responses.push(Response::StreamChunks {
             new_cx: cx,
             new_cz: cz,
         });
     }
-
     fn persist_chunk(&self, cx: i32, cz: i32) {
         self.responses.push(Response::PersistChunk { cx, cz });
     }
+}
 
+impl EntityContext for ServerContext {
     fn spawn_dropped_item(&self, x: i32, y: i32, z: i32, item_id: i32, count: i32) {
         self.responses.push(Response::SpawnDroppedItem {
             x,
@@ -206,9 +191,40 @@ impl Context for ServerContext {
             count,
         });
     }
-
-    fn broadcast(&self, msg: BroadcastMessage) {
+    fn broadcast_raw(&self, msg: BroadcastMessage) {
         self.responses.push(Response::Broadcast(msg));
+    }
+}
+
+impl ContainerContext for ServerContext {
+    fn open_chest(&self, x: i32, y: i32, z: i32) {
+        self.responses.push(Response::OpenChest { x, y, z });
+    }
+}
+
+impl Context for ServerContext {
+    fn logger(&self) -> PluginLogger {
+        PluginLogger::new(&self.plugin_name.borrow())
+    }
+
+    fn player(&self) -> &dyn PlayerContext {
+        self
+    }
+
+    fn chat(&self) -> &dyn ChatContext {
+        self
+    }
+
+    fn world_ctx(&self) -> &dyn WorldContext {
+        self
+    }
+
+    fn entities(&self) -> &dyn EntityContext {
+        self
+    }
+
+    fn containers(&self) -> &dyn ContainerContext {
+        self
     }
 }
 
@@ -298,6 +314,15 @@ pub enum Response {
         /// Item count.
         count: i32,
     },
+    /// Open a chest container at the given position.
+    OpenChest {
+        /// Block X coordinate.
+        x: i32,
+        /// Block Y coordinate.
+        y: i32,
+        /// Block Z coordinate.
+        z: i32,
+    },
 }
 
 #[cfg(test)]
@@ -315,15 +340,15 @@ mod tests {
     #[test]
     fn player_identity() {
         let ctx = test_ctx();
-        assert_eq!(ctx.player_uuid(), Uuid::default());
-        assert_eq!(ctx.player_entity_id(), 1);
-        assert_eq!(ctx.player_username(), "Steve");
+        assert_eq!(ctx.player().uuid(), Uuid::default());
+        assert_eq!(ctx.player().entity_id(), 1);
+        assert_eq!(ctx.player().username(), "Steve");
     }
 
     #[test]
     fn send_message_queues_response() {
         let ctx = test_ctx();
-        ctx.send_message("hello");
+        ctx.chat().send("hello");
         let responses = ctx.drain_responses();
         assert_eq!(responses.len(), 1);
         assert!(matches!(
@@ -338,7 +363,7 @@ mod tests {
     #[test]
     fn teleport_queues_position() {
         let ctx = test_ctx();
-        ctx.teleport(10.0, 64.0, -5.0, 90.0, 0.0);
+        ctx.player().teleport(10.0, 64.0, -5.0, 90.0, 0.0);
         let responses = ctx.drain_responses();
         assert_eq!(responses.len(), 1);
         assert!(matches!(responses[0], Response::SendPosition { .. }));
@@ -347,7 +372,7 @@ mod tests {
     #[test]
     fn set_gamemode_queues_state_change() {
         let ctx = test_ctx();
-        ctx.set_gamemode(Gamemode::Creative);
+        ctx.player().set_gamemode(Gamemode::Creative);
         let responses = ctx.drain_responses();
         assert_eq!(responses.len(), 1);
         assert!(matches!(
@@ -362,7 +387,7 @@ mod tests {
     #[test]
     fn broadcast_message_queues_broadcast() {
         let ctx = test_ctx();
-        ctx.broadcast_message("hello all");
+        ctx.chat().broadcast("hello all");
         let responses = ctx.drain_responses();
         assert_eq!(responses.len(), 1);
         assert!(matches!(
@@ -374,8 +399,8 @@ mod tests {
     #[test]
     fn drain_clears_queue() {
         let ctx = test_ctx();
-        ctx.send_message("a");
-        ctx.send_message("b");
+        ctx.chat().send("a");
+        ctx.chat().send("b");
         assert_eq!(ctx.drain_responses().len(), 2);
         assert!(ctx.drain_responses().is_empty());
     }
@@ -384,7 +409,7 @@ mod tests {
     fn context_trait_is_usable_as_dyn() {
         let ctx = test_ctx();
         let dyn_ctx: &dyn Context = &ctx;
-        dyn_ctx.send_message("via trait");
+        dyn_ctx.chat().send("via trait");
         assert_eq!(ctx.drain_responses().len(), 1);
     }
 }

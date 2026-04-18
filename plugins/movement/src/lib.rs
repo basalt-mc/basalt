@@ -22,7 +22,7 @@ impl Plugin for MovementPlugin {
 
     fn on_enable(&self, registrar: &mut PluginRegistrar) {
         registrar.on::<PlayerMovedEvent>(Stage::Post, 0, |event, ctx| {
-            ctx.broadcast(BroadcastMessage::EntityMoved {
+            ctx.entities().broadcast_raw(BroadcastMessage::EntityMoved {
                 entity_id: event.entity_id,
                 x: event.x,
                 y: event.y,

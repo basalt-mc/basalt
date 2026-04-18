@@ -23,13 +23,14 @@ impl Plugin for LifecyclePlugin {
 
     fn on_enable(&self, registrar: &mut PluginRegistrar) {
         registrar.on::<PlayerJoinedEvent>(Stage::Post, 0, |event, ctx| {
-            ctx.broadcast(BroadcastMessage::PlayerJoined {
-                info: event.info.clone(),
-            });
+            ctx.entities()
+                .broadcast_raw(BroadcastMessage::PlayerJoined {
+                    info: event.info.clone(),
+                });
         });
 
         registrar.on::<PlayerLeftEvent>(Stage::Post, 0, |event, ctx| {
-            ctx.broadcast(BroadcastMessage::PlayerLeft {
+            ctx.entities().broadcast_raw(BroadcastMessage::PlayerLeft {
                 uuid: event.uuid,
                 entity_id: event.entity_id,
                 username: event.username.clone(),

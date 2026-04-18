@@ -23,7 +23,7 @@ use crate::args::CommandArgs;
 ///     fn name(&self) -> &str { "ping" }
 ///     fn description(&self) -> &str { "Responds with pong" }
 ///     fn execute(&self, _args: &CommandArgs, ctx: &dyn Context) {
-///         ctx.send_message("Pong!");
+///         ctx.chat().send("Pong!");
 ///     }
 /// }
 /// ```

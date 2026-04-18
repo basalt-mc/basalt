@@ -26,7 +26,7 @@ impl Plugin for WorldPlugin {
             let new_cx = (event.x.floor() as i32) >> 4;
             let new_cz = (event.z.floor() as i32) >> 4;
             if new_cx != event.old_cx || new_cz != event.old_cz {
-                ctx.stream_chunks(new_cx, new_cz);
+                ctx.world_ctx().stream_chunks(new_cx, new_cz);
             }
         });
     }
