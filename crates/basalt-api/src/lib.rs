@@ -1,8 +1,14 @@
 //! Basalt public plugin API.
 //!
-//! This crate defines the complete public API for Basalt server
-//! plugins. Both built-in plugins and external plugins depend on
-//! this crate — there is no separate internal API.
+//! This crate is the **single dependency** for all Basalt plugins.
+//! Types are organized into focused modules:
+//!
+//! - [`prelude`] — essentials for every plugin (glob import this)
+//! - [`components`] — ECS component types (Position, Velocity, etc.)
+//! - [`system`] — system registration (SystemContext, Phase, etc.)
+//! - [`command`] — command argument types (Arg, CommandArgs, etc.)
+//! - [`types`] — primitive Minecraft types (Uuid, Slot, TextComponent, etc.)
+//! - [`world`] — block states, collision, block entities
 
 pub mod broadcast;
 pub mod context;
@@ -10,35 +16,69 @@ pub mod events;
 pub mod logger;
 pub mod plugin;
 
-// Re-export core types for convenience.
-pub use basalt_core::{
-    BroadcastMessage, ChatContext, ContainerContext, Context, EntityContext, Gamemode,
-    PlayerContext, PlayerSnapshot, ProfileProperty, WorldContext,
-};
+/// ECS component types for system plugins.
+///
+/// Contains spatial (Position, Velocity), identity (PlayerRef, EntityKind),
+/// item (DroppedItem, Lifetime), and inventory components.
+pub mod components {
+    pub use basalt_core::components::*;
+    pub use basalt_core::{Component, EntityId};
+}
+
+/// System registration for tick-based plugins.
+///
+/// System plugins register a runner that executes each tick with
+/// access to entities and the world via [`SystemContext`].
+pub mod system {
+    pub use basalt_core::{
+        Phase, SystemAccess, SystemBuilder, SystemContext, SystemContextExt, SystemDescriptor,
+    };
+}
+
+/// Command argument types for command plugins.
+pub mod command {
+    pub use basalt_command::{Arg, CommandArg, CommandArgs, Validation};
+}
+
+/// Primitive Minecraft types.
+pub mod types {
+    pub use basalt_types::{NamedColor, Slot, TextColor, TextComponent, Uuid};
+}
+
+/// World access: block states, collision, block entities, chunk storage.
+pub use basalt_world as world;
+
+// Top-level re-exports for non-prelude usage.
+pub use basalt_events::{Event, EventBus, Stage};
 pub use context::{Response, ServerContext};
 pub use plugin::{CommandEntry, Plugin, PluginMetadata, PluginRegistrar};
 
-// Re-export command types for convenience.
-pub use basalt_command::{Arg, CommandArg, CommandArgs, Validation};
-
-// Re-export basalt-events types.
-pub use basalt_events::{Event, EventBus, Stage};
-
-/// Prelude module for convenient glob imports.
+/// Prelude module — import this in every plugin.
+///
+/// Contains only what 90%+ of plugins need: registration types,
+/// context traits, events, and stage. Specialized types live in
+/// their respective modules.
+///
+/// ```ignore
+/// use basalt_api::prelude::*;
+/// ```
 pub mod prelude {
-    pub use basalt_command::{Arg, CommandArgs, Validation};
+    // Plugin registration
+    pub use crate::context::{Response, ServerContext};
+    pub use crate::plugin::{Plugin, PluginMetadata, PluginRegistrar};
+
+    // Context traits
     pub use basalt_core::{
         BroadcastMessage, ChatContext, ContainerContext, Context, EntityContext, Gamemode,
-        PlayerContext, PlayerSnapshot, WorldContext,
+        PlayerContext, WorldContext,
     };
 
-    pub use basalt_types::Uuid;
+    // Event system
+    pub use basalt_events::{Event, Stage};
 
-    pub use crate::context::{Response, ServerContext};
+    // All event types
     pub use crate::events::{
         BlockBrokenEvent, BlockPlacedEvent, ChatMessageEvent, CommandEvent, PlayerInteractEvent,
         PlayerJoinedEvent, PlayerLeftEvent, PlayerMovedEvent,
     };
-    pub use crate::plugin::{Plugin, PluginMetadata, PluginRegistrar};
-    pub use basalt_events::{Event, Stage};
 }
