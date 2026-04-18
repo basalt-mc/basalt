@@ -129,11 +129,13 @@ crates/basalt-server/
 
 ### Server architecture
 
-- **Game loop** (single dedicated OS thread, 20 TPS): handles all tick-based simulation — movement, block operations, chunk streaming, player lifecycle, ECS systems (physics, AI). Owns the ECS and world. Produces `ServerOutput` game events (zero encoding — no protocol knowledge).
+- **Game loop** (single dedicated OS thread, 20 TPS): handles all tick-based simulation — movement, block operations, chunk streaming, player lifecycle, ECS systems (physics, AI). Owns the ECS and world. Produces `ServerOutput` game events (zero encoding — no protocol knowledge). Tracks `ActiveChunks` (simulation distance) and flushes dirty chunks periodically.
 - **Net tasks** (one tokio task per player): handle TCP I/O, keep-alive, tab-complete, and **all packet encoding**. Receive `ServerOutput` game events from the game loop, construct protocol packets, encode, and write to TCP. Instant events (chat, commands) are dispatched directly via `Arc<EventBus>` for zero latency. Game-relevant packets are forwarded to the game loop via channel.
 - **ChunkPacketCache** (shared `DashMap` with LRU eviction): caches pre-encoded chunk bytes. Net tasks look up on `SendChunk`; game loop invalidates on block change. Configurable max size (`chunk_packet_cache_max_entries`, default 2048); evicts least recently accessed entries independently of World's chunk cache.
 - **SharedBroadcast** (`OnceLock`): broadcasts (movement, block changes) are encoded once by the first net task consumer; subsequent consumers read cached bytes.
-- **I/O thread** (dedicated OS thread): receives chunk persist requests via channel, writes BSR region files without blocking the game loop.
+- **Simulation distance** (`simulation_distance`, default 8 chunks): only chunks within this radius of any player are "active". Recalculated on player connect/disconnect/move. ECS systems should only process entities in active chunks.
+- **Batch persistence** (`persistence_interval_seconds`, default 30s): dirty chunks are flushed to the I/O thread periodically instead of per-mutation. On graceful shutdown, the I/O thread flushes all remaining dirty chunks before exit. Maximum data loss on crash: ~30 seconds.
+- **I/O thread** (dedicated OS thread): receives chunk persist requests via channel, writes BSR region files without blocking the game loop. On shutdown, flushes all dirty chunks from World before exiting.
 - Two event buses: **instant bus** (chat, commands — dispatched in net tasks) and **game bus** (blocks, movement, lifecycle — dispatched in game loop).
 - Handlers are sync. They interact with the server through `ServerContext` methods which queue deferred responses.
 - 8 built-in plugins under `plugins/`, each implementing `Plugin`:
