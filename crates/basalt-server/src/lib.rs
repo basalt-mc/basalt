@@ -132,6 +132,7 @@ impl Server {
             io_thread.sender(),
             ecs,
             server_state.declare_commands.clone(),
+            server_state.entity_id_counter(),
             self.config.server.simulation_distance,
             persistence_interval_ticks,
         );

@@ -17,8 +17,11 @@ pub(crate) use basalt_api::EventBus;
 /// network and game loops. `ServerState` only holds data needed by
 /// the connection setup flow and shared across loops.
 pub(crate) struct ServerState {
-    /// Atomic counter for assigning unique entity IDs.
-    next_entity_id: AtomicI32,
+    /// Shared counter for assigning unique entity IDs.
+    ///
+    /// Behind `Arc` so the game loop can share it for spawning
+    /// non-player entities (dropped items, mobs).
+    next_entity_id: Arc<AtomicI32>,
     /// The world — chunk cache and terrain generator.
     pub world: Arc<basalt_world::World>,
     /// Pre-built DeclareCommands packet payload (empty if no commands).
@@ -131,7 +134,7 @@ impl ServerState {
         log::info!(target: "basalt::server", "Registered {} commands", declare_commands.1);
 
         let state = Arc::new(Self {
-            next_entity_id: AtomicI32::new(1),
+            next_entity_id: Arc::new(AtomicI32::new(1)),
             world,
             declare_commands: declare_commands.0,
             command_args,
@@ -143,6 +146,15 @@ impl ServerState {
     /// Allocates a unique entity ID for a new player.
     pub fn next_entity_id(&self) -> i32 {
         self.next_entity_id.fetch_add(1, Ordering::Relaxed)
+    }
+
+    /// Returns a shared reference to the entity ID counter.
+    ///
+    /// The game loop uses this to assign entity IDs for non-player
+    /// entities (dropped items, mobs) using the same counter as
+    /// player entities, avoiding ID collisions.
+    pub fn entity_id_counter(&self) -> Arc<AtomicI32> {
+        Arc::clone(&self.next_entity_id)
     }
 }
 

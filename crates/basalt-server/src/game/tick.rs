@@ -78,6 +78,8 @@ pub(crate) struct GameLoop {
     game_rx: mpsc::UnboundedReceiver<GameInput>,
     /// Sender for the I/O thread (async chunk persistence).
     io_tx: mpsc::UnboundedSender<crate::runtime::io_thread::IoRequest>,
+    /// Counter for assigning entity IDs to non-player entities (items, mobs).
+    next_entity_id: std::sync::Arc<std::sync::atomic::AtomicI32>,
     /// Pre-built DeclareCommands packet payload.
     declare_commands: Vec<u8>,
     /// Chunks within simulation distance of any player.
@@ -102,6 +104,7 @@ impl GameLoop {
         io_tx: mpsc::UnboundedSender<crate::runtime::io_thread::IoRequest>,
         ecs: basalt_ecs::Ecs,
         declare_commands: Vec<u8>,
+        next_entity_id: std::sync::Arc<std::sync::atomic::AtomicI32>,
         simulation_distance: i32,
         persistence_interval_ticks: u64,
     ) -> Self {
@@ -112,6 +115,7 @@ impl GameLoop {
             ecs,
             game_rx,
             io_tx,
+            next_entity_id,
             declare_commands,
             active_chunks: HashSet::new(),
             simulation_distance,
@@ -123,7 +127,41 @@ impl GameLoop {
     pub fn tick(&mut self, tick: u64) {
         self.drain_game_input();
         self.ecs.run_all(tick);
+        self.tick_lifetimes();
         self.flush_dirty_chunks_if_due(tick);
+    }
+
+    /// Decrements lifetimes and despawns expired entities.
+    ///
+    /// Entities with a [`Lifetime`] component have their counter
+    /// decremented each tick. When it reaches zero, the entity is
+    /// despawned and an EntityDestroy broadcast is sent.
+    fn tick_lifetimes(&mut self) {
+        let mut expired = Vec::new();
+        for (eid, lt) in self.ecs.iter_mut::<basalt_ecs::Lifetime>() {
+            if lt.remaining_ticks == 0 {
+                expired.push(eid);
+            } else {
+                lt.remaining_ticks -= 1;
+            }
+        }
+
+        if expired.is_empty() {
+            return;
+        }
+
+        let entity_ids: Vec<i32> = expired.iter().map(|&eid| eid as i32).collect();
+        let bc = Arc::new(SharedBroadcast::new(BroadcastEvent::RemoveEntities {
+            entity_ids,
+        }));
+        for (player_eid, _) in self.ecs.iter::<OutputHandle>() {
+            self.send_to(player_eid, |tx| {
+                let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&bc)));
+            });
+        }
+        for eid in expired {
+            self.ecs.despawn(eid);
+        }
     }
 
     /// Periodically flushes all dirty chunks to the I/O thread.
@@ -763,6 +801,7 @@ impl GameLoop {
             x,
             y,
             z,
+            block_state: original_state,
             sequence,
             player_uuid: uuid,
             cancelled: false,
@@ -953,7 +992,85 @@ impl GameLoop {
                             cz: *cz,
                         });
                 }
+                Response::SpawnDroppedItem {
+                    x,
+                    y,
+                    z,
+                    item_id,
+                    count,
+                } => {
+                    self.spawn_item_entity(*x, *y, *z, *item_id, *count);
+                }
             }
+        }
+    }
+
+    /// Spawns a dropped item entity and broadcasts it to all players.
+    fn spawn_item_entity(&mut self, x: i32, y: i32, z: i32, item_id: i32, count: i32) {
+        use std::sync::atomic::Ordering;
+
+        let entity_id = self.next_entity_id.fetch_add(1, Ordering::Relaxed);
+        let eid = entity_id as basalt_ecs::EntityId;
+
+        // Small random offset so items don't stack perfectly
+        let px = x as f64 + 0.5;
+        let py = y as f64 + 0.25;
+        let pz = z as f64 + 0.5;
+
+        self.ecs.spawn_with_id(eid);
+        self.ecs.set(
+            eid,
+            basalt_ecs::Position {
+                x: px,
+                y: py,
+                z: pz,
+            },
+        );
+        self.ecs.set(
+            eid,
+            basalt_ecs::Velocity {
+                dx: 0.0,
+                dy: 0.2,
+                dz: 0.0,
+            },
+        );
+        self.ecs.set(
+            eid,
+            basalt_ecs::BoundingBox {
+                width: 0.25,
+                height: 0.25,
+            },
+        );
+        self.ecs.set(eid, basalt_ecs::EntityKind { type_id: 68 });
+        self.ecs.set(
+            eid,
+            basalt_ecs::Lifetime {
+                remaining_ticks: 6000,
+            },
+        );
+        self.ecs.set(
+            eid,
+            basalt_ecs::DroppedItem {
+                slot: basalt_types::Slot::new(item_id, count),
+            },
+        );
+
+        // Broadcast spawn to all players
+        let bc = Arc::new(SharedBroadcast::new(BroadcastEvent::SpawnItemEntity {
+            entity_id,
+            x: px,
+            y: py,
+            z: pz,
+            vx: 0.0,
+            vy: 0.2,
+            vz: 0.0,
+            item_id,
+            count,
+        }));
+        for (other_eid, _) in self.ecs.iter::<OutputHandle>() {
+            self.send_to(other_eid, |tx| {
+                let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&bc)));
+            });
         }
     }
 
@@ -1092,6 +1209,7 @@ mod tests {
             io_tx,
             ecs,
             Vec::new(),
+            Arc::new(std::sync::atomic::AtomicI32::new(1000)),
             8,
             0,
         );

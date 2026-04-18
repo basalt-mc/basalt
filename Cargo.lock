@@ -196,6 +196,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "basalt-plugin-drops"
+version = "0.1.0"
+dependencies = [
+ "basalt-api",
+ "basalt-plugin-block",
+ "basalt-testkit",
+ "basalt-types",
+ "basalt-world",
+]
+
+[[package]]
 name = "basalt-plugin-lifecycle"
 version = "0.1.0"
 dependencies = [
@@ -267,6 +278,7 @@ dependencies = [
  "basalt-plugin-block",
  "basalt-plugin-chat",
  "basalt-plugin-command",
+ "basalt-plugin-drops",
  "basalt-plugin-lifecycle",
  "basalt-plugin-movement",
  "basalt-plugin-physics",

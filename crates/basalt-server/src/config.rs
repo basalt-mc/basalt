@@ -191,6 +191,8 @@ pub struct PluginsSection {
     pub movement: bool,
     /// Physics simulation (gravity, AABB collision).
     pub physics: bool,
+    /// Item drops on block break.
+    pub drops: bool,
 }
 
 impl Default for ServerSection {
@@ -236,6 +238,7 @@ impl Default for PluginsSection {
             lifecycle: true,
             movement: true,
             physics: true,
+            drops: true,
         }
     }
 }
@@ -360,6 +363,9 @@ impl ServerConfig {
         if self.plugins.block && self.world.storage == StorageMode::ReadWrite {
             plugins.push(Box::new(basalt_plugin_storage::StoragePlugin));
         }
+        if self.plugins.drops && self.plugins.block {
+            plugins.push(Box::new(basalt_plugin_drops::DropsPlugin));
+        }
         if self.plugins.physics {
             plugins.push(Box::new(basalt_plugin_physics::PhysicsPlugin));
         }
@@ -449,8 +455,8 @@ storage = "none"
     fn create_plugins_all_enabled() {
         let config = ServerConfig::default();
         let plugins = config.create_plugins();
-        // 8 built-in plugins
-        assert_eq!(plugins.len(), 8);
+        // 9 built-in plugins
+        assert_eq!(plugins.len(), 9);
     }
 
     #[test]
@@ -458,8 +464,8 @@ storage = "none"
         let mut config = ServerConfig::default();
         config.world.storage = StorageMode::ReadOnly;
         let plugins = config.create_plugins();
-        // 7 plugins: no StoragePlugin (physics still enabled)
-        assert_eq!(plugins.len(), 7);
+        // 8 plugins: no StoragePlugin (drops + physics still enabled)
+        assert_eq!(plugins.len(), 8);
         assert!(plugins.iter().all(|p| p.metadata().name != "storage"));
     }
 
