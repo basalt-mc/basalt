@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 basalt-core = { workspace = true }
 basalt-world = { workspace = true }
+rayon = { workspace = true }
 
 [[bench]]
 name = "ecs"
