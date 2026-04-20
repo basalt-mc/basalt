@@ -6,7 +6,9 @@
 
 use std::any::{Any, TypeId};
 use std::collections::HashSet;
+use std::time::Duration;
 
+use crate::budget::TickBudget;
 use crate::components::{EntityId, Phase};
 
 /// Abstract interface for system runners.
@@ -43,6 +45,12 @@ pub trait SystemContext {
 
     /// Returns a mutable reference to a component as `dyn Any`.
     fn get_component_mut(&mut self, entity: EntityId, type_id: TypeId) -> Option<&mut dyn Any>;
+
+    /// Returns the CPU budget for the current system invocation.
+    ///
+    /// Budget-aware systems call this to check remaining time and yield
+    /// early when expired. Systems that ignore the budget run to completion.
+    fn budget(&self) -> &TickBudget;
 }
 
 /// Typed convenience methods on [`SystemContext`].
@@ -93,6 +101,8 @@ pub struct SystemDescriptor {
     pub every: u64,
     /// Component access declaration.
     pub access: SystemAccess,
+    /// Optional CPU budget per invocation. `None` means unlimited.
+    pub budget: Option<Duration>,
     /// The system function (type-erased).
     pub runner: Box<dyn SystemRunner>,
 }
@@ -165,6 +175,7 @@ pub struct SystemBuilder {
     phase: Phase,
     every: u64,
     access: SystemAccess,
+    budget: Option<Duration>,
 }
 
 impl SystemBuilder {
@@ -175,6 +186,7 @@ impl SystemBuilder {
             phase: Phase::Simulate,
             every: 1,
             access: SystemAccess::new(),
+            budget: None,
         }
     }
 
@@ -205,6 +217,15 @@ impl SystemBuilder {
         self
     }
 
+    /// Sets the CPU budget for this system in milliseconds.
+    ///
+    /// When set, the system can check `ctx.budget().is_expired()` to
+    /// yield early. Systems without a budget get an unlimited one.
+    pub fn budget_ms(mut self, ms: u64) -> Self {
+        self.budget = Some(Duration::from_millis(ms));
+        self
+    }
+
     /// Finalizes the builder and registers the system with a runner.
     pub fn run<F: FnMut(&mut dyn SystemContext) + Send + 'static>(
         self,
@@ -215,6 +236,7 @@ impl SystemBuilder {
             phase: self.phase,
             every: self.every,
             access: self.access,
+            budget: self.budget,
             runner: Box::new(runner),
         }
     }
