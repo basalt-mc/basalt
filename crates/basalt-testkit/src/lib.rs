@@ -385,6 +385,8 @@ pub struct SystemTestContext {
     pub ecs: basalt_ecs::Ecs,
     /// Shared world for block/collision queries.
     world: Arc<World>,
+    /// Unlimited budget for test systems.
+    budget: basalt_core::TickBudget,
 }
 
 impl SystemTestContext {
@@ -393,6 +395,7 @@ impl SystemTestContext {
         Self {
             ecs: basalt_ecs::Ecs::new(),
             world: Arc::new(World::flat()),
+            budget: basalt_core::TickBudget::unlimited(),
         }
     }
 
@@ -401,6 +404,7 @@ impl SystemTestContext {
         Self {
             ecs: basalt_ecs::Ecs::new(),
             world,
+            budget: basalt_core::TickBudget::unlimited(),
         }
     }
 }
@@ -451,5 +455,9 @@ impl basalt_core::SystemContext for SystemTestContext {
         type_id: std::any::TypeId,
     ) -> Option<&mut dyn std::any::Any> {
         self.ecs.get_component_mut(entity, type_id)
+    }
+
+    fn budget(&self) -> &basalt_core::TickBudget {
+        &self.budget
     }
 }

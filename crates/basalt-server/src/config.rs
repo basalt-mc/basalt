@@ -4,6 +4,7 @@
 //! mode), and which plugins are enabled. Missing fields use sensible
 //! defaults — a missing `basalt.toml` runs a full game server.
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use serde::Deserialize;
@@ -63,6 +64,8 @@ pub struct ServerSection {
     pub persistence_interval_seconds: u32,
     /// Performance tuning.
     pub performance: PerformanceSection,
+    /// Per-system CPU budget overrides (milliseconds per tick).
+    pub budgets: BudgetsSection,
 }
 
 /// Performance tuning settings.
@@ -103,6 +106,32 @@ pub struct PerformanceSection {
     /// `None` (default) lets rayon auto-detect based on available CPU cores.
     /// Set to `Some(n)` to use exactly `n` worker threads.
     pub system_threads: Option<usize>,
+}
+
+/// Per-system CPU budget overrides.
+///
+/// Systems can declare a default budget via the builder API. This
+/// section allows operators to override budgets by system name,
+/// or set a global default for systems without explicit budgets.
+///
+/// # Example
+///
+/// ```toml
+/// [server.budgets]
+/// default_ms = 10
+/// physics = 5
+/// ai_goals = 8
+/// pathfinding = 2
+/// ```
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct BudgetsSection {
+    /// Default budget in milliseconds for systems without an explicit
+    /// builder-declared or per-system override. `None` means unlimited.
+    pub default_ms: Option<u64>,
+    /// Per-system overrides: system name → max milliseconds per tick.
+    #[serde(flatten)]
+    pub overrides: HashMap<String, u64>,
 }
 
 /// Log output format.
@@ -214,6 +243,7 @@ impl Default for ServerSection {
             simulation_distance: 8,
             persistence_interval_seconds: 30,
             performance: PerformanceSection::default(),
+            budgets: BudgetsSection::default(),
         }
     }
 }
