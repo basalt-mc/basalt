@@ -291,6 +291,8 @@ pub(super) mod tests {
             basalt_ecs::SystemBuilder::new("lifetime")
                 .phase(basalt_ecs::Phase::Simulate)
                 .every(1)
+                .reads::<basalt_core::Lifetime>()
+                .writes::<basalt_core::Lifetime>()
                 .run(|ctx: &mut dyn basalt_core::SystemContext| {
                     use basalt_core::SystemContextExt;
                     for id in ctx.query::<basalt_core::Lifetime>() {
@@ -306,6 +308,8 @@ pub(super) mod tests {
             basalt_ecs::SystemBuilder::new("pickup_delay")
                 .phase(basalt_ecs::Phase::Simulate)
                 .every(1)
+                .reads::<basalt_core::PickupDelay>()
+                .writes::<basalt_core::PickupDelay>()
                 .run(|ctx: &mut dyn basalt_core::SystemContext| {
                     use basalt_core::SystemContextExt;
                     for id in ctx.query::<basalt_core::PickupDelay>() {

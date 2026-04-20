@@ -97,6 +97,12 @@ pub struct PerformanceSection {
     /// Each entry is typically 10-50 KB (encoded packet bytes).
     /// Default: 2048 (~50-100 MB).
     pub chunk_packet_cache_max_entries: usize,
+    /// Number of threads for parallel ECS system dispatch during SIMULATE.
+    ///
+    /// Non-conflicting systems are dispatched to a rayon thread pool.
+    /// `None` (default) lets rayon auto-detect based on available CPU cores.
+    /// Set to `Some(n)` to use exactly `n` worker threads.
+    pub system_threads: Option<usize>,
 }
 
 /// Log output format.
@@ -217,6 +223,7 @@ impl Default for PerformanceSection {
         Self {
             chunk_cache_max_entries: 4096,
             chunk_packet_cache_max_entries: 2048,
+            system_threads: None,
         }
     }
 }

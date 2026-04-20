@@ -84,6 +84,18 @@ impl Server {
         let (server_state, instant_bus, game_bus, plugin_systems) =
             ServerState::build_for_loops(Arc::clone(&world), plugins);
 
+        // Initialize rayon thread pool for parallel ECS system dispatch
+        let system_threads = self.config.server.performance.system_threads.unwrap_or(0);
+        if let Err(e) = rayon::ThreadPoolBuilder::new()
+            .num_threads(system_threads)
+            .build_global()
+        {
+            log::warn!(target: "basalt::server", "Rayon thread pool already initialized: {e}");
+        } else {
+            let actual = rayon::current_num_threads();
+            log::info!(target: "basalt::server", "Rayon thread pool: {actual} threads (parallel ECS dispatch)");
+        }
+
         let shared = SharedState::new();
         let tps = self.config.server.tick_rate;
         let crash_on_panic = self.config.server.crash_on_plugin_panic;
@@ -127,6 +139,8 @@ impl Server {
             basalt_ecs::SystemBuilder::new("lifetime")
                 .phase(basalt_ecs::Phase::Simulate)
                 .every(1)
+                .reads::<basalt_core::Lifetime>()
+                .writes::<basalt_core::Lifetime>()
                 .run(|ctx: &mut dyn basalt_core::SystemContext| {
                     use basalt_core::SystemContextExt;
                     for id in ctx.query::<basalt_core::Lifetime>() {
@@ -142,6 +156,8 @@ impl Server {
             basalt_ecs::SystemBuilder::new("pickup_delay")
                 .phase(basalt_ecs::Phase::Simulate)
                 .every(1)
+                .reads::<basalt_core::PickupDelay>()
+                .writes::<basalt_core::PickupDelay>()
                 .run(|ctx: &mut dyn basalt_core::SystemContext| {
                     use basalt_core::SystemContextExt;
                     for id in ctx.query::<basalt_core::PickupDelay>() {
