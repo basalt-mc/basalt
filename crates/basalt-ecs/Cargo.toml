@@ -10,6 +10,7 @@ repository.workspace = true
 basalt-core = { workspace = true }
 basalt-world = { workspace = true }
 rayon = { workspace = true }
+log = { workspace = true }
 
 [[bench]]
 name = "ecs"

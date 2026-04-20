@@ -173,6 +173,7 @@ mod tests {
             phase: Phase::Simulate,
             every,
             access,
+            budget: None,
             runner: Box::new(|_: &mut dyn basalt_core::SystemContext| {}),
         })
     }
@@ -288,6 +289,7 @@ mod tests {
                 phase: Phase::Input,
                 every: 1,
                 access: SystemAccess::new(),
+                budget: None,
                 runner: Box::new(|_: &mut dyn basalt_core::SystemContext| {}),
             }),
         ];
