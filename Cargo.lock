@@ -147,6 +147,7 @@ version = "0.1.0"
 dependencies = [
  "basalt-core",
  "basalt-world",
+ "log",
  "rayon",
 ]
 
