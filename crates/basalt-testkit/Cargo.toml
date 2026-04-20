@@ -1,6 +1,7 @@
 [package]
 name = "basalt-testkit"
-version = "0.1.0"
+version.workspace = true
+publish = false
 description = "Testing framework for Basalt plugins"
 edition.workspace = true
 license.workspace = true

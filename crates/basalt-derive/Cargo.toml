@@ -1,6 +1,7 @@
 [package]
 name = "basalt-derive"
-version = "0.1.0"
+version.workspace = true
+publish = false
 description = "Derive macros for Encode/Decode/EncodedSize traits"
 edition.workspace = true
 license.workspace = true

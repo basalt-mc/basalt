@@ -1,6 +1,7 @@
 [package]
 name = "basalt-net"
-version = "0.1.0"
+version.workspace = true
+publish = false
 description = "Async networking layer with encryption, compression, and middleware pipeline"
 edition.workspace = true
 license.workspace = true

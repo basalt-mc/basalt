@@ -1,6 +1,7 @@
 [package]
 name = "basalt-types"
-version = "0.1.0"
+version.workspace = true
+publish = false
 description = "Primitive Minecraft protocol types with zero-copy serialization"
 edition.workspace = true
 license.workspace = true
