@@ -1,4 +1,4 @@
-.PHONY: build test check fmt clippy deny codegen coverage vanilla-start vanilla-stop vanilla-logs vanilla-attach
+.PHONY: build test check fmt clippy deny codegen coverage release vanilla-start vanilla-stop vanilla-logs vanilla-attach
 
 ## Build all crates
 build:
@@ -31,6 +31,19 @@ codegen:
 ## Run coverage report locally
 coverage:
 	cargo llvm-cov --all-features --fail-under-lines 90 --ignore-filename-regex "(examples|packets/)"
+
+## Cut a release: bump version, update changelog, commit, tag
+## Usage: make release VERSION=0.2.0
+release:
+	@test -n "$(VERSION)" || (echo "Usage: make release VERSION=x.y.z" && exit 1)
+	@echo "Releasing v$(VERSION)..."
+	sed -i.bak 's/^version = ".*"/version = "$(VERSION)"/' Cargo.toml && rm Cargo.toml.bak
+	cargo check --workspace --lib --bins --examples
+	git-cliff --tag "v$(VERSION)" --output CHANGELOG.md
+	git add Cargo.toml CHANGELOG.md
+	git commit -m "chore(workspace): release v$(VERSION)"
+	git tag "v$(VERSION)"
+	@echo "Done. Run 'git push && git push --tags' to trigger the release workflow."
 
 ## Start vanilla 1.21.4 server on port 25566 (for protocol comparison)
 vanilla-start:
