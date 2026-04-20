@@ -98,6 +98,9 @@ node_modules/
 ## misc
 /coverage
 
+## claude code
+.claude/
+
 ## superpowers specs (local only)
 docs/superpowers/
 
