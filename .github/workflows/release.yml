@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  push:
+    tags: [ "v*" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --all-features
+      - run: cargo clippy --lib --bins --tests --examples --all-features -- -D warnings
+
+  build:
+    name: Build (${{ matrix.target }})
+    needs: [ test ]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            binary: basalt-server-linux-x86_64
+            cross: false
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-latest
+            binary: basalt-server-linux-aarch64
+            cross: true
+          - target: x86_64-apple-darwin
+            runner: macos-latest
+            binary: basalt-server-darwin-x86_64
+            cross: false
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+            binary: basalt-server-darwin-aarch64
+            cross: false
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+            binary: basalt-server-windows-x86_64.exe
+            cross: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.cross
+        uses: taiki-e/install-action@cross
+
+      - name: Build (native)
+        if: "!matrix.cross"
+        run: cargo build --release --package basalt-server --example server --target ${{
+          matrix.target }}
+
+      - name: Build (cross)
+        if: matrix.cross
+        run: cross build --release --package basalt-server --example server --target ${{
+          matrix.target }}
+
+      - name: Rename binary (unix)
+        if: runner.os != 'Windows'
+        run: mv "target/${{ matrix.target }}/release/examples/server" "${{ matrix.binary
+          }}"
+
+      - name: Rename binary (windows)
+        if: runner.os == 'Windows'
+        run: mv "target/${{ matrix.target }}/release/examples/server.exe" "${{
+          matrix.binary }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.binary }}
+          path: ${{ matrix.binary }}
+
+  release:
+    name: Release
+    needs: [ build ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@git-cliff
+
+      - name: Generate release notes
+        run: git-cliff --latest --strip header > RELEASE_NOTES.md
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect binaries
+        run: |
+          mkdir release
+          find artifacts -type f -exec mv {} release/ \;
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
+          files: release/*
