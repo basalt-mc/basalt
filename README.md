@@ -2,6 +2,7 @@
 
 A Minecraft server written from scratch in Rust. No wrappers, no JVM, no legacy code. A clean, modern foundation for building custom Minecraft experiences.
 
+[![Version](https://img.shields.io/github/v/release/basalt-mc/basalt?label=version&color=orange)](https://github.com/basalt-mc/basalt/releases)
 [![CI](https://github.com/basalt-mc/basalt/actions/workflows/ci.yml/badge.svg)](https://github.com/basalt-mc/basalt/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-%3E90%25-brightgreen)](https://github.com/basalt-mc/basalt)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
