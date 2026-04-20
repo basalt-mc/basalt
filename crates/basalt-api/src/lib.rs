@@ -32,6 +32,7 @@ pub mod components {
 pub mod system {
     pub use basalt_core::{
         Phase, SystemAccess, SystemBuilder, SystemContext, SystemContextExt, SystemDescriptor,
+        TickBudget,
     };
 }
 

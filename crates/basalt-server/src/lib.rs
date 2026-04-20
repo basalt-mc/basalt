@@ -130,7 +130,16 @@ impl Server {
         ecs.register_component::<basalt_core::OpenContainer>();
         ecs.register_component::<basalt_core::PlayerRef>();
         ecs.register_component::<basalt_core::Inventory>();
-        for system in plugin_systems {
+        // Apply budget overrides from config before registering systems
+        let budgets = &self.config.server.budgets;
+        for mut system in plugin_systems {
+            if let Some(&ms) = budgets.overrides.get(&system.name) {
+                system.budget = Some(std::time::Duration::from_millis(ms));
+            } else if system.budget.is_none()
+                && let Some(ms) = budgets.default_ms
+            {
+                system.budget = Some(std::time::Duration::from_millis(ms));
+            }
             ecs.add_system(system);
         }
 
@@ -169,6 +178,10 @@ impl Server {
                     }
                 }),
         );
+
+        // Configure tick overrun detection
+        let tick_duration = std::time::Duration::from_nanos(1_000_000_000 / u64::from(tps));
+        ecs.set_tick_duration(tick_duration);
 
         // Game loop — single dedicated OS thread
         let persistence_interval_ticks =
