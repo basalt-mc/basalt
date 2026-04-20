@@ -147,6 +147,7 @@ version = "0.1.0"
 dependencies = [
  "basalt-core",
  "basalt-world",
+ "rayon",
 ]
 
 [[package]]
@@ -287,6 +288,7 @@ dependencies = [
  "dashmap",
  "env_logger",
  "log",
+ "rayon",
  "reqwest",
  "serde",
  "serde_json",
