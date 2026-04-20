@@ -8,7 +8,7 @@ pub use basalt_core::{Component, EntityId};
 
 /// Type-erased component store, allowing the [`Ecs`] to hold
 /// stores for different component types in a single HashMap.
-trait AnyComponentStore: Send + Sync {
+pub(crate) trait AnyComponentStore: Send + Sync {
     /// Returns `self` as `&dyn Any` for downcasting.
     fn as_any(&self) -> &dyn Any;
     /// Returns `self` as `&mut dyn Any` for downcasting.
@@ -79,6 +79,12 @@ impl<T: Component + 'static> AnyComponentStore for ComponentStore<T> {
     }
 }
 
+/// Creates a new empty typed component store for testing.
+#[cfg(test)]
+pub(crate) fn new_component_store<T: Component>() -> Box<dyn AnyComponentStore> {
+    Box::new(ComponentStore::<T>::new())
+}
+
 /// Type-erased component store for dynamic component registration.
 ///
 /// Used when components are set via `SystemContext::set_component`
@@ -136,9 +142,14 @@ pub struct Ecs {
     /// Set of all living entities.
     alive: Vec<EntityId>,
     /// Registered systems, sorted by phase.
-    systems: Vec<crate::system::SystemDescriptor>,
+    /// Stored as `Option` to allow zero-allocation extraction during
+    /// parallel dispatch (individual systems are `take()`-n and put back).
+    systems: Vec<Option<basalt_core::SystemDescriptor>>,
     /// World reference for SystemContext::world(). Set by the server at startup.
     world: Option<std::sync::Arc<basalt_world::World>>,
+    /// Precomputed parallel execution groups for the SIMULATE phase.
+    /// Built lazily on first tick, invalidated on system registration.
+    simulate_cache: Option<crate::schedule::GroupCache>,
 }
 
 impl Ecs {
@@ -150,6 +161,7 @@ impl Ecs {
             alive: Vec::new(),
             systems: Vec::new(),
             world: None,
+            simulate_cache: None,
         }
     }
 
@@ -299,9 +311,13 @@ impl Ecs {
     // -- System scheduling --
 
     /// Registers a system for tick-phase execution.
-    pub fn add_system(&mut self, system: crate::system::SystemDescriptor) {
-        self.systems.push(system);
-        self.systems.sort_by_key(|s| s.phase);
+    ///
+    /// Invalidates the precomputed parallel group cache so it will
+    /// be rebuilt on the next SIMULATE tick.
+    pub fn add_system(&mut self, system: basalt_core::SystemDescriptor) {
+        self.systems.push(Some(system));
+        self.systems.sort_by_key(|s| s.as_ref().unwrap().phase);
+        self.simulate_cache = None;
     }
 
     /// Runs all systems for the given tick and phase.
@@ -311,27 +327,210 @@ impl Ecs {
     /// to each system runner). They are put back after execution.
     pub fn run_phase(&mut self, phase: basalt_core::Phase, tick: u64) {
         let mut systems = std::mem::take(&mut self.systems);
-        for system in &mut systems {
-            if system.phase == phase && tick.is_multiple_of(system.every) {
+        for slot in &mut systems {
+            if let Some(system) = slot
+                && system.phase == phase
+                && tick.is_multiple_of(system.every)
+            {
                 system.runner.run(self);
             }
         }
         self.systems = systems;
     }
 
+    /// Runs systems in parallel for a given phase using rayon.
+    ///
+    /// Uses a precomputed group cache (built once, O(1) lookup per tick).
+    /// Systems within a group have no conflicting component access and
+    /// are dispatched concurrently. A barrier separates groups.
+    ///
+    /// Falls back to sequential execution when there is a single group
+    /// with a single system (zero overhead in that case).
+    pub fn run_phase_parallel(&mut self, phase: basalt_core::Phase, tick: u64) {
+        // Build cache lazily on first call (or after add_system invalidation)
+        if self.simulate_cache.is_none() {
+            self.simulate_cache = Some(crate::schedule::GroupCache::build(&self.systems, phase));
+        }
+
+        // Take cache out to release borrow on self (zero-alloc pointer swap)
+        let cache = self.simulate_cache.take().unwrap();
+        let groups = cache.groups_for_tick(tick);
+
+        if groups.is_empty() {
+            self.simulate_cache = Some(cache);
+            return;
+        }
+
+        // Fast path: single group with single system — skip all parallel machinery
+        if groups.len() == 1 && groups[0].len() == 1 {
+            let idx = groups[0][0];
+            self.simulate_cache = Some(cache);
+            let mut systems = std::mem::take(&mut self.systems);
+            systems[idx].as_mut().unwrap().runner.run(self);
+            self.systems = systems;
+            return;
+        }
+
+        // Clone group indices before returning cache (small: few Vecs of few usizes)
+        let groups = groups.to_vec();
+        self.simulate_cache = Some(cache);
+
+        // Systems already stored as Vec<Option<_>> — zero-alloc extraction
+        let mut systems = std::mem::take(&mut self.systems);
+
+        for group in &groups {
+            self.dispatch_group(group, &mut systems);
+        }
+
+        self.systems = systems;
+    }
+
+    /// Dispatches one parallel group of systems via rayon.
+    ///
+    /// For each system in the group:
+    /// - Write-stores are temporarily removed from the Ecs (exclusive ownership)
+    /// - Read-stores are shared via `&dyn` references
+    /// - A [`ParallelSystemContext`] is built per system
+    ///
+    /// After the group completes, write-stores are returned and deferred
+    /// spawn/despawn commands are applied.
+    fn dispatch_group(
+        &mut self,
+        group: &[usize],
+        system_slots: &mut [Option<basalt_core::SystemDescriptor>],
+    ) {
+        // Collect all TypeIds written by systems in this group.
+        // Each write-TypeId belongs to exactly one system (guaranteed by conflict-free grouping).
+        let mut write_owners: HashMap<TypeId, usize> = HashMap::new();
+        for &idx in group {
+            let access = &system_slots[idx].as_ref().unwrap().access;
+            for &tid in &access.writes {
+                write_owners.insert(tid, idx);
+            }
+        }
+
+        // Extract write-stores from Ecs — each goes to its owning system
+        let mut per_system_writes: HashMap<usize, HashMap<TypeId, Box<dyn AnyComponentStore>>> =
+            group.iter().map(|&idx| (idx, HashMap::new())).collect();
+        for (&tid, &owner_idx) in &write_owners {
+            if let Some(store) = self.stores.remove(&tid) {
+                per_system_writes
+                    .get_mut(&owner_idx)
+                    .unwrap()
+                    .insert(tid, store);
+            }
+        }
+
+        // Build read-store references per system from the remaining stores in self.
+        // All write-stores have been removed, so what remains is safe to share as &.
+        let mut per_system_reads: HashMap<usize, HashMap<TypeId, &dyn AnyComponentStore>> =
+            group.iter().map(|&idx| (idx, HashMap::new())).collect();
+        for &idx in group {
+            let access = &system_slots[idx].as_ref().unwrap().access;
+            for &tid in &access.reads {
+                // Skip if this system already has it as a write-store
+                if per_system_writes
+                    .get(&idx)
+                    .is_some_and(|ws| ws.contains_key(&tid))
+                {
+                    continue;
+                }
+                if let Some(store) = self.stores.get(&tid) {
+                    per_system_reads
+                        .get_mut(&idx)
+                        .unwrap()
+                        .insert(tid, &**store);
+                }
+            }
+        }
+
+        let world_ref = self
+            .world
+            .as_ref()
+            .expect("Ecs::set_world() must be called before running parallel systems");
+
+        // Snapshot alive list and entity counter for parallel contexts.
+        // Clone alive so rayon tasks don't borrow self (which we mutate after the scope).
+        let local_counter = AtomicU32::new(self.next_entity_id.load(Ordering::Relaxed));
+
+        // Take systems out for the group
+        let mut group_systems: Vec<(usize, basalt_core::SystemDescriptor)> = group
+            .iter()
+            .map(|&idx| (idx, system_slots[idx].take().unwrap()))
+            .collect();
+
+        // Collect results from parallel execution via a shared mutex.
+        // Each entry: (system_index, system_descriptor, returned_write_stores, deferred_commands)
+        type GroupResult = (
+            usize,
+            basalt_core::SystemDescriptor,
+            HashMap<TypeId, Box<dyn AnyComponentStore>>,
+            Vec<crate::parallel::DeferredCommand>,
+        );
+        let results: std::sync::Mutex<Vec<GroupResult>> = std::sync::Mutex::new(Vec::new());
+
+        rayon::scope(|s| {
+            for (idx, mut sys) in group_systems.drain(..) {
+                let write_stores = per_system_writes.remove(&idx).unwrap_or_default();
+                let read_stores = per_system_reads.remove(&idx).unwrap_or_default();
+                let sys_name = sys.name.clone();
+                let results = &results;
+                let counter = &local_counter;
+
+                s.spawn(move |_| {
+                    let mut ctx = crate::parallel::ParallelSystemContext::new(
+                        write_stores,
+                        read_stores,
+                        world_ref,
+                        counter,
+                        sys_name,
+                    );
+                    sys.runner.run(&mut ctx);
+                    let (writes_back, deferred) = ctx.into_parts();
+                    results
+                        .lock()
+                        .unwrap()
+                        .push((idx, sys, writes_back, deferred));
+                });
+            }
+        });
+        // rayon::scope blocks — all tasks are complete, all borrows released.
+
+        // Sync the entity counter back
+        self.next_entity_id
+            .store(local_counter.load(Ordering::Relaxed), Ordering::Relaxed);
+
+        // Process results: return systems, stores, and apply deferred commands
+        for (idx, sys, writes_back, deferred) in results.into_inner().unwrap() {
+            system_slots[idx] = Some(sys);
+            for (tid, store) in writes_back {
+                self.stores.insert(tid, store);
+            }
+            for cmd in deferred {
+                match cmd {
+                    crate::parallel::DeferredCommand::Spawn { entity_id } => {
+                        self.alive.push(entity_id);
+                    }
+                    crate::parallel::DeferredCommand::Despawn { entity_id } => {
+                        Ecs::despawn(self, entity_id);
+                    }
+                }
+            }
+        }
+    }
+
     /// Runs all phases in order for the given tick.
+    ///
+    /// The SIMULATE phase uses parallel dispatch via rayon when multiple
+    /// non-conflicting systems exist. All other phases run sequentially.
     pub fn run_all(&mut self, tick: u64) {
         use basalt_core::Phase;
-        for phase in [
-            Phase::Input,
-            Phase::Validate,
-            Phase::Simulate,
-            Phase::Process,
-            Phase::Output,
-            Phase::Post,
-        ] {
-            self.run_phase(phase, tick);
-        }
+        self.run_phase(Phase::Input, tick);
+        self.run_phase(Phase::Validate, tick);
+        self.run_phase_parallel(Phase::Simulate, tick);
+        self.run_phase(Phase::Process, tick);
+        self.run_phase(Phase::Output, tick);
+        self.run_phase(Phase::Post, tick);
     }
 
     /// Returns the number of registered systems.
@@ -606,6 +805,279 @@ mod tests {
                 max: 20.0,
             },
         );
+        assert_eq!(ecs.get::<Health>(e).unwrap().current, 5.0);
+    }
+
+    // -- Parallel dispatch tests --
+
+    fn setup_parallel_ecs() -> Ecs {
+        let mut ecs = Ecs::new();
+        ecs.register_component::<Position>();
+        ecs.register_component::<Velocity>();
+        ecs.register_component::<Health>();
+        let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
+        ecs.set_world(world);
+        ecs
+    }
+
+    #[test]
+    fn parallel_two_non_conflicting_systems() {
+        let mut ecs = setup_parallel_ecs();
+        let e = ecs.spawn();
+        ecs.set(
+            e,
+            Position {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+        );
+        ecs.set(
+            e,
+            Health {
+                current: 20.0,
+                max: 20.0,
+            },
+        );
+
+        // System A writes Position (sets x to 42)
+        ecs.add_system(
+            basalt_core::SystemBuilder::new("move_x")
+                .phase(basalt_core::Phase::Simulate)
+                .writes::<Position>()
+                .run(|ctx: &mut dyn basalt_core::SystemContext| {
+                    use basalt_core::SystemContextExt;
+                    for id in ctx.query::<Position>() {
+                        if let Some(pos) = ctx.get_mut::<Position>(id) {
+                            pos.x = 42.0;
+                        }
+                    }
+                }),
+        );
+
+        // System B writes Health (sets current to 10) — no conflict with A
+        ecs.add_system(
+            basalt_core::SystemBuilder::new("damage")
+                .phase(basalt_core::Phase::Simulate)
+                .writes::<Health>()
+                .run(|ctx: &mut dyn basalt_core::SystemContext| {
+                    use basalt_core::SystemContextExt;
+                    for id in ctx.query::<Health>() {
+                        if let Some(hp) = ctx.get_mut::<Health>(id) {
+                            hp.current = 10.0;
+                        }
+                    }
+                }),
+        );
+
+        ecs.run_phase_parallel(basalt_core::Phase::Simulate, 1);
+
+        assert_eq!(ecs.get::<Position>(e).unwrap().x, 42.0);
+        assert_eq!(ecs.get::<Health>(e).unwrap().current, 10.0);
+    }
+
+    #[test]
+    fn parallel_conflicting_systems_run_sequentially() {
+        let mut ecs = setup_parallel_ecs();
+        let e = ecs.spawn();
+        ecs.set(
+            e,
+            Velocity {
+                dx: 0.0,
+                dy: 0.0,
+                dz: 0.0,
+            },
+        );
+
+        // Both write Velocity — they must be in separate groups
+        ecs.add_system(
+            basalt_core::SystemBuilder::new("sys_a")
+                .phase(basalt_core::Phase::Simulate)
+                .writes::<Velocity>()
+                .run(|ctx: &mut dyn basalt_core::SystemContext| {
+                    use basalt_core::SystemContextExt;
+                    for id in ctx.query::<Velocity>() {
+                        if let Some(vel) = ctx.get_mut::<Velocity>(id) {
+                            vel.dx += 1.0;
+                        }
+                    }
+                }),
+        );
+
+        ecs.add_system(
+            basalt_core::SystemBuilder::new("sys_b")
+                .phase(basalt_core::Phase::Simulate)
+                .writes::<Velocity>()
+                .run(|ctx: &mut dyn basalt_core::SystemContext| {
+                    use basalt_core::SystemContextExt;
+                    for id in ctx.query::<Velocity>() {
+                        if let Some(vel) = ctx.get_mut::<Velocity>(id) {
+                            vel.dx += 2.0;
+                        }
+                    }
+                }),
+        );
+
+        ecs.run_phase_parallel(basalt_core::Phase::Simulate, 1);
+
+        // Both ran (sequentially in separate groups), total dx = 3.0
+        assert_eq!(ecs.get::<Velocity>(e).unwrap().dx, 3.0);
+    }
+
+    #[test]
+    fn parallel_single_system_uses_fast_path() {
+        let mut ecs = setup_parallel_ecs();
+        let e = ecs.spawn();
+        ecs.set(
+            e,
+            Position {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+        );
+
+        ecs.add_system(
+            basalt_core::SystemBuilder::new("only_one")
+                .phase(basalt_core::Phase::Simulate)
+                .writes::<Position>()
+                .run(|ctx: &mut dyn basalt_core::SystemContext| {
+                    use basalt_core::SystemContextExt;
+                    for id in ctx.query::<Position>() {
+                        if let Some(pos) = ctx.get_mut::<Position>(id) {
+                            pos.y = 100.0;
+                        }
+                    }
+                }),
+        );
+
+        ecs.run_phase_parallel(basalt_core::Phase::Simulate, 1);
+        assert_eq!(ecs.get::<Position>(e).unwrap().y, 100.0);
+    }
+
+    #[test]
+    fn parallel_deferred_spawn_applied_after_group() {
+        let mut ecs = setup_parallel_ecs();
+        let initial_count = ecs.entity_count();
+
+        ecs.add_system(
+            basalt_core::SystemBuilder::new("spawner_a")
+                .phase(basalt_core::Phase::Simulate)
+                .writes::<Position>()
+                .run(|ctx: &mut dyn basalt_core::SystemContext| {
+                    ctx.spawn();
+                }),
+        );
+
+        ecs.add_system(
+            basalt_core::SystemBuilder::new("spawner_b")
+                .phase(basalt_core::Phase::Simulate)
+                .writes::<Health>()
+                .run(|ctx: &mut dyn basalt_core::SystemContext| {
+                    ctx.spawn();
+                }),
+        );
+
+        ecs.run_phase_parallel(basalt_core::Phase::Simulate, 1);
+
+        // Both systems spawned an entity — they appear after the group
+        assert_eq!(ecs.entity_count(), initial_count + 2);
+    }
+
+    #[test]
+    fn parallel_run_all_integrates_correctly() {
+        let mut ecs = setup_parallel_ecs();
+        let e = ecs.spawn();
+        ecs.set(
+            e,
+            Position {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+        );
+        ecs.set(
+            e,
+            Health {
+                current: 20.0,
+                max: 20.0,
+            },
+        );
+
+        ecs.add_system(
+            basalt_core::SystemBuilder::new("move")
+                .phase(basalt_core::Phase::Simulate)
+                .writes::<Position>()
+                .run(|ctx: &mut dyn basalt_core::SystemContext| {
+                    use basalt_core::SystemContextExt;
+                    for id in ctx.query::<Position>() {
+                        if let Some(pos) = ctx.get_mut::<Position>(id) {
+                            pos.x += 1.0;
+                        }
+                    }
+                }),
+        );
+
+        ecs.add_system(
+            basalt_core::SystemBuilder::new("heal")
+                .phase(basalt_core::Phase::Simulate)
+                .writes::<Health>()
+                .run(|ctx: &mut dyn basalt_core::SystemContext| {
+                    use basalt_core::SystemContextExt;
+                    for id in ctx.query::<Health>() {
+                        if let Some(hp) = ctx.get_mut::<Health>(id) {
+                            hp.current -= 1.0;
+                        }
+                    }
+                }),
+        );
+
+        // run_all calls run_phase_parallel for Simulate
+        ecs.run_all(1);
+
+        assert_eq!(ecs.get::<Position>(e).unwrap().x, 1.0);
+        assert_eq!(ecs.get::<Health>(e).unwrap().current, 19.0);
+    }
+
+    #[test]
+    fn parallel_system_reads_while_other_writes() {
+        let mut ecs = setup_parallel_ecs();
+        let e = ecs.spawn();
+        ecs.set(
+            e,
+            Position {
+                x: 5.0,
+                y: 0.0,
+                z: 0.0,
+            },
+        );
+        ecs.set(
+            e,
+            Health {
+                current: 20.0,
+                max: 20.0,
+            },
+        );
+
+        // System A reads Position, writes Health — uses Position.x to set Health
+        ecs.add_system(
+            basalt_core::SystemBuilder::new("pos_to_hp")
+                .phase(basalt_core::Phase::Simulate)
+                .reads::<Position>()
+                .writes::<Health>()
+                .run(|ctx: &mut dyn basalt_core::SystemContext| {
+                    use basalt_core::SystemContextExt;
+                    for id in ctx.query::<Health>() {
+                        let x = ctx.get::<Position>(id).map_or(0.0, |p| p.x);
+                        if let Some(hp) = ctx.get_mut::<Health>(id) {
+                            hp.current = x as f32;
+                        }
+                    }
+                }),
+        );
+
+        ecs.run_phase_parallel(basalt_core::Phase::Simulate, 1);
+
         assert_eq!(ecs.get::<Health>(e).unwrap().current, 5.0);
     }
 }

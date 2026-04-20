@@ -12,6 +12,8 @@
 //! game-specific components. Component types are defined in `basalt-core`.
 
 mod ecs;
+pub(crate) mod parallel;
+pub(crate) mod schedule;
 mod system;
 
 pub use ecs::{Component, Ecs, EntityId};
