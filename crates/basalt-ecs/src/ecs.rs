@@ -345,6 +345,7 @@ impl Ecs {
     /// double mutable borrow (`self.systems` + `&mut self` passed
     /// to each system runner). They are put back after execution.
     pub fn run_phase(&mut self, phase: basalt_core::Phase, tick: u64) {
+        let track = self.tick_duration.is_some();
         let mut systems = std::mem::take(&mut self.systems);
         for slot in &mut systems {
             if let Some(system) = slot
@@ -357,8 +358,10 @@ impl Ecs {
                 };
                 self.current_budget = budget;
                 system.runner.run(self);
-                self.tick_timings
-                    .push((system.name.clone(), self.current_budget.elapsed()));
+                if track {
+                    self.tick_timings
+                        .push((system.name.clone(), self.current_budget.elapsed()));
+                }
             }
         }
         self.systems = systems;
@@ -563,8 +566,11 @@ impl Ecs {
     /// non-conflicting systems exist. All other phases run sequentially.
     pub fn run_all(&mut self, tick: u64) {
         use basalt_core::Phase;
-        let tick_start = Instant::now();
-        self.tick_timings.clear();
+        // Only start timing when overrun detection is enabled (avoids ~25ns Instant::now cost)
+        let tick_start = self.tick_duration.map(|_| Instant::now());
+        if tick_start.is_some() {
+            self.tick_timings.clear();
+        }
 
         self.run_phase(Phase::Input, tick);
         self.run_phase(Phase::Validate, tick);
@@ -573,8 +579,10 @@ impl Ecs {
         self.run_phase(Phase::Output, tick);
         self.run_phase(Phase::Post, tick);
 
-        if let Some(limit) = self.tick_duration {
-            let total = tick_start.elapsed();
+        if let Some(start) = tick_start
+            && let Some(limit) = self.tick_duration
+        {
+            let total = start.elapsed();
             if total > limit {
                 log::warn!(
                     "Tick {tick} overrun: {total:.1?} > {limit:.1?} — {}",
