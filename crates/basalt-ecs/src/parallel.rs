@@ -12,7 +12,7 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use basalt_core::{EntityId, SystemContext};
+use basalt_core::{EntityId, SystemContext, TickBudget};
 
 use crate::ecs::AnyComponentStore;
 
@@ -50,6 +50,8 @@ pub(crate) struct ParallelSystemContext<'scope> {
     pub(crate) deferred: Vec<DeferredCommand>,
     /// System name for error messages.
     system_name: String,
+    /// CPU budget for this system invocation.
+    budget: TickBudget,
 }
 
 impl<'scope> ParallelSystemContext<'scope> {
@@ -60,6 +62,7 @@ impl<'scope> ParallelSystemContext<'scope> {
         world: &'scope basalt_world::World,
         next_entity_id: &'scope AtomicU32,
         system_name: String,
+        budget: TickBudget,
     ) -> Self {
         Self {
             write_stores,
@@ -68,7 +71,13 @@ impl<'scope> ParallelSystemContext<'scope> {
             next_entity_id,
             deferred: Vec::new(),
             system_name,
+            budget,
         }
+    }
+
+    /// Returns the system name.
+    pub(crate) fn system_name(&self) -> &str {
+        &self.system_name
     }
 
     /// Consumes the context, returning write stores and deferred commands.
@@ -148,6 +157,10 @@ impl SystemContext for ParallelSystemContext<'_> {
             self.system_name, type_id
         );
     }
+
+    fn budget(&self) -> &TickBudget {
+        &self.budget
+    }
 }
 
 #[cfg(test)]
@@ -193,6 +206,7 @@ mod tests {
             &world,
             &counter,
             "test".to_string(),
+            TickBudget::unlimited(),
         );
 
         let pos = ctx.get::<Position>(1).unwrap();
@@ -216,6 +230,7 @@ mod tests {
             &world,
             &counter,
             "test".to_string(),
+            TickBudget::unlimited(),
         );
 
         let pos = ctx.get::<Position>(1).unwrap();
@@ -238,6 +253,7 @@ mod tests {
             &world,
             &counter,
             "test".to_string(),
+            TickBudget::unlimited(),
         );
 
         let pos = ctx.get_mut::<Position>(1).unwrap();
@@ -257,6 +273,7 @@ mod tests {
             &world,
             &counter,
             "test".to_string(),
+            TickBudget::unlimited(),
         );
 
         let id1 = ctx.spawn();
@@ -278,6 +295,7 @@ mod tests {
             &world,
             &counter,
             "test".to_string(),
+            TickBudget::unlimited(),
         );
 
         ctx.despawn(5);
@@ -308,6 +326,7 @@ mod tests {
             &world,
             &counter,
             "test".to_string(),
+            TickBudget::unlimited(),
         );
 
         let entities = ctx.entities_with(TypeId::of::<Position>());
@@ -325,6 +344,7 @@ mod tests {
             &world,
             &counter,
             "test".to_string(),
+            TickBudget::unlimited(),
         );
 
         ctx.set_component(
@@ -346,6 +366,7 @@ mod tests {
             &world,
             &counter,
             "test".to_string(),
+            TickBudget::unlimited(),
         );
 
         ctx.get_component_mut(1, TypeId::of::<Position>());
@@ -367,6 +388,7 @@ mod tests {
             &world,
             &counter,
             "test".to_string(),
+            TickBudget::unlimited(),
         );
 
         // Mutate through context

@@ -3,7 +3,9 @@
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::{Duration, Instant};
 
+use basalt_core::TickBudget;
 pub use basalt_core::{Component, EntityId};
 
 /// Type-erased component store, allowing the [`Ecs`] to hold
@@ -150,6 +152,12 @@ pub struct Ecs {
     /// Precomputed parallel execution groups for the SIMULATE phase.
     /// Built lazily on first tick, invalidated on system registration.
     simulate_cache: Option<crate::schedule::GroupCache>,
+    /// Budget for the currently executing system (set before each runner call).
+    current_budget: TickBudget,
+    /// Per-system timing for the current tick (name, elapsed).
+    tick_timings: Vec<(String, Duration)>,
+    /// Expected tick duration for overrun detection. `None` disables logging.
+    tick_duration: Option<Duration>,
 }
 
 impl Ecs {
@@ -162,7 +170,18 @@ impl Ecs {
             systems: Vec::new(),
             world: None,
             simulate_cache: None,
+            current_budget: TickBudget::unlimited(),
+            tick_timings: Vec::new(),
+            tick_duration: None,
         }
+    }
+
+    /// Sets the expected tick duration for overrun detection.
+    ///
+    /// When set, `run_all` logs a warning if the total tick time exceeds
+    /// this duration, including a per-system timing breakdown.
+    pub fn set_tick_duration(&mut self, duration: Duration) {
+        self.tick_duration = Some(duration);
     }
 
     /// Sets the world reference for system runners.
@@ -332,7 +351,14 @@ impl Ecs {
                 && system.phase == phase
                 && tick.is_multiple_of(system.every)
             {
+                let budget = match system.budget {
+                    Some(limit) => TickBudget::new(limit),
+                    None => TickBudget::unlimited(),
+                };
+                self.current_budget = budget;
                 system.runner.run(self);
+                self.tick_timings
+                    .push((system.name.clone(), self.current_budget.elapsed()));
             }
         }
         self.systems = systems;
@@ -460,12 +486,14 @@ impl Ecs {
             .collect();
 
         // Collect results from parallel execution via a shared mutex.
-        // Each entry: (system_index, system_descriptor, returned_write_stores, deferred_commands)
+        // Each entry: (index, descriptor, write_stores, deferred_cmds, name, elapsed)
         type GroupResult = (
             usize,
             basalt_core::SystemDescriptor,
             HashMap<TypeId, Box<dyn AnyComponentStore>>,
             Vec<crate::parallel::DeferredCommand>,
+            String,
+            Duration,
         );
         let results: std::sync::Mutex<Vec<GroupResult>> = std::sync::Mutex::new(Vec::new());
 
@@ -477,6 +505,11 @@ impl Ecs {
                 let results = &results;
                 let counter = &local_counter;
 
+                let sys_budget = match sys.budget {
+                    Some(limit) => TickBudget::new(limit),
+                    None => TickBudget::unlimited(),
+                };
+
                 s.spawn(move |_| {
                     let mut ctx = crate::parallel::ParallelSystemContext::new(
                         write_stores,
@@ -484,13 +517,17 @@ impl Ecs {
                         world_ref,
                         counter,
                         sys_name,
+                        sys_budget,
                     );
+                    let run_start = Instant::now();
                     sys.runner.run(&mut ctx);
+                    let elapsed = run_start.elapsed();
+                    let name = ctx.system_name().to_string();
                     let (writes_back, deferred) = ctx.into_parts();
                     results
                         .lock()
                         .unwrap()
-                        .push((idx, sys, writes_back, deferred));
+                        .push((idx, sys, writes_back, deferred, name, elapsed));
                 });
             }
         });
@@ -500,8 +537,9 @@ impl Ecs {
         self.next_entity_id
             .store(local_counter.load(Ordering::Relaxed), Ordering::Relaxed);
 
-        // Process results: return systems, stores, and apply deferred commands
-        for (idx, sys, writes_back, deferred) in results.into_inner().unwrap() {
+        // Process results: return systems, stores, apply deferred commands, collect timings
+        for (idx, sys, writes_back, deferred, name, elapsed) in results.into_inner().unwrap() {
+            self.tick_timings.push((name, elapsed));
             system_slots[idx] = Some(sys);
             for (tid, store) in writes_back {
                 self.stores.insert(tid, store);
@@ -525,17 +563,44 @@ impl Ecs {
     /// non-conflicting systems exist. All other phases run sequentially.
     pub fn run_all(&mut self, tick: u64) {
         use basalt_core::Phase;
+        let tick_start = Instant::now();
+        self.tick_timings.clear();
+
         self.run_phase(Phase::Input, tick);
         self.run_phase(Phase::Validate, tick);
         self.run_phase_parallel(Phase::Simulate, tick);
         self.run_phase(Phase::Process, tick);
         self.run_phase(Phase::Output, tick);
         self.run_phase(Phase::Post, tick);
+
+        if let Some(limit) = self.tick_duration {
+            let total = tick_start.elapsed();
+            if total > limit {
+                log::warn!(
+                    "Tick {tick} overrun: {total:.1?} > {limit:.1?} — {}",
+                    self.format_timings()
+                );
+            }
+        }
     }
 
     /// Returns the number of registered systems.
     pub fn system_count(&self) -> usize {
         self.systems.len()
+    }
+
+    /// Returns per-system timings collected during the last `run_all` call.
+    pub fn tick_timings(&self) -> &[(String, Duration)] {
+        &self.tick_timings
+    }
+
+    /// Formats the per-system timing breakdown for logging.
+    fn format_timings(&self) -> String {
+        self.tick_timings
+            .iter()
+            .map(|(name, elapsed)| format!("{name}={elapsed:.1?}"))
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 }
 
@@ -588,6 +653,10 @@ impl basalt_core::SystemContext for Ecs {
 
     fn get_component_mut(&mut self, entity: EntityId, type_id: TypeId) -> Option<&mut dyn Any> {
         self.stores.get_mut(&type_id)?.get_any_mut(entity)
+    }
+
+    fn budget(&self) -> &TickBudget {
+        &self.current_budget
     }
 }
 
