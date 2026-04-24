@@ -58,11 +58,13 @@ impl ServerState {
         EventBus,
         EventBus,
         Vec<basalt_core::SystemDescriptor>,
+        basalt_recipes::RecipeRegistry,
     ) {
         let mut instant_bus = EventBus::new();
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
+        let mut recipes = basalt_recipes::RecipeRegistry::with_vanilla();
         {
             let mut registrar = basalt_api::PluginRegistrar::new(
                 &mut instant_bus,
@@ -70,6 +72,7 @@ impl ServerState {
                 &mut commands,
                 &mut systems,
                 std::sync::Arc::clone(&world),
+                &mut recipes,
             );
             for plugin in &plugins {
                 log::info!(target: "basalt::plugin", "Enabling {} v{}", plugin.metadata().name, plugin.metadata().version);
@@ -137,7 +140,7 @@ impl ServerState {
             command_args,
         });
 
-        (state, instant_bus, game_bus, systems)
+        (state, instant_bus, game_bus, systems, recipes)
     }
 
     /// Allocates a unique entity ID for a new player.
@@ -401,7 +404,7 @@ mod tests {
         let config = crate::config::ServerConfig::default();
         let world = Arc::new(config.create_world());
         let plugins = config.create_plugins();
-        let (state, _instant_bus, _game_bus, _systems) =
+        let (state, _instant_bus, _game_bus, _systems, _recipes) =
             ServerState::build_for_loops(world, plugins);
         state
     }

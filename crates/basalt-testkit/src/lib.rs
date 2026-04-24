@@ -46,6 +46,8 @@ pub struct PluginTestHarness {
     game_bus: EventBus,
     /// Collected command entries.
     commands: Vec<basalt_api::CommandEntry>,
+    /// Recipe registry for plugin customisation.
+    recipes: basalt_recipes::RecipeRegistry,
 }
 
 impl PluginTestHarness {
@@ -56,6 +58,7 @@ impl PluginTestHarness {
             instant_bus: EventBus::new(),
             game_bus: EventBus::new(),
             commands: Vec::new(),
+            recipes: basalt_recipes::RecipeRegistry::empty(),
         }
     }
 
@@ -66,6 +69,7 @@ impl PluginTestHarness {
             instant_bus: EventBus::new(),
             game_bus: EventBus::new(),
             commands: Vec::new(),
+            recipes: basalt_recipes::RecipeRegistry::empty(),
         }
     }
 
@@ -83,6 +87,7 @@ impl PluginTestHarness {
             &mut self.commands,
             &mut systems,
             Arc::clone(&self.world),
+            &mut self.recipes,
         );
         plugin.on_enable(&mut registrar);
     }
