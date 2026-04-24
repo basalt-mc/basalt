@@ -1,0 +1,13 @@
+[package]
+name = "basalt-plugin-recipe"
+version.workspace = true
+publish = false
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+basalt-api = { workspace = true }
+
+[dev-dependencies]
+basalt-testkit = { workspace = true }
