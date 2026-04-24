@@ -26,17 +26,19 @@ pub struct Lifetime {
 }
 impl Component for Lifetime {}
 
-/// Tracks an open container window for a player.
+/// Tracks that a player currently has a non-inventory window open.
 ///
-/// Present on player entities while they have a container (chest, etc.)
-/// open. Used to route WindowClick packets and broadcast slot changes
-/// to all viewers of the same container.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Present on the player entity from the moment an OpenWindow packet
+/// is sent until a CloseWindow packet is received (or the player
+/// disconnects). Removed on close.
+#[derive(Debug, Clone)]
 pub struct OpenContainer {
-    /// Protocol window ID (1-127, cycling).
+    /// Protocol window ID (1-127) assigned when opening.
     pub window_id: u8,
-    /// Absolute block position of the container.
-    pub position: (i32, i32, i32),
+    /// The kind of inventory that was opened.
+    pub inventory_type: crate::container::InventoryType,
+    /// How the container is backed in the world.
+    pub backing: crate::container::ContainerBacking,
 }
 impl Component for OpenContainer {}
 
