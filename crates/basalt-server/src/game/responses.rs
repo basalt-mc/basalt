@@ -122,7 +122,17 @@ impl GameLoop {
                 }
                 Response::OpenChest(pos) => {
                     if let Some(eid) = self.find_by_uuid(source_uuid) {
-                        self.open_chest(eid, pos.x, pos.y, pos.z);
+                        self.open_chest(source_uuid, eid, pos.x, pos.y, pos.z);
+                    }
+                }
+                Response::OpenCraftingTable { position } => {
+                    if let Some(eid) = self.find_by_uuid(source_uuid) {
+                        self.open_crafting_table(eid, position.x, position.y, position.z);
+                    }
+                }
+                Response::OpenContainer(container) => {
+                    if let Some(eid) = self.find_by_uuid(source_uuid) {
+                        self.open_custom_container(eid, source_uuid, container.clone());
                     }
                 }
             }

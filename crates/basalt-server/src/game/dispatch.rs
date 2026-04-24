@@ -30,7 +30,13 @@ impl GameLoop {
                     );
                 }
                 GameInput::PlayerDisconnected { uuid } => {
+                    // Look up eid before disconnection removes it from the index
+                    let eid = self.find_by_uuid(uuid);
                     self.handle_player_disconnected(uuid);
+                    // Clean up drag state for disconnected player
+                    if let Some(eid) = eid {
+                        self.drag_states.remove(&eid);
+                    }
                 }
                 GameInput::Position {
                     uuid,
@@ -127,6 +133,13 @@ impl GameLoop {
                 }
                 GameInput::CloseWindow { uuid, .. } => {
                     if let Some(eid) = self.find_by_uuid(uuid) {
+                        // Dispatch ContainerClosedEvent before removing the component
+                        self.dispatch_container_closed(
+                            eid,
+                            uuid,
+                            basalt_api::events::CloseReason::Manual,
+                        );
+
                         // Return cursor item to inventory or drop it
                         let cursor_item = self
                             .ecs
@@ -150,34 +163,87 @@ impl GameLoop {
                                 cursor_item.item_count,
                             );
                         }
-                        // Broadcast chest close animation if no other viewers
+                        // Read container metadata before removing the component
                         if let Some(oc) = self.ecs.get::<basalt_core::OpenContainer>(eid) {
-                            let pos = oc.position;
-                            let remaining = self
-                                .ecs
-                                .iter::<basalt_core::OpenContainer>()
-                                .filter(|(id, oc2)| *id != eid && oc2.position == pos)
-                                .count() as u8;
-                            let view = self.build_chest_view(pos.0, pos.1, pos.2);
-                            for part in &view.parts {
-                                let (px, py, pz) = part.position;
-                                for (e, _) in self.ecs.iter::<super::OutputHandle>() {
-                                    self.send_to(e, |tx| {
-                                        let _ = tx.try_send(
-                                            crate::messages::ServerOutput::BlockAction {
-                                                x: px,
-                                                y: py,
-                                                z: pz,
-                                                action_id: 1,
-                                                action_param: remaining,
-                                                block_id: 185,
-                                            },
+                            let inventory_type = oc.inventory_type;
+                            let backing = oc.backing;
+
+                            // If closing a crafting table, drop grid contents and reset to 2x2
+                            if matches!(inventory_type, basalt_core::InventoryType::Crafting) {
+                                // Collect slots to drop before mutable borrow
+                                let slots_to_drop: Vec<(i32, i32)> = self
+                                    .ecs
+                                    .get::<basalt_core::CraftingGrid>(eid)
+                                    .iter()
+                                    .flat_map(|grid| grid.slots.iter())
+                                    .filter_map(|slot| slot.item_id.map(|id| (id, slot.item_count)))
+                                    .collect();
+                                // Drop all items from the crafting grid
+                                for (item_id, count) in slots_to_drop {
+                                    if let Some(player_pos) =
+                                        self.ecs.get::<basalt_core::Position>(eid)
+                                    {
+                                        self.spawn_item_entity(
+                                            player_pos.x as i32,
+                                            player_pos.y as i32 + 1,
+                                            player_pos.z as i32,
+                                            item_id,
+                                            count,
                                         );
-                                    });
+                                    }
                                 }
+                                // Reset to 2x2 mode
+                                if let Some(grid) =
+                                    self.ecs.get_mut::<basalt_core::CraftingGrid>(eid)
+                                {
+                                    grid.grid_size = 2;
+                                    grid.clear();
+                                }
+                            } else if let basalt_core::ContainerBacking::Block { position } =
+                                backing
+                            {
+                                // Broadcast chest close animation if no other viewers
+                                let pos = (position.x, position.y, position.z);
+                                let remaining = self
+                                    .ecs
+                                    .iter::<basalt_core::OpenContainer>()
+                                    .filter(|(id, oc2)| {
+                                        *id != eid
+                                            && matches!(
+                                                &oc2.backing,
+                                                basalt_core::ContainerBacking::Block { position: p }
+                                                    if (p.x, p.y, p.z) == pos
+                                            )
+                                    })
+                                    .count() as u8;
+                                let view = self.build_chest_view(pos.0, pos.1, pos.2);
+                                for part in &view.parts {
+                                    let (px, py, pz) = part.position;
+                                    for (e, _) in self.ecs.iter::<super::OutputHandle>() {
+                                        self.send_to(e, |tx| {
+                                            let _ = tx.try_send(
+                                                crate::messages::ServerOutput::BlockAction {
+                                                    x: px,
+                                                    y: py,
+                                                    z: pz,
+                                                    action_id: 1,
+                                                    action_param: remaining,
+                                                    block_id: 185,
+                                                },
+                                            );
+                                        });
+                                    }
+                                }
+                            }
+                            // If backing is Virtual, remove VirtualContainerSlots component
+                            if matches!(backing, basalt_core::ContainerBacking::Virtual) {
+                                self.ecs
+                                    .remove_component::<basalt_core::VirtualContainerSlots>(eid);
                             }
                         }
                         self.ecs.remove_component::<basalt_core::OpenContainer>(eid);
+                        // Cancel any in-progress drag operation
+                        self.drag_states.remove(&eid);
                     }
                 }
                 GameInput::EntityAction {
@@ -195,5 +261,174 @@ impl GameLoop {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use basalt_types::Uuid;
+
+    use crate::messages::{GameInput, ServerOutput};
+
+    #[test]
+    fn crafting_table_close_drops_grid_items() {
+        let (mut game_loop, game_tx, _io_rx) = super::super::tests::test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let mut rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
+        while rx.try_recv().is_ok() {}
+
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
+
+        // Place a crafting table and open it
+        game_loop
+            .world
+            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+        game_loop.open_crafting_table(eid, 5, 64, 3);
+        while rx.try_recv().is_ok() {}
+
+        // Put items in the crafting grid
+        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+            grid.slots[0] = basalt_types::Slot::new(1, 4);
+            grid.slots[4] = basalt_types::Slot::new(2, 8);
+        }
+
+        // Close the window
+        let _ = game_tx.send(GameInput::CloseWindow { uuid });
+        game_loop.tick(1);
+
+        // Grid should be reset to 2x2 and cleared
+        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        assert_eq!(grid.grid_size, 2, "grid should reset to 2x2 after close");
+        for slot in &grid.slots {
+            assert!(slot.is_empty(), "grid slots should be empty after close");
+        }
+
+        // Items should have been dropped (broadcast as spawn entities)
+        let mut spawn_count = 0;
+        while let Ok(msg) = rx.try_recv() {
+            if matches!(&msg, ServerOutput::Broadcast(_)) {
+                spawn_count += 1;
+            }
+        }
+        assert!(
+            spawn_count >= 2,
+            "closing crafting table should drop grid items, got {spawn_count} broadcasts"
+        );
+
+        // OpenContainer should be removed
+        assert!(!game_loop.ecs.has::<basalt_core::OpenContainer>(eid));
+    }
+
+    #[test]
+    fn crafting_table_close_resets_to_2x2() {
+        let (mut game_loop, game_tx, _io_rx) = super::super::tests::test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let _rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
+
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
+
+        // Place a crafting table and open it
+        game_loop
+            .world
+            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+        game_loop.open_crafting_table(eid, 5, 64, 3);
+
+        // Verify 3x3 mode
+        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        assert_eq!(grid.grid_size, 3);
+
+        // Close
+        let _ = game_tx.send(GameInput::CloseWindow { uuid });
+        game_loop.tick(1);
+
+        // Should be back to 2x2
+        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        assert_eq!(grid.grid_size, 2, "should revert to 2x2 after close");
+    }
+
+    #[test]
+    fn player_inventory_close_preserves_2x2_grid() {
+        let (mut game_loop, game_tx, _io_rx) = super::super::tests::test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let _rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
+
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
+
+        // Put items in 2x2 crafting grid (no OpenContainer = player inventory)
+        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+            grid.slots[0] = basalt_types::Slot::new(43, 1);
+            grid.slots[1] = basalt_types::Slot::new(43, 1);
+        }
+
+        // Close player inventory window (no OpenContainer)
+        let _ = game_tx.send(GameInput::CloseWindow { uuid });
+        game_loop.tick(1);
+
+        // 2x2 grid items should persist (no OpenContainer = not a crafting table close)
+        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        assert_eq!(grid.grid_size, 2, "grid size should remain 2");
+        assert_eq!(
+            grid.slots[0].item_id,
+            Some(43),
+            "2x2 items should persist on player inventory close"
+        );
+    }
+
+    #[test]
+    fn drag_state_cleared_on_disconnect() {
+        let (mut game_loop, game_tx, _io_rx) = super::super::tests::test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let _rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
+
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
+
+        // Simulate an in-progress drag operation
+        game_loop.drag_states.insert(
+            eid,
+            super::super::click::DragState::Active {
+                drag_type: 0,
+                slots: vec![10, 20],
+            },
+        );
+        assert!(game_loop.drag_states.contains_key(&eid));
+
+        // Disconnect the player
+        let _ = game_tx.send(GameInput::PlayerDisconnected { uuid });
+        game_loop.tick(1);
+
+        // Drag state should be cleaned up
+        assert!(
+            game_loop.drag_states.is_empty(),
+            "drag state should be removed on disconnect"
+        );
+    }
+
+    #[test]
+    fn drag_state_cleared_on_close_window() {
+        let (mut game_loop, game_tx, _io_rx) = super::super::tests::test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let _rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
+
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
+
+        // Simulate an in-progress drag operation
+        game_loop.drag_states.insert(
+            eid,
+            super::super::click::DragState::Active {
+                drag_type: 1,
+                slots: vec![5],
+            },
+        );
+        assert!(game_loop.drag_states.contains_key(&eid));
+
+        // Close the window
+        let _ = game_tx.send(GameInput::CloseWindow { uuid });
+        game_loop.tick(1);
+
+        // Drag state should be cleaned up
+        assert!(
+            !game_loop.drag_states.contains_key(&eid),
+            "drag state should be removed on close window"
+        );
     }
 }

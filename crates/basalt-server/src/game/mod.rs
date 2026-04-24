@@ -6,7 +6,10 @@
 //! 3. Produces [`ServerOutput`] game events to player net tasks (zero encoding)
 
 mod blocks;
+mod click;
+mod click_handler;
 mod container;
+mod crafting;
 mod dispatch;
 mod helpers;
 mod inventory;
@@ -104,6 +107,16 @@ pub(crate) struct GameLoop {
     pub(super) uuid_index: std::collections::HashMap<basalt_types::Uuid, basalt_ecs::EntityId>,
     /// Whether to crash the server when a plugin handler panics.
     pub(super) crash_on_plugin_panic: bool,
+    /// Per-player drag state for multi-packet drag operations.
+    ///
+    /// Tracks in-progress drag operations across multiple WindowClick
+    /// packets (StartDrag, AddDragSlot, EndDrag).
+    pub(super) drag_states: std::collections::HashMap<basalt_ecs::EntityId, click::DragState>,
+    /// Shared recipe registry for crafting grid matching.
+    ///
+    /// Used by `update_crafting_output()` to match grid contents
+    /// against recipes and compute crafting output.
+    pub(super) recipes: std::sync::Arc<basalt_recipes::RecipeRegistry>,
 }
 
 impl GameLoop {
@@ -121,6 +134,7 @@ impl GameLoop {
         simulation_distance: i32,
         persistence_interval_ticks: u64,
         crash_on_plugin_panic: bool,
+        recipes: std::sync::Arc<basalt_recipes::RecipeRegistry>,
     ) -> Self {
         Self {
             bus,
@@ -137,6 +151,8 @@ impl GameLoop {
             next_window_id: 1,
             uuid_index: std::collections::HashMap::new(),
             crash_on_plugin_panic,
+            drag_states: std::collections::HashMap::new(),
+            recipes,
         }
     }
 
@@ -271,6 +287,7 @@ pub(super) mod tests {
         let mut bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
+        let mut recipes = basalt_recipes::RecipeRegistry::with_vanilla();
         {
             let mut registrar = basalt_api::PluginRegistrar::new(
                 &mut instant_bus,
@@ -278,6 +295,7 @@ pub(super) mod tests {
                 &mut commands,
                 &mut systems,
                 Arc::clone(&world),
+                &mut recipes,
             );
             basalt_plugin_block::BlockPlugin.on_enable(&mut registrar);
             basalt_plugin_item::ItemPlugin.on_enable(&mut registrar);
@@ -321,6 +339,7 @@ pub(super) mod tests {
                     }
                 }),
         );
+        let recipes_arc = Arc::new(recipes);
         let game_loop = GameLoop::new(
             bus,
             world,
@@ -333,6 +352,7 @@ pub(super) mod tests {
             8,
             0,
             true,
+            recipes_arc,
         );
         (game_loop, game_tx, io_rx)
     }

@@ -53,6 +53,7 @@ impl GameLoop {
             },
         );
         self.ecs.set(eid, basalt_core::Inventory::empty());
+        self.ecs.set(eid, basalt_core::CraftingGrid::empty());
         self.ecs.set(
             eid,
             SkinData {
@@ -287,6 +288,11 @@ impl GameLoop {
             (eid as i32, pr.username.clone())
         };
 
+        // Dispatch ContainerClosedEvent before despawn (if container is open)
+        if self.ecs.has::<basalt_core::OpenContainer>(eid) {
+            self.dispatch_container_closed(eid, uuid, basalt_api::events::CloseReason::Disconnect);
+        }
+
         // Dispatch PlayerLeftEvent
         let ctx = self.make_context(uuid, entity_id, &username, 0.0, 0.0);
         let mut event = PlayerLeftEvent;
@@ -364,10 +370,29 @@ mod tests {
         assert!(game_loop.ecs.has::<basalt_core::Rotation>(eid));
         assert!(game_loop.ecs.has::<basalt_core::BoundingBox>(eid));
         assert!(game_loop.ecs.has::<basalt_core::Inventory>(eid));
+        assert!(game_loop.ecs.has::<basalt_core::CraftingGrid>(eid));
         assert!(game_loop.ecs.has::<basalt_core::PlayerRef>(eid));
         assert!(game_loop.ecs.has::<super::super::SkinData>(eid));
         assert!(game_loop.ecs.has::<super::super::ChunkView>(eid));
         assert!(game_loop.ecs.has::<super::super::OutputHandle>(eid));
+    }
+
+    #[test]
+    fn player_connect_initializes_crafting_grid() {
+        let (mut game_loop, game_tx, _io_rx) = super::super::tests::test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let _rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
+
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_core::CraftingGrid>(eid)
+            .expect("CraftingGrid should be initialized on connect");
+        assert_eq!(grid.grid_size, 2, "default grid should be 2x2");
+        for slot in &grid.slots {
+            assert!(slot.is_empty(), "grid slots should be empty on connect");
+        }
+        assert!(grid.output.is_empty(), "output should be empty on connect");
     }
 
     #[test]
