@@ -336,7 +336,9 @@ async fn process_instant_responses(
             | Response::StreamChunks(_)
             | Response::PersistChunk(_)
             | Response::SpawnDroppedItem { .. }
-            | Response::OpenChest(_) => {}
+            | Response::OpenChest(_)
+            | Response::OpenCraftingTable { .. }
+            | Response::OpenContainer(_) => {}
         }
     }
     Ok(())
