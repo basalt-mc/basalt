@@ -81,7 +81,7 @@ impl Server {
     async fn run_with_listener(&self, listener: TcpListener) {
         let world = Arc::new(self.config.create_world());
         let plugins = self.config.create_plugins();
-        let (server_state, instant_bus, game_bus, plugin_systems) =
+        let (server_state, instant_bus, game_bus, plugin_systems, recipes) =
             ServerState::build_for_loops(Arc::clone(&world), plugins);
 
         // Initialize rayon thread pool for parallel ECS system dispatch
@@ -130,6 +130,8 @@ impl Server {
         ecs.register_component::<basalt_core::OpenContainer>();
         ecs.register_component::<basalt_core::PlayerRef>();
         ecs.register_component::<basalt_core::Inventory>();
+        ecs.register_component::<basalt_core::CraftingGrid>();
+        ecs.register_component::<basalt_core::VirtualContainerSlots>();
         // Apply budget overrides from config before registering systems
         let budgets = &self.config.server.budgets;
         for mut system in plugin_systems {
@@ -198,6 +200,7 @@ impl Server {
             self.config.server.simulation_distance,
             persistence_interval_ticks,
             crash_on_panic,
+            Arc::new(recipes),
         );
         let _game_loop = runtime::tick::TickLoop::start("game-loop", tps, move |tick| {
             game_loop_inst.tick(tick);

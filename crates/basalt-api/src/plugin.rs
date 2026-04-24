@@ -70,16 +70,19 @@ pub struct PluginRegistrar<'a> {
     systems: &'a mut Vec<basalt_core::SystemDescriptor>,
     /// Shared world reference, available to all plugins.
     world: std::sync::Arc<basalt_world::World>,
+    /// Mutable recipe registry for plugin customisation.
+    recipes: &'a mut basalt_recipes::RecipeRegistry,
 }
 
 impl<'a> PluginRegistrar<'a> {
-    /// Creates a new registrar with dual event buses.
+    /// Creates a new registrar with dual event buses and recipe registry.
     pub fn new(
         instant_bus: &'a mut EventBus,
         game_bus: &'a mut EventBus,
         commands: &'a mut Vec<CommandEntry>,
         systems: &'a mut Vec<basalt_core::SystemDescriptor>,
         world: std::sync::Arc<basalt_world::World>,
+        recipes: &'a mut basalt_recipes::RecipeRegistry,
     ) -> Self {
         Self {
             instant_bus,
@@ -87,6 +90,7 @@ impl<'a> PluginRegistrar<'a> {
             commands,
             systems,
             world,
+            recipes,
         }
     }
 
@@ -96,6 +100,15 @@ impl<'a> PluginRegistrar<'a> {
     /// in system closures for block access, collision checks, etc.
     pub fn world(&self) -> std::sync::Arc<basalt_world::World> {
         std::sync::Arc::clone(&self.world)
+    }
+
+    /// Returns a mutable reference to the recipe registry.
+    ///
+    /// Plugins can add, remove, or replace recipes during [`on_enable`](Plugin::on_enable).
+    /// After all plugins are enabled, the registry is finalized and shared
+    /// immutably with the game loop.
+    pub fn recipes_mut(&mut self) -> &mut basalt_recipes::RecipeRegistry {
+        self.recipes
     }
 
     /// Registers an event handler on the correct bus.
@@ -340,6 +353,7 @@ mod tests {
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
+        let mut recipes = basalt_recipes::RecipeRegistry::empty();
         {
             let mut registrar = PluginRegistrar::new(
                 &mut instant_bus,
@@ -347,6 +361,7 @@ mod tests {
                 &mut commands,
                 &mut systems,
                 std::sync::Arc::new(basalt_world::World::new_memory(42)),
+                &mut recipes,
             );
             registrar.on::<ChatMessageEvent>(Stage::Post, 0, |_event, _ctx| {});
             registrar.on::<BlockBrokenEvent>(Stage::Process, 0, |_event, _ctx| {});
@@ -361,6 +376,7 @@ mod tests {
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
+        let mut recipes = basalt_recipes::RecipeRegistry::empty();
         {
             let mut registrar = PluginRegistrar::new(
                 &mut instant_bus,
@@ -368,6 +384,7 @@ mod tests {
                 &mut commands,
                 &mut systems,
                 std::sync::Arc::new(basalt_world::World::new_memory(42)),
+                &mut recipes,
             );
             registrar
                 .command("tp")
@@ -389,6 +406,7 @@ mod tests {
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
+        let mut recipes = basalt_recipes::RecipeRegistry::empty();
         {
             let mut registrar = PluginRegistrar::new(
                 &mut instant_bus,
@@ -396,6 +414,7 @@ mod tests {
                 &mut commands,
                 &mut systems,
                 std::sync::Arc::new(basalt_world::World::new_memory(42)),
+                &mut recipes,
             );
             registrar
                 .command("tp")
@@ -420,6 +439,7 @@ mod tests {
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
+        let mut recipes = basalt_recipes::RecipeRegistry::empty();
         {
             let mut registrar = PluginRegistrar::new(
                 &mut instant_bus,
@@ -427,6 +447,7 @@ mod tests {
                 &mut commands,
                 &mut systems,
                 std::sync::Arc::new(basalt_world::World::new_memory(42)),
+                &mut recipes,
             );
             registrar
                 .command("help")

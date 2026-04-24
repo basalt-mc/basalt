@@ -230,6 +230,8 @@ pub struct PluginsSection {
     pub drops: bool,
     /// Container interaction (chests).
     pub container: bool,
+    /// Crafting table interaction and recipe matching.
+    pub crafting: bool,
 }
 
 impl Default for ServerSection {
@@ -279,6 +281,7 @@ impl Default for PluginsSection {
             physics: true,
             drops: true,
             container: true,
+            crafting: true,
         }
     }
 }
@@ -409,6 +412,9 @@ impl ServerConfig {
         if self.plugins.container && self.plugins.block {
             plugins.push(Box::new(basalt_plugin_container::ContainerPlugin));
         }
+        if self.plugins.crafting {
+            plugins.push(Box::new(basalt_plugin_recipe::RecipePlugin));
+        }
         if self.plugins.physics {
             plugins.push(Box::new(basalt_plugin_physics::PhysicsPlugin));
         }
@@ -434,6 +440,7 @@ mod tests {
         assert!(config.plugins.world);
         assert!(config.plugins.lifecycle);
         assert!(config.plugins.movement);
+        assert!(config.plugins.crafting);
     }
 
     #[test]
@@ -498,8 +505,8 @@ storage = "none"
     fn create_plugins_all_enabled() {
         let config = ServerConfig::default();
         let plugins = config.create_plugins();
-        // 10 built-in plugins
-        assert_eq!(plugins.len(), 10);
+        // 11 built-in plugins
+        assert_eq!(plugins.len(), 11);
     }
 
     #[test]
@@ -507,8 +514,8 @@ storage = "none"
         let mut config = ServerConfig::default();
         config.world.storage = StorageMode::ReadOnly;
         let plugins = config.create_plugins();
-        // 9 plugins: no StoragePlugin (drops + container + physics still enabled)
-        assert_eq!(plugins.len(), 9);
+        // 10 plugins: no StoragePlugin (drops + container + crafting + physics still enabled)
+        assert_eq!(plugins.len(), 10);
         assert!(plugins.iter().all(|p| p.metadata().name != "storage"));
     }
 
@@ -522,6 +529,7 @@ storage = "none"
         config.plugins.lifecycle = false;
         config.plugins.movement = false;
         config.plugins.physics = false;
+        config.plugins.crafting = false;
         let plugins = config.create_plugins();
         assert!(plugins.is_empty());
     }

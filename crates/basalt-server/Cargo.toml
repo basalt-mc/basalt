@@ -16,6 +16,7 @@ basalt-api = { workspace = true }
 basalt-ecs = { workspace = true }
 basalt-net = { workspace = true }
 basalt-world = { workspace = true }
+basalt-recipes = { workspace = true }
 
 # Built-in plugins
 basalt-plugin-chat = { path = "../../plugins/chat" }
@@ -25,6 +26,7 @@ basalt-plugin-world = { path = "../../plugins/world" }
 basalt-plugin-storage = { path = "../../plugins/storage" }
 basalt-plugin-item = { path = "../../plugins/item" }
 basalt-plugin-container = { path = "../../plugins/container" }
+basalt-plugin-recipe = { path = "../../plugins/recipe" }
 basalt-plugin-physics = { path = "../../plugins/physics" }
 basalt-plugin-lifecycle = { path = "../../plugins/lifecycle" }
 basalt-plugin-movement = { path = "../../plugins/movement" }
