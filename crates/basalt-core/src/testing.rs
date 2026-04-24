@@ -82,6 +82,8 @@ impl EntityContext for NoopContext {
 
 impl ContainerContext for NoopContext {
     fn open_chest(&self, _x: i32, _y: i32, _z: i32) {}
+    fn open_crafting_table(&self, _x: i32, _y: i32, _z: i32) {}
+    fn open(&self, _container: &crate::container::Container) {}
 }
 
 impl Context for NoopContext {

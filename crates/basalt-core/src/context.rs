@@ -95,10 +95,29 @@ pub trait EntityContext {
     fn broadcast_raw(&self, msg: BroadcastMessage);
 }
 
-/// Container interaction: chests, future crafting/furnaces.
+/// Container interaction: chests, crafting tables, custom windows.
 pub trait ContainerContext {
     /// Opens a chest container at the given position for the current player.
     fn open_chest(&self, x: i32, y: i32, z: i32);
+    /// Opens a crafting table window at the given position for the current player.
+    fn open_crafting_table(&self, x: i32, y: i32, z: i32);
+
+    /// Opens a custom container window for the current player.
+    ///
+    /// Takes a reference so the `Container` can be stored in a static,
+    /// cloned across calls, or shared — opening doesn't consume it.
+    ///
+    /// # Example
+    /// ```ignore
+    /// static SHOP: LazyLock<Container> = LazyLock::new(|| {
+    ///     Container::builder()
+    ///         .inventory_type(InventoryType::Generic9x6)
+    ///         .title("Shop")
+    ///         .build()
+    /// });
+    /// ctx.containers().open(&SHOP);
+    /// ```
+    fn open(&self, container: &crate::container::Container);
 }
 
 // ── Main Context trait ───────────────────────────────────────────────
