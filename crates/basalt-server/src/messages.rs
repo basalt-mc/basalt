@@ -244,9 +244,15 @@ pub enum ServerOutput {
         slots: Vec<basalt_types::Slot>,
     },
     /// Update a slot in an open container window.
+    ///
+    /// The `window_id` is a signed protocol field:
+    /// - `-2`: direct player inventory access (ignores state_id, no animation)
+    /// - `-1`: set the cursor (carried item)
+    /// - `0`: player inventory window (when no container is open)
+    /// - `1+`: open container window
     SetContainerSlot {
-        /// Window ID.
-        window_id: u8,
+        /// Protocol window ID (negative values have special meaning).
+        window_id: i32,
         /// Slot index within the window.
         slot: i16,
         /// The item in the slot.

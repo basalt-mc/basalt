@@ -145,7 +145,7 @@ pub(super) async fn write_server_output(
         } => {
             use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
             let packet = ClientboundPlaySetSlot {
-                window_id: *window_id as i32,
+                window_id: *window_id,
                 state_id: 0,
                 slot: *slot,
                 item: item.clone(),
