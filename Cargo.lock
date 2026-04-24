@@ -109,6 +109,7 @@ dependencies = [
  "basalt-command",
  "basalt-core",
  "basalt-events",
+ "basalt-recipes",
  "basalt-types",
  "basalt-world",
  "log",
@@ -235,6 +236,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "basalt-plugin-recipe"
+version = "0.1.0"
+dependencies = [
+ "basalt-api",
+ "basalt-testkit",
+]
+
+[[package]]
 name = "basalt-plugin-storage"
 version = "0.1.0"
 dependencies = [
@@ -264,6 +273,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "basalt-recipes"
+version = "0.1.0"
+
+[[package]]
 name = "basalt-server"
 version = "0.1.0"
 dependencies = [
@@ -281,9 +294,11 @@ dependencies = [
  "basalt-plugin-lifecycle",
  "basalt-plugin-movement",
  "basalt-plugin-physics",
+ "basalt-plugin-recipe",
  "basalt-plugin-storage",
  "basalt-plugin-world",
  "basalt-protocol",
+ "basalt-recipes",
  "basalt-types",
  "basalt-world",
  "dashmap",
@@ -315,6 +330,7 @@ dependencies = [
  "basalt-core",
  "basalt-ecs",
  "basalt-events",
+ "basalt-recipes",
  "basalt-types",
  "basalt-world",
 ]
