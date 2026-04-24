@@ -2,6 +2,7 @@
 //!
 //! Events are grouped by domain:
 //! - [`block`] — block breaking, placing, interaction
+//! - [`container`] — container open/close, clicks, drags, block entities
 //! - [`player`] — movement, join, leave
 //! - [`chat`] — chat messages and commands
 //!
@@ -11,10 +12,14 @@
 
 mod block;
 mod chat;
+mod container;
+mod crafting;
 mod player;
 
 pub use block::{BlockBrokenEvent, BlockPlacedEvent, PlayerInteractEvent};
 pub use chat::{ChatMessageEvent, CommandEvent};
+pub use container::*;
+pub use crafting::{CraftingGridChangedEvent, CraftingOutputClickedEvent};
 pub use player::{PlayerJoinedEvent, PlayerLeftEvent, PlayerMovedEvent};
 
 /// Implements [`Event`](basalt_events::Event) and
