@@ -1,0 +1,10 @@
+[package]
+name = "basalt-recipes"
+version.workspace = true
+publish = false
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# No external dependencies — pure data + matching logic.

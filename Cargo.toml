@@ -24,6 +24,7 @@ basalt-events = { path = "crates/basalt-events" }
 basalt-storage = { path = "crates/basalt-storage" }
 basalt-ecs = { path = "crates/basalt-ecs" }
 basalt-testkit = { path = "crates/basalt-testkit" }
+basalt-recipes = { path = "crates/basalt-recipes" }
 
 # Error handling
 thiserror = "2"
