@@ -86,7 +86,7 @@ jobs:
           shared-key: build-debug
           save-if: false
       - uses: taiki-e/install-action@cargo-llvm-cov
-      - run: cargo llvm-cov --all-features --fail-under-lines 90 --ignore-filename-regex "(examples|packets/)"
+      - run: cargo llvm-cov --all-features --fail-under-lines 90 --ignore-filename-regex "(examples|packets/|xtask/src/recipes\.rs|basalt-recipes/src/generated\.rs)"
 
   codegen:
     name: Codegen Drift Check
