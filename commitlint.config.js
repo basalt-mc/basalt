@@ -328,6 +328,18 @@ const container = [
   'container',
 ];
 
+const recipes = [
+  // basalt-recipes crate: codegen'd recipe data, registry, matching algorithm.
+  // Example: "feat(recipes): add recipe codegen from minecraft-data"
+  'recipes',
+];
+
+const recipe = [
+  // Recipe plugin: crafting table interaction, recipe matching dispatch.
+  // Example: "feat(recipe): add RecipePlugin with crafting table support"
+  'recipe',
+];
+
 const keywords = [
   // Root workspace configuration: Cargo.toml workspace settings, workspace-wide
   // dependency versions, cross-crate build configuration.
@@ -388,7 +400,7 @@ const keywords = [
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...ecs, ...testkit, ...physics, ...item, ...container, ...keywords]],
+    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...ecs, ...testkit, ...physics, ...item, ...container, ...recipes, ...recipe, ...keywords]],
     'scope-empty': [2, 'never'],
   },
 };
