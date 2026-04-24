@@ -1,4 +1,4 @@
-.PHONY: build test check fmt clippy deny codegen coverage release vanilla-start vanilla-stop vanilla-logs vanilla-attach
+.PHONY: build test check fmt clippy deny codegen recipes coverage release vanilla-start vanilla-stop vanilla-logs vanilla-attach
 
 ## Build all crates
 build:
@@ -26,6 +26,11 @@ deny:
 ## Generate protocol packets from minecraft-data
 codegen:
 	cargo run --package xtask -- codegen
+	cargo fmt --all
+
+## Generate recipe data from minecraft-data
+recipes:
+	cargo run --package xtask -- recipes
 	cargo fmt --all
 
 ## Run coverage report locally

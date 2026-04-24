@@ -8,6 +8,7 @@
 mod codegen;
 mod helpers;
 mod play;
+mod recipes;
 mod registry;
 mod types;
 
@@ -41,8 +42,9 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     match args.get(1).map(|s| s.as_str()) {
         Some("codegen") => run_codegen(),
+        Some("recipes") => recipes::run_recipes(),
         _ => {
-            eprintln!("Usage: cargo xt codegen");
+            eprintln!("Usage: cargo xt <codegen|recipes>");
             std::process::exit(1);
         }
     }
