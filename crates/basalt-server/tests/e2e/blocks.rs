@@ -8,7 +8,6 @@ use basalt_protocol::packets::play::world::{
 };
 use basalt_protocol::packets::play::{
     ServerboundPlayCloseWindow, ServerboundPlaySetCreativeSlot, ServerboundPlayWindowClick,
-    ServerboundPlayWindowClickChangedslots,
 };
 
 #[tokio::test]
@@ -295,7 +294,32 @@ async fn e2e_chest_break_drops_contents_and_block() {
     .await;
     read_until_packet(&mut client, ClientboundPlayOpenWindow::PACKET_ID).await;
 
-    // Put stone in chest slot 0 via WindowClick
+    // Give the player stone in hotbar slot 0 via creative mode,
+    // then pick it up and place it into the chest (server-authoritative).
+    // Protocol slot 36 = hotbar 0 in player inventory window.
+    give_creative_item(&mut client, 36, 1, 10).await;
+
+    // Left-click hotbar 0 in chest window (slot 27+27=54? no — single chest
+    // has 27 container slots, then 27 main inv, then 9 hotbar)
+    // Chest window: slots 0-26 = container, 27-53 = main inv, 54-62 = hotbar
+    // Hotbar 0 in chest window = slot 54
+    send_packet(
+        &mut client,
+        ServerboundPlayWindowClick::PACKET_ID,
+        &ServerboundPlayWindowClick {
+            window_id: 1,
+            state_id: 0,
+            slot: 54,
+            mouse_button: 0,
+            mode: 0,
+            changed_slots: vec![],
+            cursor_item: basalt_types::Slot::empty(),
+        },
+    )
+    .await;
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    // Left-click on chest slot 0 to place cursor there
     send_packet(
         &mut client,
         ServerboundPlayWindowClick::PACKET_ID,
@@ -305,10 +329,7 @@ async fn e2e_chest_break_drops_contents_and_block() {
             slot: 0,
             mouse_button: 0,
             mode: 0,
-            changed_slots: vec![ServerboundPlayWindowClickChangedslots {
-                location: 0,
-                item: basalt_types::Slot::new(1, 10),
-            }],
+            changed_slots: vec![],
             cursor_item: basalt_types::Slot::empty(),
         },
     )
