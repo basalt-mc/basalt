@@ -11,4 +11,15 @@ impl ContainerContext for ServerContext {
         self.responses
             .push(Response::OpenChest(BlockPosition { x, y, z }));
     }
+
+    fn open_crafting_table(&self, x: i32, y: i32, z: i32) {
+        self.responses.push(Response::OpenCraftingTable {
+            position: BlockPosition { x, y, z },
+        });
+    }
+
+    fn open(&self, container: &basalt_core::container::Container) {
+        self.responses
+            .push(Response::OpenContainer(container.clone()));
+    }
 }

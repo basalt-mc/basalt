@@ -11,6 +11,7 @@
 //! - [`world`] — block states, collision, block entities
 
 pub mod broadcast;
+pub mod container;
 pub mod context;
 pub mod events;
 pub mod logger;
@@ -49,6 +50,11 @@ pub mod types {
 /// World access: block states, collision, block entities, chunk storage.
 pub use basalt_world as world;
 
+/// Recipe data and matching registry.
+pub mod recipes {
+    pub use basalt_recipes::*;
+}
+
 // Top-level re-exports for non-prelude usage.
 pub use basalt_events::{Event, EventBus, Stage};
 pub use context::{Response, ServerContext};
@@ -77,9 +83,16 @@ pub mod prelude {
     // Event system
     pub use basalt_events::{Event, Stage};
 
+    // Container types
+    pub use crate::container::{Container, ContainerBuilder, InventoryType};
+
     // All event types
     pub use crate::events::{
-        BlockBrokenEvent, BlockPlacedEvent, ChatMessageEvent, CommandEvent, PlayerInteractEvent,
-        PlayerJoinedEvent, PlayerLeftEvent, PlayerMovedEvent,
+        BlockBrokenEvent, BlockEntityCreatedEvent, BlockEntityDestroyedEvent, BlockEntityKind,
+        BlockEntityModifiedEvent, BlockPlacedEvent, ChatMessageEvent, CloseReason, CommandEvent,
+        ContainerClickEvent, ContainerClickType, ContainerClosedEvent, ContainerDragEvent,
+        ContainerOpenRequestEvent, ContainerOpenedEvent, ContainerSlotChangedEvent,
+        CraftingGridChangedEvent, CraftingOutputClickedEvent, DragType, PlayerInteractEvent,
+        PlayerJoinedEvent, PlayerLeftEvent, PlayerMovedEvent, WindowSlotKind,
     };
 }
