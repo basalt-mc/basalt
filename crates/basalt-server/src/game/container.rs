@@ -857,7 +857,7 @@ mod tests {
 
     #[test]
     fn read_container_slot_returns_item() {
-        let (mut game_loop, _game_tx, _io_rx) = super::super::tests::test_game_loop();
+        let (game_loop, _game_tx, _io_rx) = super::super::tests::test_game_loop();
 
         let mut be = basalt_world::block_entity::BlockEntity::empty_chest();
         let basalt_world::block_entity::BlockEntity::Chest { ref mut slots } = be;
