@@ -54,6 +54,19 @@ pub enum Response {
     },
     /// Open a chest container at the given position.
     OpenChest(BlockPosition),
+    /// Open a crafting table window for the current player.
+    ///
+    /// Sends an OpenScreen packet with the 3x3 crafting grid type
+    /// and attaches a CraftingGrid component to the player entity.
+    OpenCraftingTable {
+        /// Block position of the crafting table.
+        position: BlockPosition,
+    },
+    /// Open a custom container window for the current player.
+    ///
+    /// Accepts a [`Container`](basalt_core::container::Container) template
+    /// value built via [`Container::builder()`](basalt_core::container::Container::builder).
+    OpenContainer(basalt_core::container::Container),
 }
 
 /// Thread-local queue for deferred async responses.

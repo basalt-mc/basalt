@@ -12,4 +12,5 @@ basalt-command = { workspace = true }
 basalt-events = { workspace = true }
 basalt-types = { workspace = true }
 basalt-world = { workspace = true }
+basalt-recipes = { workspace = true }
 log = { workspace = true }
