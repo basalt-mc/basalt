@@ -31,12 +31,23 @@ pub const GRAVEL: u16 = 124;
 /// Snow block — covers high-altitude terrain tops.
 pub const SNOW_BLOCK: u16 = 5950;
 
+/// Crafting table — default state (1.21.4 block state ID).
+///
+/// Verified against minecraft-data registry. When updating to a new
+/// Minecraft version, verify this constant against the block state data.
+pub const CRAFTING_TABLE: u16 = 4332;
+
 /// Chest — default state (facing north, type single, no waterlog).
 pub const CHEST: u16 = 3010;
 
 /// Range of block states that are chest variants (facing × type × waterlogged).
 const CHEST_MIN: u16 = 3009;
 const CHEST_MAX: u16 = 3032;
+
+/// Returns true if the block state is a crafting table.
+pub fn is_crafting_table(state: u16) -> bool {
+    state == CRAFTING_TABLE
+}
 
 /// Returns true if the block state is any chest variant.
 pub fn is_chest(state: u16) -> bool {
@@ -334,6 +345,16 @@ mod tests {
         assert!(block_state_to_item_id(GRAVEL).is_some(), "gravel");
         assert!(block_state_to_item_id(BEDROCK).is_some(), "bedrock");
         assert!(block_state_to_item_id(SNOW_BLOCK).is_some(), "snow_block");
+    }
+
+    #[test]
+    fn is_crafting_table_matches_constant() {
+        assert!(is_crafting_table(CRAFTING_TABLE));
+    }
+
+    #[test]
+    fn is_crafting_table_rejects_air() {
+        assert!(!is_crafting_table(AIR));
     }
 
     #[test]
