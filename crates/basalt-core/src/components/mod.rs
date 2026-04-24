@@ -5,11 +5,15 @@
 //! reference them through `basalt-api` without depending on the ECS
 //! storage engine.
 
+mod container;
+mod crafting;
 mod identity;
 mod inventory;
 mod item;
 mod spatial;
 
+pub use container::VirtualContainerSlots;
+pub use crafting::CraftingGrid;
 pub use identity::{EntityKind, Health, PlayerRef, Sneaking};
 pub use inventory::Inventory;
 pub use item::{DroppedItem, Lifetime, OpenContainer, PickupDelay};

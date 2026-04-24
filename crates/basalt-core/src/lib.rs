@@ -14,6 +14,7 @@
 pub mod broadcast;
 pub mod budget;
 pub mod components;
+pub mod container;
 pub mod context;
 pub mod gamemode;
 pub mod logger;
@@ -24,10 +25,11 @@ pub mod testing;
 pub use broadcast::{BroadcastMessage, PlayerSnapshot, ProfileProperty};
 pub use budget::TickBudget;
 pub use components::{
-    BlockPosition, BoundingBox, ChunkPosition, Component, DroppedItem, EntityId, EntityKind,
-    Health, Inventory, Lifetime, OpenContainer, Phase, PickupDelay, PlayerRef, Position, Rotation,
-    Sneaking, Velocity,
+    BlockPosition, BoundingBox, ChunkPosition, Component, CraftingGrid, DroppedItem, EntityId,
+    EntityKind, Health, Inventory, Lifetime, OpenContainer, Phase, PickupDelay, PlayerRef,
+    Position, Rotation, Sneaking, Velocity, VirtualContainerSlots,
 };
+pub use container::{Container, ContainerBacking, ContainerBuilder, InventoryType};
 pub use context::{
     ChatContext, ContainerContext, Context, EntityContext, PlayerContext, WorldContext,
 };
