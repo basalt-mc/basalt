@@ -100,6 +100,25 @@ Plugin handlers receive `&dyn Context` — they never reference `ServerContext` 
 
 `ServerContext` stores a `PlayerInfo` struct (uuid, entity_id, username, rotation) instead of inline fields. `Response` variants use structured types (`Position`, `Rotation`, `BlockPosition`, `ChunkPosition`).
 
+### Feature development workflow — events first
+
+**When implementing any new feature, follow this order strictly:**
+
+1. **Define events at the finest possible granularity.** One event per distinct game-state transition or player action that plugins might want to react to or cancel. Don't bundle unrelated concerns. Example: a crafting feature defines `CraftingGridChangedEvent`, `CraftingOutputClickedEvent`, etc. — NOT a single `CraftingEvent` with a variant field.
+
+2. **Integrate the events in the core infrastructure** (basalt-api + basalt-server game loop). The core dispatches events at the right moments but contains NO business logic. The game loop is the mechanism; it fires events and processes their responses.
+
+3. **Write plugins for the actual logic.** Every feature's behavior lives in a plugin crate under `plugins/` that listens to the events defined in step 1. Plugins are the policy; they own all domain-specific decisions.
+
+**Why:** Keeps the core minimal and focused on dispatch. Makes features composable — multiple plugins can react to the same event. Lets operators enable/disable behavior via config flags. Gives external plugins maximum flexibility without requiring core changes.
+
+**Concrete checklist before writing any feature code:**
+- [ ] List every event the feature needs (name, fields, stage, cancellable?)
+- [ ] Identify where each event fires in the game loop / net task
+- [ ] Agree on the event surface with the user
+- [ ] Wire up event dispatch in the core
+- [ ] THEN write the plugin(s) that react to the events
+
 ### Plugin development rules
 
 **Single dependency**: every plugin crate has exactly one production dependency: `basalt-api`. No plugin may depend on `basalt-ecs`, `basalt-core`, `basalt-world`, `basalt-types`, or any other internal crate directly. Everything is accessed through `basalt-api`'s module re-exports.
