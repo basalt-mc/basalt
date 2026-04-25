@@ -11,7 +11,7 @@ use tokio::sync::mpsc;
 
 use super::helpers::{send_player_info_add, send_spawn_entity};
 use super::{ChunkStreamRate, ChunkView, GameLoop, OutputHandle, SkinData, VIEW_RADIUS};
-use crate::messages::{BroadcastEvent, EncodablePacket, ServerOutput, SharedBroadcast};
+use crate::messages::{EncodablePacket, ServerOutput, SharedBroadcast};
 
 impl GameLoop {
     /// Handles a new player connection: spawn entity, send initial world, broadcast join.
@@ -136,10 +136,14 @@ impl GameLoop {
                     .color(basalt_types::TextColor::Named(
                         basalt_types::NamedColor::Yellow,
                     ));
-                let _ = tx.try_send(ServerOutput::SystemChat {
-                    content: msg.to_nbt(),
-                    action_bar: false,
-                });
+                use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
+                let _ = tx.try_send(ServerOutput::plain(
+                    ClientboundPlaySystemChat::PACKET_ID,
+                    ClientboundPlaySystemChat {
+                        content: msg.to_nbt(),
+                        is_action_bar: false,
+                    },
+                ));
             });
         }
 
@@ -148,10 +152,14 @@ impl GameLoop {
             let msg = basalt_types::TextComponent::text(format!("Welcome, {username}!")).color(
                 basalt_types::TextColor::Named(basalt_types::NamedColor::Gold),
             );
-            let _ = tx.try_send(ServerOutput::SystemChat {
-                content: msg.to_nbt(),
-                action_bar: false,
-            });
+            use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
+            let _ = tx.try_send(ServerOutput::plain(
+                ClientboundPlaySystemChat::PACKET_ID,
+                ClientboundPlaySystemChat {
+                    content: msg.to_nbt(),
+                    is_action_bar: false,
+                },
+            ));
         });
 
         // Dispatch PlayerJoinedEvent
@@ -195,7 +203,7 @@ impl GameLoop {
             enforces_secure_chat: false,
         };
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(ServerOutput::Packet(EncodablePacket::new(
+            let _ = tx.try_send(ServerOutput::Plain(EncodablePacket::new(
                 ClientboundPlayLogin::PACKET_ID,
                 login,
             )));
@@ -205,17 +213,17 @@ impl GameLoop {
         if !self.declare_commands.is_empty() {
             let dc = self.declare_commands.clone();
             self.send_to(eid, |tx| {
-                let _ = tx.try_send(ServerOutput::Raw {
-                    id: ClientboundPlayDeclareCommands::PACKET_ID,
-                    data: dc,
-                });
+                let _ = tx.try_send(ServerOutput::raw_owned(
+                    ClientboundPlayDeclareCommands::PACKET_ID,
+                    dc,
+                ));
             });
         }
 
         // SpawnPosition
         let spawn_y = self.world.spawn_y() as i32;
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(ServerOutput::Packet(EncodablePacket::new(
+            let _ = tx.try_send(ServerOutput::Plain(EncodablePacket::new(
                 basalt_protocol::packets::play::world::ClientboundPlaySpawnPosition::PACKET_ID,
                 basalt_protocol::packets::play::world::ClientboundPlaySpawnPosition {
                     location: Position::new(0, spawn_y, 0),
@@ -226,10 +234,14 @@ impl GameLoop {
 
         // GameEvent (wait for chunks)
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(ServerOutput::GameStateChange {
-                reason: 13,
-                value: 0.0,
-            });
+            use basalt_protocol::packets::play::player::ClientboundPlayGameStateChange;
+            let _ = tx.try_send(ServerOutput::plain(
+                ClientboundPlayGameStateChange::PACKET_ID,
+                ClientboundPlayGameStateChange {
+                    reason: 13,
+                    game_mode: 0.0,
+                },
+            ));
         });
 
         // UpdateViewPosition + enqueue initial chunks for tick-paced sending.
@@ -238,7 +250,14 @@ impl GameLoop {
         let cx = (position.0 as i32) >> 4;
         let cz = (position.2 as i32) >> 4;
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(ServerOutput::UpdateViewPosition { cx, cz });
+            use basalt_protocol::packets::play::world::ClientboundPlayUpdateViewPosition;
+            let _ = tx.try_send(ServerOutput::plain(
+                ClientboundPlayUpdateViewPosition::PACKET_ID,
+                ClientboundPlayUpdateViewPosition {
+                    chunk_x: cx,
+                    chunk_z: cz,
+                },
+            ));
         });
 
         if let Some(rate) = self.ecs.get_mut::<ChunkStreamRate>(eid) {
@@ -251,23 +270,38 @@ impl GameLoop {
 
         // Position
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(ServerOutput::SetPosition {
-                teleport_id: 1,
-                x: position.0,
-                y: position.1,
-                z: position.2,
-                yaw: 0.0,
-                pitch: 0.0,
-            });
+            use basalt_protocol::packets::play::player::ClientboundPlayPosition;
+            let _ = tx.try_send(ServerOutput::plain(
+                ClientboundPlayPosition::PACKET_ID,
+                ClientboundPlayPosition {
+                    teleport_id: 1,
+                    x: position.0,
+                    y: position.1,
+                    z: position.2,
+                    dx: 0.0,
+                    dy: 0.0,
+                    dz: 0.0,
+                    yaw: 0.0,
+                    pitch: 0.0,
+                    flags: 0,
+                },
+            ));
         });
 
         // Sync full inventory
         if let Some(inv) = self.ecs.get::<basalt_core::Inventory>(eid) {
             let protocol_slots = inv.to_protocol_slots();
             self.send_to(eid, |tx| {
-                let _ = tx.try_send(ServerOutput::SyncInventory {
-                    slots: protocol_slots,
-                });
+                use basalt_protocol::packets::play::inventory::ClientboundPlayWindowItems;
+                let _ = tx.try_send(ServerOutput::plain(
+                    ClientboundPlayWindowItems::PACKET_ID,
+                    ClientboundPlayWindowItems {
+                        window_id: 0,
+                        state_id: 0,
+                        items: protocol_slots,
+                        carried_item: basalt_types::Slot::empty(),
+                    },
+                ));
             });
         }
     }
@@ -320,25 +354,37 @@ impl GameLoop {
         self.rebuild_active_chunks();
 
         // Broadcast leave to remaining players
-        let remove_players = Arc::new(SharedBroadcast::new(BroadcastEvent::RemovePlayers {
-            uuids: vec![uuid],
-        }));
-        let remove_entities = Arc::new(SharedBroadcast::new(BroadcastEvent::RemoveEntities {
-            entity_ids: vec![entity_id],
-        }));
+        use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
+        use basalt_protocol::packets::play::entity::ClientboundPlayEntityDestroy;
+        use basalt_protocol::packets::play::player::ClientboundPlayPlayerRemove;
+        let remove_players = Arc::new(SharedBroadcast::single(
+            ClientboundPlayPlayerRemove::PACKET_ID,
+            ClientboundPlayPlayerRemove {
+                players: vec![uuid],
+            },
+        ));
+        let remove_entities = Arc::new(SharedBroadcast::single(
+            ClientboundPlayEntityDestroy::PACKET_ID,
+            ClientboundPlayEntityDestroy {
+                entity_ids: vec![entity_id],
+            },
+        ));
         let msg = basalt_types::TextComponent::text(format!("{username} left the game")).color(
             basalt_types::TextColor::Named(basalt_types::NamedColor::Yellow),
         );
-        let leave_chat = Arc::new(SharedBroadcast::new(BroadcastEvent::SystemChat {
-            content: msg.to_nbt(),
-            action_bar: false,
-        }));
+        let leave_chat = Arc::new(SharedBroadcast::single(
+            ClientboundPlaySystemChat::PACKET_ID,
+            ClientboundPlaySystemChat {
+                content: msg.to_nbt(),
+                is_action_bar: false,
+            },
+        ));
 
         for (other_eid, _) in self.ecs.iter::<OutputHandle>() {
             self.send_to(other_eid, |tx| {
-                let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&remove_players)));
-                let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&remove_entities)));
-                let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&leave_chat)));
+                let _ = tx.try_send(ServerOutput::Cached(Arc::clone(&remove_players)));
+                let _ = tx.try_send(ServerOutput::Cached(Arc::clone(&remove_entities)));
+                let _ = tx.try_send(ServerOutput::Cached(Arc::clone(&leave_chat)));
             });
         }
     }
@@ -417,9 +463,11 @@ mod tests {
         let uuid = Uuid::from_bytes([1; 16]);
         let mut rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
 
+        use basalt_protocol::packets::play::inventory::ClientboundPlayWindowItems;
         let mut got_sync = false;
         while let Ok(msg) = rx.try_recv() {
-            if matches!(&msg, ServerOutput::SyncInventory { .. }) {
+            if matches!(&msg, ServerOutput::Plain(ep) if ep.id() == ClientboundPlayWindowItems::PACKET_ID)
+            {
                 got_sync = true;
             }
         }

@@ -65,12 +65,26 @@ impl GameLoop {
         }
 
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(ServerOutput::OpenWindow {
-                window_id,
-                inventory_type: 11, // crafting table
-                title: basalt_types::TextComponent::text("Crafting").to_nbt(),
-                slots: window_slots,
-            });
+            use basalt_protocol::packets::play::inventory::{
+                ClientboundPlayOpenWindow, ClientboundPlayWindowItems,
+            };
+            let _ = tx.try_send(ServerOutput::plain(
+                ClientboundPlayOpenWindow::PACKET_ID,
+                ClientboundPlayOpenWindow {
+                    window_id: i32::from(window_id),
+                    inventory_type: 11, // crafting table
+                    window_title: basalt_types::TextComponent::text("Crafting").to_nbt(),
+                },
+            ));
+            let _ = tx.try_send(ServerOutput::plain(
+                ClientboundPlayWindowItems::PACKET_ID,
+                ClientboundPlayWindowItems {
+                    window_id: i32::from(window_id),
+                    state_id: 0,
+                    items: window_slots,
+                    carried_item: basalt_types::Slot::empty(),
+                },
+            ));
         });
     }
 
@@ -281,11 +295,16 @@ impl GameLoop {
             .unwrap_or(0);
 
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(ServerOutput::SetContainerSlot {
-                window_id,
-                slot: 0,
-                item: output,
-            });
+            use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+            let _ = tx.try_send(ServerOutput::plain(
+                ClientboundPlaySetSlot::PACKET_ID,
+                ClientboundPlaySetSlot {
+                    window_id,
+                    state_id: 0,
+                    slot: 0,
+                    item: output,
+                },
+            ));
         });
     }
 
@@ -342,14 +361,19 @@ impl GameLoop {
             (data, sc.min(9), wid)
         };
 
+        use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
         for (i, item) in slots_data.into_iter().enumerate().take(slot_count) {
             let window_slot = (i + 1) as i16;
             self.send_to(eid, |tx| {
-                let _ = tx.try_send(ServerOutput::SetContainerSlot {
-                    window_id,
-                    slot: window_slot,
-                    item,
-                });
+                let _ = tx.try_send(ServerOutput::plain(
+                    ClientboundPlaySetSlot::PACKET_ID,
+                    ClientboundPlaySetSlot {
+                        window_id,
+                        state_id: 0,
+                        slot: window_slot,
+                        item,
+                    },
+                ));
             });
         }
     }
@@ -391,11 +415,16 @@ impl GameLoop {
 
             let item = item.clone();
             self.send_to(eid, |tx| {
-                let _ = tx.try_send(ServerOutput::SetContainerSlot {
-                    window_id,
-                    slot: window_slot,
-                    item,
-                });
+                use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+                let _ = tx.try_send(ServerOutput::plain(
+                    ClientboundPlaySetSlot::PACKET_ID,
+                    ClientboundPlaySetSlot {
+                        window_id,
+                        state_id: 0,
+                        slot: window_slot,
+                        item,
+                    },
+                ));
             });
         }
     }
@@ -679,10 +708,13 @@ mod tests {
         assert_eq!(grid.output.item_count, 1);
 
         // Client should have received SetContainerSlot for the output
+        use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
         let mut got_output_slot = false;
         while let Ok(msg) = rx.try_recv() {
-            if let ServerOutput::SetContainerSlot { slot: 0, item, .. } = &msg
-                && item.item_id == Some(314)
+            if let ServerOutput::Plain(ep) = &msg
+                && let Some(p) = ep.downcast::<ClientboundPlaySetSlot>()
+                && p.slot == 0
+                && p.item.item_id == Some(314)
             {
                 got_output_slot = true;
             }
@@ -905,12 +937,15 @@ mod tests {
         game_loop.open_crafting_table(eid, 5, 64, 3);
 
         // Check OpenWindow was sent with inventory_type 11
+        use basalt_protocol::packets::play::inventory::ClientboundPlayOpenWindow;
         let mut got_open = false;
         let mut inv_type = 0;
         while let Ok(msg) = rx.try_recv() {
-            if let ServerOutput::OpenWindow { inventory_type, .. } = &msg {
+            if let ServerOutput::Plain(ep) = &msg
+                && let Some(p) = ep.downcast::<ClientboundPlayOpenWindow>()
+            {
                 got_open = true;
-                inv_type = *inventory_type;
+                inv_type = p.inventory_type;
             }
         }
         assert!(got_open, "open_crafting_table should send OpenWindow");
@@ -1016,17 +1051,17 @@ mod tests {
         game_loop.tick(1);
 
         // Server should sync consumed grid slots AND the cursor
+        use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
         let mut grid_slot_syncs = 0;
         let mut cursor_syncs = 0;
         while let Ok(msg) = rx.try_recv() {
-            if let ServerOutput::SetContainerSlot {
-                window_id, slot, ..
-            } = &msg
+            if let ServerOutput::Plain(ep) = &msg
+                && let Some(p) = ep.downcast::<ClientboundPlaySetSlot>()
             {
-                if (1..=9).contains(slot) {
+                if (1..=9).contains(&p.slot) {
                     grid_slot_syncs += 1;
                 }
-                if *window_id == -1 && *slot == -1 {
+                if p.window_id == -1 && p.slot == -1 {
                     cursor_syncs += 1;
                 }
             }
@@ -1078,13 +1113,16 @@ mod tests {
         game_loop.tick(1);
 
         // Shift-click should sync both grid AND inventory slots to client
+        use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
         let mut grid_slot_syncs = 0;
         let mut inv_slot_syncs = 0;
         while let Ok(msg) = rx.try_recv() {
-            if let ServerOutput::SetContainerSlot { slot, .. } = &msg {
-                if (1..=9).contains(slot) {
+            if let ServerOutput::Plain(ep) = &msg
+                && let Some(p) = ep.downcast::<ClientboundPlaySetSlot>()
+            {
+                if (1..=9).contains(&p.slot) {
                     grid_slot_syncs += 1;
-                } else if (10..=45).contains(slot) {
+                } else if (10..=45).contains(&p.slot) {
                     inv_slot_syncs += 1;
                 }
             }

@@ -8,6 +8,10 @@
 //! `dispatch.rs`); on join it's seeded from
 //! `chunk_batch_initial_rate`.
 
+use basalt_protocol::packets::play::world::{
+    ClientboundPlayChunkBatchFinished, ClientboundPlayChunkBatchStart,
+};
+
 use super::{ChunkStreamRate, ChunkView, GameLoop};
 use crate::messages::ServerOutput;
 
@@ -64,14 +68,20 @@ impl GameLoop {
             }
 
             self.send_to(eid, |tx| {
-                let _ = tx.try_send(ServerOutput::ChunkBatchStart);
+                let _ = tx.try_send(ServerOutput::plain(
+                    ClientboundPlayChunkBatchStart::PACKET_ID,
+                    ClientboundPlayChunkBatchStart,
+                ));
             });
             for (cx, cz) in &to_send {
                 self.send_chunk_with_entities(eid, *cx, *cz);
             }
             let batch_size = to_send.len() as i32;
             self.send_to(eid, |tx| {
-                let _ = tx.try_send(ServerOutput::ChunkBatchFinished { batch_size });
+                let _ = tx.try_send(ServerOutput::plain(
+                    ClientboundPlayChunkBatchFinished::PACKET_ID,
+                    ClientboundPlayChunkBatchFinished { batch_size },
+                ));
             });
         }
     }

@@ -26,7 +26,7 @@ use basalt_types::Uuid;
 use dashmap::DashMap;
 use tokio::sync::{broadcast, mpsc};
 
-use crate::messages::{BroadcastEvent, GameInput, ServerOutput};
+use crate::messages::{GameInput, ServerOutput};
 use crate::state::CommandMeta;
 
 /// Handles a single serverbound packet -- instant or forwarded.
@@ -319,13 +319,14 @@ async fn process_instant_responses(
     for response in responses {
         match response {
             Response::Broadcast(basalt_api::broadcast::BroadcastMessage::Chat { content }) => {
-                let bc = Arc::new(crate::messages::SharedBroadcast::new(
-                    BroadcastEvent::SystemChat {
+                let bc = Arc::new(crate::messages::SharedBroadcast::single(
+                    ClientboundPlaySystemChat::PACKET_ID,
+                    ClientboundPlaySystemChat {
                         content: content.clone(),
-                        action_bar: false,
+                        is_action_bar: false,
                     },
                 ));
-                let _ = broadcast_tx.send(ServerOutput::Broadcast(bc));
+                let _ = broadcast_tx.send(ServerOutput::Cached(bc));
             }
             Response::SendSystemChat {
                 content,

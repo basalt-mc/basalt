@@ -189,11 +189,16 @@ impl GameLoop {
         };
         let Some(slot) = proto_slot else { return };
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(ServerOutput::SetContainerSlot {
-                window_id,
-                slot,
-                item,
-            });
+            use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+            let _ = tx.try_send(ServerOutput::plain(
+                ClientboundPlaySetSlot::PACKET_ID,
+                ClientboundPlaySetSlot {
+                    window_id,
+                    state_id: 0,
+                    slot,
+                    item,
+                },
+            ));
         });
     }
 
@@ -209,11 +214,16 @@ impl GameLoop {
             .map(|inv| inv.cursor.clone())
             .unwrap_or_default();
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(ServerOutput::SetContainerSlot {
-                window_id: -1,
-                slot: -1,
-                item: cursor,
-            });
+            use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+            let _ = tx.try_send(ServerOutput::plain(
+                ClientboundPlaySetSlot::PACKET_ID,
+                ClientboundPlaySetSlot {
+                    window_id: -1,
+                    state_id: 0,
+                    slot: -1,
+                    item: cursor,
+                },
+            ));
         });
     }
 
