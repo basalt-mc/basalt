@@ -85,18 +85,22 @@ async fn e2e_initial_chunks_arrive_in_rate_limited_batches() {
         }
     }
 
-    // Walk the chunk-batch stream until the server falls silent.
+    // Walk the chunk-batch stream deterministically: read until we've
+    // observed all 121 chunks AND closed the batch that contained the
+    // last one. Avoids any timeout race — coverage runs (llvm-cov
+    // instrumentation) inflate per-tick latency well past a 500ms
+    // inter-batch silence window, which would prematurely cut the loop.
+    const TOTAL_CHUNKS: u32 = 121;
     let mut in_batch = false;
     let mut current_batch_chunks = 0i32;
     let mut completed_batches = 0u32;
     let mut total_map_chunks = 0u32;
 
-    while let Ok(Ok(Some(raw))) = tokio::time::timeout(
-        std::time::Duration::from_millis(500),
-        framing::read_raw_packet(&mut client),
-    )
-    .await
-    {
+    while total_map_chunks < TOTAL_CHUNKS || in_batch {
+        let raw = framing::read_raw_packet(&mut client)
+            .await
+            .unwrap()
+            .unwrap();
         if raw.id == ClientboundPlayChunkBatchStart::PACKET_ID {
             assert!(!in_batch, "ChunkBatchStart received inside an open batch");
             in_batch = true;
@@ -122,12 +126,8 @@ async fn e2e_initial_chunks_arrive_in_rate_limited_batches() {
         }
     }
 
-    assert!(
-        !in_batch,
-        "stream ended with an open batch (missing ChunkBatchFinished)"
-    );
     assert_eq!(
-        total_map_chunks, 121,
+        total_map_chunks, TOTAL_CHUNKS,
         "expected 121 chunks for view radius 5 ((2*5+1)^2), got {total_map_chunks}"
     );
     // 121 chunks at the default 25 chunks/tick → ⌈121/25⌉ = 5 batches.
