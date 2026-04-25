@@ -234,6 +234,22 @@ impl RecipeRegistry {
         self.shaped.iter().any(|r| &r.id == id) || self.shapeless.iter().any(|r| &r.id == id)
     }
 
+    /// Returns a clone of the recipe with the given id, or `None`.
+    ///
+    /// Searches shaped recipes first then shapeless. The clone is
+    /// owned by the caller — useful for converting the matched recipe
+    /// into a presentation payload (e.g. `RecipeDisplay`) without
+    /// holding a borrow on the registry.
+    pub fn find_by_id(&self, id: &RecipeId) -> Option<Recipe> {
+        if let Some(r) = self.shaped.iter().find(|r| &r.id == id) {
+            return Some(Recipe::Shaped(r.clone()));
+        }
+        if let Some(r) = self.shapeless.iter().find(|r| &r.id == id) {
+            return Some(Recipe::Shapeless(r.clone()));
+        }
+        None
+    }
+
     /// Matches a crafting grid against all registered recipes.
     ///
     /// The `grid` is a flat row-major array of item slots. `grid_size` is
