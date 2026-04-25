@@ -72,10 +72,20 @@ pub struct PluginRegistrar<'a> {
     world: std::sync::Arc<basalt_world::World>,
     /// Mutable recipe registry for plugin customisation.
     recipes: &'a mut basalt_recipes::RecipeRegistry,
+    /// Stub dispatch context for system-level events fired during
+    /// plugin loading (e.g. recipe registry lifecycle). The context
+    /// carries `PlayerInfo::stub()` — handlers must rely on the event
+    /// payload, not `ctx.player()`.
+    bootstrap_ctx: &'a ServerContext,
 }
 
 impl<'a> PluginRegistrar<'a> {
     /// Creates a new registrar with dual event buses and recipe registry.
+    ///
+    /// `bootstrap_ctx` is a stub [`ServerContext`] used only to dispatch
+    /// system-level events (today: the recipe registry lifecycle) that
+    /// fire before any player exists.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         instant_bus: &'a mut EventBus,
         game_bus: &'a mut EventBus,
@@ -83,6 +93,7 @@ impl<'a> PluginRegistrar<'a> {
         systems: &'a mut Vec<basalt_core::SystemDescriptor>,
         world: std::sync::Arc<basalt_world::World>,
         recipes: &'a mut basalt_recipes::RecipeRegistry,
+        bootstrap_ctx: &'a ServerContext,
     ) -> Self {
         Self {
             instant_bus,
@@ -91,6 +102,7 @@ impl<'a> PluginRegistrar<'a> {
             systems,
             world,
             recipes,
+            bootstrap_ctx,
         }
     }
 
@@ -102,13 +114,22 @@ impl<'a> PluginRegistrar<'a> {
         std::sync::Arc::clone(&self.world)
     }
 
-    /// Returns a mutable reference to the recipe registry.
+    /// Returns a [`RecipeRegistrar`](crate::recipes::RecipeRegistrar)
+    /// that mutates the registry while dispatching the lifecycle
+    /// events on the game bus.
     ///
-    /// Plugins can add, remove, or replace recipes during [`on_enable`](Plugin::on_enable).
-    /// After all plugins are enabled, the registry is finalized and shared
-    /// immutably with the game loop.
-    pub fn recipes_mut(&mut self) -> &mut basalt_recipes::RecipeRegistry {
-        self.recipes
+    /// Plugins call this from [`on_enable`](Plugin::on_enable) to add
+    /// or remove recipes. Mutations on the returned wrapper trigger
+    /// [`RecipeRegisterEvent`](crate::events::RecipeRegisterEvent),
+    /// [`RecipeRegisteredEvent`](crate::events::RecipeRegisteredEvent),
+    /// and [`RecipeUnregisteredEvent`](crate::events::RecipeUnregisteredEvent)
+    /// so other plugins can observe or veto changes.
+    ///
+    /// After every plugin's `on_enable` completes, the registry is
+    /// frozen behind `Arc<RecipeRegistry>` and shared immutably with
+    /// the game loop.
+    pub fn recipes(&mut self) -> crate::recipes::RecipeRegistrar<'_> {
+        crate::recipes::RecipeRegistrar::new(self.recipes, self.game_bus, self.bootstrap_ctx)
     }
 
     /// Registers an event handler on the correct bus.
@@ -319,6 +340,12 @@ impl VariantBuilder {
 mod tests {
     use super::*;
 
+    /// Builds a stub bootstrap [`ServerContext`] for tests that need
+    /// to construct a [`PluginRegistrar`] without a real player.
+    fn bootstrap_ctx(world: std::sync::Arc<basalt_world::World>) -> ServerContext {
+        ServerContext::new(world, basalt_core::player::PlayerInfo::stub())
+    }
+
     struct TestPlugin;
 
     impl Plugin for TestPlugin {
@@ -354,14 +381,17 @@ mod tests {
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::empty();
+        let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
+        let ctx = bootstrap_ctx(std::sync::Arc::clone(&world));
         {
             let mut registrar = PluginRegistrar::new(
                 &mut instant_bus,
                 &mut game_bus,
                 &mut commands,
                 &mut systems,
-                std::sync::Arc::new(basalt_world::World::new_memory(42)),
+                world,
                 &mut recipes,
+                &ctx,
             );
             registrar.on::<ChatMessageEvent>(Stage::Post, 0, |_event, _ctx| {});
             registrar.on::<BlockBrokenEvent>(Stage::Process, 0, |_event, _ctx| {});
@@ -377,14 +407,17 @@ mod tests {
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::empty();
+        let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
+        let ctx = bootstrap_ctx(std::sync::Arc::clone(&world));
         {
             let mut registrar = PluginRegistrar::new(
                 &mut instant_bus,
                 &mut game_bus,
                 &mut commands,
                 &mut systems,
-                std::sync::Arc::new(basalt_world::World::new_memory(42)),
+                world,
                 &mut recipes,
+                &ctx,
             );
             registrar
                 .command("tp")
@@ -407,14 +440,17 @@ mod tests {
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::empty();
+        let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
+        let ctx = bootstrap_ctx(std::sync::Arc::clone(&world));
         {
             let mut registrar = PluginRegistrar::new(
                 &mut instant_bus,
                 &mut game_bus,
                 &mut commands,
                 &mut systems,
-                std::sync::Arc::new(basalt_world::World::new_memory(42)),
+                world,
                 &mut recipes,
+                &ctx,
             );
             registrar
                 .command("tp")
@@ -440,14 +476,17 @@ mod tests {
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::empty();
+        let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
+        let ctx = bootstrap_ctx(std::sync::Arc::clone(&world));
         {
             let mut registrar = PluginRegistrar::new(
                 &mut instant_bus,
                 &mut game_bus,
                 &mut commands,
                 &mut systems,
-                std::sync::Arc::new(basalt_world::World::new_memory(42)),
+                world,
                 &mut recipes,
+                &ctx,
             );
             registrar
                 .command("help")
@@ -457,5 +496,53 @@ mod tests {
         assert_eq!(commands.len(), 1);
         assert!(commands[0].args.is_empty());
         assert!(commands[0].variants.is_empty());
+    }
+
+    #[test]
+    fn recipes_accessor_exposes_registrar_with_dispatch() {
+        use crate::events::RecipeRegisteredEvent;
+        use basalt_recipes::{OwnedShapedRecipe, RecipeId};
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicU32, Ordering};
+
+        let mut instant_bus = EventBus::new();
+        let mut game_bus = EventBus::new();
+        let mut commands = Vec::new();
+        let mut systems = Vec::new();
+        let mut recipes = basalt_recipes::RecipeRegistry::empty();
+        let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
+        let ctx = bootstrap_ctx(std::sync::Arc::clone(&world));
+
+        let post_seen = Arc::new(AtomicU32::new(0));
+        {
+            let p = Arc::clone(&post_seen);
+            game_bus.on::<RecipeRegisteredEvent, ServerContext>(Stage::Post, 0, move |_, _| {
+                p.fetch_add(1, Ordering::Relaxed);
+            });
+        }
+
+        {
+            let mut registrar = PluginRegistrar::new(
+                &mut instant_bus,
+                &mut game_bus,
+                &mut commands,
+                &mut systems,
+                world,
+                &mut recipes,
+                &ctx,
+            );
+            let inserted = registrar.recipes().add_shaped(OwnedShapedRecipe {
+                id: RecipeId::new("plugin", "demo"),
+                width: 1,
+                height: 1,
+                pattern: vec![Some(1)],
+                result_id: 7,
+                result_count: 1,
+            });
+            assert!(inserted);
+        }
+
+        assert_eq!(post_seen.load(Ordering::Relaxed), 1);
+        assert_eq!(recipes.shaped_count(), 1);
     }
 }

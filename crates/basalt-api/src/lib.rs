@@ -16,6 +16,7 @@ pub mod context;
 pub mod events;
 pub mod logger;
 pub mod plugin;
+pub mod recipes;
 
 /// ECS component types for system plugins.
 ///
@@ -49,11 +50,6 @@ pub mod types {
 
 /// World access: block states, collision, block entities, chunk storage.
 pub use basalt_world as world;
-
-/// Recipe data and matching registry.
-pub mod recipes {
-    pub use basalt_recipes::*;
-}
 
 // Top-level re-exports for non-prelude usage.
 pub use basalt_events::{Event, EventBus, Stage};
@@ -95,6 +91,9 @@ pub mod prelude {
         CraftingCraftedEvent, CraftingGridChangedEvent, CraftingPreCraftEvent,
         CraftingRecipeClearedEvent, CraftingRecipeMatchedEvent, CraftingShiftClickBatchEvent,
         DragType, PlayerInteractEvent, PlayerJoinedEvent, PlayerLeftEvent, PlayerMovedEvent,
-        WindowSlotKind,
+        RecipeRegisterEvent, RecipeRegisteredEvent, RecipeUnregisteredEvent, WindowSlotKind,
     };
+
+    // Recipe types referenced by registry-lifecycle events.
+    pub use basalt_recipes::{OwnedShapedRecipe, OwnedShapelessRecipe, Recipe, RecipeId};
 }
