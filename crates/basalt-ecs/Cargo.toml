@@ -7,7 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-basalt-core = { workspace = true }
+basalt-api = { workspace = true }
 basalt-world = { workspace = true }
 rayon = { workspace = true }
 log = { workspace = true }

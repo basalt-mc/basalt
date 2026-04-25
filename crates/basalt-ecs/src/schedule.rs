@@ -7,7 +7,8 @@
 //! The [`GroupCache`] precomputes groups for all tick offsets at startup,
 //! making per-tick lookup O(1) instead of O(n²).
 
-use basalt_core::{Phase, SystemDescriptor};
+use basalt_api::components::Phase;
+use basalt_api::system::SystemDescriptor;
 
 /// Greatest common divisor (Euclidean algorithm).
 fn gcd(a: u64, b: u64) -> u64 {
@@ -138,21 +139,21 @@ fn compute_groups(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use basalt_core::SystemAccess;
+    use basalt_api::system::SystemAccess;
     use std::any::TypeId;
 
     // Dummy component types for testing
     #[derive(Debug)]
     struct Position;
-    impl basalt_core::Component for Position {}
+    impl basalt_api::components::Component for Position {}
 
     #[derive(Debug)]
     struct Velocity;
-    impl basalt_core::Component for Velocity {}
+    impl basalt_api::components::Component for Velocity {}
 
     #[derive(Debug)]
     struct ParticleEffect;
-    impl basalt_core::Component for ParticleEffect {}
+    impl basalt_api::components::Component for ParticleEffect {}
 
     /// Helper to build a system slot with given access declarations.
     fn system_with_access(
@@ -174,7 +175,7 @@ mod tests {
             every,
             access,
             budget: None,
-            runner: Box::new(|_: &mut dyn basalt_core::SystemContext| {}),
+            runner: Box::new(|_: &mut dyn basalt_api::system::SystemContext| {}),
         })
     }
 
@@ -290,7 +291,7 @@ mod tests {
                 every: 1,
                 access: SystemAccess::new(),
                 budget: None,
-                runner: Box::new(|_: &mut dyn basalt_core::SystemContext| {}),
+                runner: Box::new(|_: &mut dyn basalt_api::system::SystemContext| {}),
             }),
         ];
         let groups = compute_groups(&systems, Phase::Simulate, 1);
