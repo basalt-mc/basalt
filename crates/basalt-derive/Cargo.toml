@@ -6,6 +6,11 @@ description = "Derive macros for Encode/Decode/EncodedSize traits"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+documentation = "https://docs.rs/basalt-derive"
+readme = "README.md"
+rust-version = "1.85"
+keywords = ["minecraft", "protocol", "derive", "encoding", "macro"]
+categories = ["encoding", "development-tools::procedural-macro-helpers"]
 
 [lib]
 proc-macro = true
