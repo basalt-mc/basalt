@@ -44,9 +44,9 @@ pub(crate) struct CommandMeta {
     /// Command description.
     pub description: String,
     /// Argument schemas (empty if no variants).
-    pub args: Vec<basalt_command::CommandArg>,
+    pub args: Vec<basalt_api::command::CommandArg>,
     /// Variant argument schemas.
-    pub variants: Vec<Vec<basalt_command::CommandArg>>,
+    pub variants: Vec<Vec<basalt_api::command::CommandArg>>,
 }
 
 impl ServerState {
@@ -118,8 +118,11 @@ impl ServerState {
                     let args = parts.get(1).copied().unwrap_or("");
                     let found = commands.iter().find(|c| c.name == cmd);
                     if let Some(entry) = found {
-                        match basalt_command::parse_command_args(args, &entry.args, &entry.variants)
-                        {
+                        match basalt_api::command::parse_command_args(
+                            args,
+                            &entry.args,
+                            &entry.variants,
+                        ) {
                             Ok(parsed) => (entry.handler)(&parsed, ctx),
                             Err(msg) => {
                                 let err_msg = format!("/{cmd}: {msg}");
@@ -186,8 +189,8 @@ struct BrigNode {
 
 /// Encodes parser ID and properties for a Brigadier argument node.
 /// IDs from 1.21.4 protocol.json parser registry.
-fn encode_parser(arg_type: &basalt_command::Arg) -> Vec<u8> {
-    use basalt_command::Arg;
+fn encode_parser(arg_type: &basalt_api::command::Arg) -> Vec<u8> {
+    use basalt_api::command::Arg;
     use basalt_types::{Encode, VarInt};
 
     let mut data = Vec::new();
@@ -258,12 +261,12 @@ fn encode_parser(arg_type: &basalt_command::Arg) -> Vec<u8> {
 /// Recursively builds argument nodes from a set of arg chains,
 /// merging shared prefixes into single nodes with multiple children.
 fn build_arg_trie(
-    chains: &[&[basalt_command::CommandArg]],
+    chains: &[&[basalt_api::command::CommandArg]],
     nodes: &mut Vec<BrigNode>,
     parent_children: &mut Vec<i32>,
 ) {
     let mut group_order: Vec<String> = Vec::new();
-    let mut group_map: std::collections::HashMap<String, Vec<&[basalt_command::CommandArg]>> =
+    let mut group_map: std::collections::HashMap<String, Vec<&[basalt_api::command::CommandArg]>> =
         std::collections::HashMap::new();
 
     for chain in chains {
@@ -306,7 +309,7 @@ fn build_arg_trie(
             },
         });
 
-        let sub_chains: Vec<&[basalt_command::CommandArg]> = group
+        let sub_chains: Vec<&[basalt_api::command::CommandArg]> = group
             .iter()
             .filter(|c| c.len() > 1)
             .map(|c| &c[1..])
@@ -360,7 +363,7 @@ fn build_declare_commands(commands: &[basalt_api::CommandEntry]) -> (Vec<u8>, us
         let literal_idx = literal_start + cmd_i;
         nodes[literal_idx].name = Some(cmd.name.clone());
 
-        let arg_lists: Vec<&Vec<basalt_command::CommandArg>> = if !cmd.variants.is_empty() {
+        let arg_lists: Vec<&Vec<basalt_api::command::CommandArg>> = if !cmd.variants.is_empty() {
             cmd.variants.iter().collect()
         } else if !cmd.args.is_empty() {
             vec![&cmd.args]
@@ -369,7 +372,7 @@ fn build_declare_commands(commands: &[basalt_api::CommandEntry]) -> (Vec<u8>, us
             continue;
         };
 
-        let chains: Vec<&[basalt_command::CommandArg]> =
+        let chains: Vec<&[basalt_api::command::CommandArg]> =
             arg_lists.iter().map(|v| v.as_slice()).collect();
 
         let mut children = Vec::new();
@@ -433,7 +436,7 @@ mod tests {
 
     #[test]
     fn declare_commands_tp_has_three_variants() {
-        use basalt_command::{Arg, CommandArg, Validation};
+        use basalt_api::command::{Arg, CommandArg, Validation};
 
         let commands = vec![basalt_api::CommandEntry {
             name: "tp".into(),
@@ -556,10 +559,13 @@ mod tests {
         let commands = vec![basalt_api::CommandEntry {
             name: "gamemode".into(),
             description: "Change gamemode".into(),
-            args: vec![basalt_command::CommandArg {
+            args: vec![basalt_api::command::CommandArg {
                 name: "mode".into(),
-                arg_type: basalt_command::Arg::Options(vec!["survival".into(), "creative".into()]),
-                validation: basalt_command::Validation::Auto,
+                arg_type: basalt_api::command::Arg::Options(vec![
+                    "survival".into(),
+                    "creative".into(),
+                ]),
+                validation: basalt_api::command::Validation::Auto,
                 required: true,
             }],
             variants: Vec::new(),
