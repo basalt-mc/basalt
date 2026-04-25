@@ -406,6 +406,26 @@ impl DispatchResult {
             .iter()
             .any(|r| matches!(r, Response::DestroyBlockEntity { .. }))
     }
+
+    /// Returns true if any response unlocks the given recipe id.
+    pub fn has_unlock_recipe(&self, id: &basalt_recipes::RecipeId) -> bool {
+        self.responses.iter().any(|r| {
+            matches!(
+                r,
+                Response::UnlockRecipe { recipe_id, .. } if recipe_id == id
+            )
+        })
+    }
+
+    /// Returns true if any response locks the given recipe id.
+    pub fn has_lock_recipe(&self, id: &basalt_recipes::RecipeId) -> bool {
+        self.responses.iter().any(|r| {
+            matches!(
+                r,
+                Response::LockRecipe { recipe_id } if recipe_id == id
+            )
+        })
+    }
 }
 
 /// Test context for system plugins.
