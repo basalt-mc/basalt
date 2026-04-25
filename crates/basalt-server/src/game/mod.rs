@@ -6,6 +6,7 @@
 //! 3. Produces [`ServerOutput`] game events to player net tasks (zero encoding)
 
 mod blocks;
+mod chunk_stream;
 mod click;
 mod click_handler;
 mod container;
@@ -75,6 +76,34 @@ impl ChunkView {
 }
 impl basalt_ecs::Component for ChunkView {}
 
+/// Per-player chunk-batch state: send rate plus pending queue.
+///
+/// `desired_chunks_per_tick` is seeded at spawn from
+/// `ServerSection::chunk_batch_initial_rate` and updated each time
+/// the client reports a new decode rate via
+/// `ServerboundPlayChunkBatchReceived`. `pending` holds chunks the
+/// player needs to receive but hasn't been sent yet — the drainer
+/// pops up to `floor(desired_chunks_per_tick)` entries per tick so
+/// slow or distant clients aren't flooded.
+struct ChunkStreamRate {
+    /// Chunks per tick the client can currently decode.
+    desired_chunks_per_tick: f32,
+    /// Chunks waiting to be sent, drained per tick at the configured rate.
+    pending: std::collections::VecDeque<(i32, i32)>,
+}
+
+impl ChunkStreamRate {
+    /// Creates a rate seeded from the configured initial value with
+    /// an empty pending queue.
+    fn new(initial_rate: f32) -> Self {
+        Self {
+            desired_chunks_per_tick: initial_rate,
+            pending: std::collections::VecDeque::new(),
+        }
+    }
+}
+impl basalt_ecs::Component for ChunkStreamRate {}
+
 /// The game loop state and logic.
 pub(crate) struct GameLoop {
     /// Game event bus (blocks, movement, lifecycle).
@@ -118,6 +147,12 @@ pub(crate) struct GameLoop {
     /// Used by `update_crafting_output()` to match grid contents
     /// against recipes and compute crafting output.
     pub(super) recipes: std::sync::Arc<basalt_recipes::RecipeRegistry>,
+    /// Initial chunk-batch rate for newly spawned players, in chunks
+    /// per tick. Used to seed each player's [`ChunkStreamRate`].
+    pub(super) chunk_batch_initial_rate: f32,
+    /// Upper bound applied when the client reports a decode rate.
+    /// Reported values are clamped into `[0.01, chunk_batch_max_rate]`.
+    pub(super) chunk_batch_max_rate: f32,
 }
 
 impl GameLoop {
@@ -136,6 +171,8 @@ impl GameLoop {
         persistence_interval_ticks: u64,
         crash_on_plugin_panic: bool,
         recipes: std::sync::Arc<basalt_recipes::RecipeRegistry>,
+        chunk_batch_initial_rate: f32,
+        chunk_batch_max_rate: f32,
     ) -> Self {
         Self {
             bus,
@@ -154,6 +191,8 @@ impl GameLoop {
             crash_on_plugin_panic,
             drag_states: std::collections::HashMap::new(),
             recipes,
+            chunk_batch_initial_rate,
+            chunk_batch_max_rate,
         }
     }
 
@@ -210,6 +249,10 @@ impl GameLoop {
         self.broadcast_item_movement();
         self.tick_item_pickup();
         self.collect_expired_entities();
+        // Drain queued chunks AFTER input + ECS systems so newly-enqueued
+        // chunks (from boundary crossings handled this tick) are eligible
+        // for sending immediately.
+        self.drain_chunk_batches();
         self.flush_dirty_chunks_if_due(tick);
     }
 
@@ -360,6 +403,8 @@ pub(super) mod tests {
             0,
             true,
             recipes_arc,
+            25.0,
+            100.0,
         );
         (game_loop, game_tx, io_rx)
     }

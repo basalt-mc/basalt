@@ -6,7 +6,7 @@ use std::sync::Arc;
 use basalt_api::events::PlayerMovedEvent;
 use basalt_types::Uuid;
 
-use super::{ChunkView, GameLoop, OutputHandle, VIEW_RADIUS};
+use super::{ChunkStreamRate, ChunkView, GameLoop, OutputHandle, VIEW_RADIUS};
 use crate::messages::{BroadcastEvent, ServerOutput, SharedBroadcast};
 
 impl GameLoop {
@@ -101,6 +101,12 @@ impl GameLoop {
     }
 
     /// Streams chunks when a player crosses a chunk boundary.
+    ///
+    /// Sends `UnloadChunk` for chunks that left the view, drops still-pending
+    /// chunks that have left the view (they were never sent), and enqueues
+    /// newly-in-view chunks onto the player's [`ChunkStreamRate`] pending
+    /// queue. The actual sending happens in `drain_chunk_batches` at the
+    /// player's negotiated per-tick rate.
     pub(super) fn stream_chunks(&mut self, eid: basalt_ecs::EntityId, new_cx: i32, new_cz: i32) {
         self.send_to(eid, |tx| {
             let _ = tx.try_send(ServerOutput::UpdateViewPosition {
@@ -117,7 +123,7 @@ impl GameLoop {
             }
         }
 
-        // Unload
+        // Unload chunks the client previously received but no longer needs.
         let Some(view) = self.ecs.get::<ChunkView>(eid) else {
             return;
         };
@@ -134,33 +140,44 @@ impl GameLoop {
             });
         }
 
-        let Some(view) = self.ecs.get_mut::<ChunkView>(eid) else {
-            return;
+        if let Some(view) = self.ecs.get_mut::<ChunkView>(eid) {
+            for k in &to_unload {
+                view.loaded_chunks.remove(k);
+            }
+        }
+
+        // Compute the set of chunks already accounted for so we don't
+        // double-enqueue: `loaded_chunks` are sent, `pending` are queued.
+        let already = {
+            let loaded = self
+                .ecs
+                .get::<ChunkView>(eid)
+                .map(|v| v.loaded_chunks.clone())
+                .unwrap_or_default();
+            let queued: HashSet<(i32, i32)> = self
+                .ecs
+                .get::<ChunkStreamRate>(eid)
+                .map(|r| r.pending.iter().copied().collect())
+                .unwrap_or_default();
+            loaded.union(&queued).copied().collect::<HashSet<_>>()
         };
-        for k in &to_unload {
-            view.loaded_chunks.remove(k);
-        }
 
-        // Load
-        let mut to_load = Vec::new();
-        for &key in &in_view {
-            if view.loaded_chunks.insert(key) {
-                to_load.push(key);
+        if let Some(rate) = self.ecs.get_mut::<ChunkStreamRate>(eid) {
+            // Drop pending chunks that have left the view — the client never
+            // received them so no UnloadChunk is needed; we just cancel the
+            // queued send.
+            rate.pending.retain(|k| in_view.contains(k));
+            // Enqueue newly-visible chunks. Order is "row-major in view radius"
+            // which biases nearby chunks earlier — distance-priority is a
+            // separate optimization (see issue #173 non-goals).
+            for dx in -r..=r {
+                for dz in -r..=r {
+                    let key = (new_cx + dx, new_cz + dz);
+                    if !already.contains(&key) {
+                        rate.pending.push_back(key);
+                    }
+                }
             }
-        }
-
-        if !to_load.is_empty() {
-            self.send_to(eid, |tx| {
-                let _ = tx.try_send(ServerOutput::ChunkBatchStart);
-            });
-            for &(cx, cz) in &to_load {
-                self.send_chunk_with_entities(eid, cx, cz);
-            }
-            self.send_to(eid, |tx| {
-                let _ = tx.try_send(ServerOutput::ChunkBatchFinished {
-                    batch_size: to_load.len() as i32,
-                });
-            });
         }
     }
 }
@@ -263,7 +280,14 @@ mod tests {
             z: 0.0,
             on_ground: true,
         });
-        game_loop.tick(1);
+
+        // The drainer ships up to floor(rate)=25 chunks per tick, and a
+        // boundary crossing can leave the queue holding the full view
+        // radius (~121 chunks). Drive enough ticks to drain everything
+        // — 10 is well over the ~5 needed at rate 25.
+        for tick in 1..=10 {
+            game_loop.tick(tick);
+        }
 
         let mut got_packets = false;
         while rx.try_recv().is_ok() {

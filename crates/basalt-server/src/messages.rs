@@ -176,6 +176,19 @@ pub enum GameInput {
         /// degrades this to a single craft.
         make_all: bool,
     },
+    /// Client report of how many chunks per tick it can decode.
+    ///
+    /// Sent by the client after each chunk batch is fully received
+    /// (`ServerboundPlayChunkBatchReceived`, packet `0x09`). The server
+    /// uses the rate to throttle subsequent chunk sends so slow or
+    /// distant clients are not flooded. Clamped on receipt to
+    /// `[0.01, chunk_batch_max_rate]` to defend against malformed values.
+    ChunkBatchAck {
+        /// UUID of the reporting player.
+        uuid: Uuid,
+        /// Decoded chunks per tick measured by the client.
+        chunks_per_tick: f32,
+    },
 }
 
 /// Output from the game loop to a player's net task.

@@ -201,6 +201,8 @@ impl Server {
             persistence_interval_ticks,
             crash_on_panic,
             Arc::new(recipes),
+            self.config.server.chunk_batch_initial_rate,
+            self.config.server.chunk_batch_max_rate,
         );
         let _game_loop = runtime::tick::TickLoop::start("game-loop", tps, move |tick| {
             game_loop_inst.tick(tick);
