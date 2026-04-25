@@ -12,7 +12,9 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use basalt_core::{EntityId, SystemContext, TickBudget};
+use basalt_api::budget::TickBudget;
+use basalt_api::components::EntityId;
+use basalt_api::system::SystemContext;
 
 use crate::ecs::AnyComponentStore;
 
@@ -166,7 +168,7 @@ impl SystemContext for ParallelSystemContext<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use basalt_core::SystemContextExt;
+    use basalt_api::system::SystemContextExt;
     use std::sync::atomic::AtomicU32;
 
     #[derive(Debug, Clone, PartialEq)]
@@ -174,9 +176,9 @@ mod tests {
         x: f64,
         y: f64,
     }
-    impl basalt_core::Component for Position {}
+    impl basalt_api::components::Component for Position {}
 
-    fn make_store_with<T: basalt_core::Component>(
+    fn make_store_with<T: basalt_api::components::Component>(
         entries: Vec<(EntityId, T)>,
     ) -> Box<dyn AnyComponentStore> {
         let mut store = crate::ecs::new_component_store::<T>();
