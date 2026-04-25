@@ -26,12 +26,13 @@ pub use broadcast::{BroadcastMessage, PlayerSnapshot, ProfileProperty};
 pub use budget::TickBudget;
 pub use components::{
     BlockPosition, BoundingBox, ChunkPosition, Component, CraftingGrid, DroppedItem, EntityId,
-    EntityKind, Health, Inventory, Lifetime, OpenContainer, Phase, PickupDelay, PlayerRef,
-    Position, Rotation, Sneaking, Velocity, VirtualContainerSlots,
+    EntityKind, Health, Inventory, KnownRecipes, Lifetime, OpenContainer, Phase, PickupDelay,
+    PlayerRef, Position, Rotation, Sneaking, Velocity, VirtualContainerSlots,
 };
 pub use container::{Container, ContainerBacking, ContainerBuilder, InventoryType};
 pub use context::{
-    ChatContext, ContainerContext, Context, EntityContext, PlayerContext, WorldContext,
+    ChatContext, ContainerContext, Context, EntityContext, PlayerContext, RecipeContext,
+    UnlockReason, WorldContext,
 };
 pub use gamemode::Gamemode;
 pub use logger::PluginLogger;

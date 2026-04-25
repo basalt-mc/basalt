@@ -10,6 +10,7 @@ mod crafting;
 mod identity;
 mod inventory;
 mod item;
+mod recipe_book;
 mod spatial;
 
 pub use container::VirtualContainerSlots;
@@ -17,6 +18,7 @@ pub use crafting::CraftingGrid;
 pub use identity::{EntityKind, Health, PlayerRef, Sneaking};
 pub use inventory::Inventory;
 pub use item::{DroppedItem, Lifetime, OpenContainer, PickupDelay};
+pub use recipe_book::KnownRecipes;
 pub use spatial::{BlockPosition, BoundingBox, ChunkPosition, Position, Rotation, Velocity};
 
 /// Marker trait for component types stored in the ECS.

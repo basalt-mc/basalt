@@ -5,10 +5,30 @@
 //! and [`ContainerContext`]. Plugins access them via `ctx.player()`,
 //! `ctx.chat()`, etc.
 
+use basalt_recipes::RecipeId;
 use basalt_types::{TextComponent, Uuid};
 
 use crate::broadcast::BroadcastMessage;
 use crate::gamemode::Gamemode;
+
+/// Why a recipe was unlocked for a player.
+///
+/// Surfaced in [`RecipeContext::unlock`] and on the
+/// `RecipeUnlockedEvent` so plugins can branch on the source. For
+/// example, an analytics plugin records `AutoDiscovered` differently
+/// from `Manual` admin grants; a tutorial plugin only triggers on
+/// `InitialJoin`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum UnlockReason {
+    /// The player crafted (or otherwise encountered) the recipe and
+    /// the server auto-granted it.
+    AutoDiscovered,
+    /// A plugin or admin command granted the recipe.
+    Manual,
+    /// Granted as part of the initial recipe set when the player
+    /// joined (starter recipes).
+    InitialJoin,
+}
 
 // ── Sub-context traits ───────────────────────────────────────────────
 
@@ -156,6 +176,41 @@ pub trait ContainerContext {
     fn notify_viewers(&self, x: i32, y: i32, z: i32, slot_index: i16, item: basalt_types::Slot);
 }
 
+/// Per-player recipe-book state.
+///
+/// Plugins use this to grant or revoke recipes for the current player
+/// — the dispatch context's player. Mutations queue a deferred
+/// response that the game loop translates into the appropriate S2C
+/// recipe-book packet and dispatches `RecipeUnlockedEvent` /
+/// `RecipeLockedEvent` after commit.
+///
+/// `has` and `unlocked` are synchronous reads against the player's
+/// `KnownRecipes` component.
+pub trait RecipeContext {
+    /// Unlocks the recipe for the current player.
+    ///
+    /// Queues a `Recipe Book Add` packet, inserts into the player's
+    /// `KnownRecipes`, and dispatches `RecipeUnlockedEvent` at Post.
+    /// No-op if the recipe is already unlocked.
+    fn unlock(&self, id: &RecipeId, reason: UnlockReason);
+
+    /// Locks the recipe for the current player.
+    ///
+    /// Queues a `Recipe Book Remove` packet, removes from the player's
+    /// `KnownRecipes`, and dispatches `RecipeLockedEvent` at Post.
+    /// No-op if the recipe is not currently unlocked.
+    fn lock(&self, id: &RecipeId);
+
+    /// Returns true if the recipe is unlocked for the current player.
+    fn has(&self, id: &RecipeId) -> bool;
+
+    /// Returns a snapshot of every recipe id the player has unlocked.
+    ///
+    /// Allocates a new `Vec` — callers that only need to test for
+    /// membership should prefer [`has`](Self::has).
+    fn unlocked(&self) -> Vec<RecipeId>;
+}
+
 // ── Main Context trait ───────────────────────────────────────────────
 
 /// Execution context for commands and event handlers.
@@ -164,7 +219,7 @@ pub trait ContainerContext {
 /// Implemented by `ServerContext` (in-game player) and potentially
 /// `ConsoleContext` (server terminal) in the future.
 pub trait Context:
-    PlayerContext + ChatContext + WorldContext + EntityContext + ContainerContext
+    PlayerContext + ChatContext + WorldContext + EntityContext + ContainerContext + RecipeContext
 {
     /// Returns a logger scoped to the current plugin.
     fn logger(&self) -> crate::logger::PluginLogger;
@@ -183,4 +238,7 @@ pub trait Context:
 
     /// Access container interaction.
     fn containers(&self) -> &dyn ContainerContext;
+
+    /// Access the current player's recipe-book state.
+    fn recipes(&self) -> &dyn RecipeContext;
 }

@@ -6,10 +6,12 @@
 
 use crate::broadcast::BroadcastMessage;
 use crate::context::{
-    ChatContext, ContainerContext, Context, EntityContext, PlayerContext, WorldContext,
+    ChatContext, ContainerContext, Context, EntityContext, PlayerContext, RecipeContext,
+    UnlockReason, WorldContext,
 };
 use crate::gamemode::Gamemode;
 use crate::logger::PluginLogger;
+use basalt_recipes::RecipeId;
 use basalt_types::{TextComponent, Uuid};
 
 /// A no-op [`Context`] implementation for unit tests.
@@ -109,6 +111,17 @@ impl ContainerContext for NoopContext {
     }
 }
 
+impl RecipeContext for NoopContext {
+    fn unlock(&self, _id: &RecipeId, _reason: UnlockReason) {}
+    fn lock(&self, _id: &RecipeId) {}
+    fn has(&self, _id: &RecipeId) -> bool {
+        false
+    }
+    fn unlocked(&self) -> Vec<RecipeId> {
+        Vec::new()
+    }
+}
+
 impl Context for NoopContext {
     fn logger(&self) -> PluginLogger {
         PluginLogger::new("test")
@@ -126,6 +139,9 @@ impl Context for NoopContext {
         self
     }
     fn containers(&self) -> &dyn ContainerContext {
+        self
+    }
+    fn recipes(&self) -> &dyn RecipeContext {
         self
     }
 }
