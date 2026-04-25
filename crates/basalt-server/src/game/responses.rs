@@ -135,6 +135,56 @@ impl GameLoop {
                         self.open_custom_container(eid, source_uuid, container.clone());
                     }
                 }
+                Response::BroadcastBlockAction {
+                    position,
+                    action_id,
+                    action_param,
+                    block_id,
+                } => {
+                    let x = position.x;
+                    let y = position.y;
+                    let z = position.z;
+                    let aid = *action_id;
+                    let ap = *action_param;
+                    let bid = *block_id;
+                    for (e, _) in self.ecs.iter::<OutputHandle>() {
+                        self.send_to(e, |tx| {
+                            let _ = tx.try_send(ServerOutput::BlockAction {
+                                x,
+                                y,
+                                z,
+                                action_id: aid,
+                                action_param: ap,
+                                block_id: bid,
+                            });
+                        });
+                    }
+                }
+                Response::NotifyContainerViewers {
+                    position,
+                    slot_index,
+                    item,
+                } => {
+                    if let Some(source_eid) = self.find_by_uuid(source_uuid) {
+                        self.notify_container_viewers(
+                            (position.x, position.y, position.z),
+                            source_eid,
+                            *slot_index,
+                            item,
+                        );
+                    }
+                }
+                Response::DestroyBlockEntity { position } => {
+                    if let Some(eid) = self.find_by_uuid(source_uuid) {
+                        self.destroy_block_entity(
+                            source_uuid,
+                            eid,
+                            position.x,
+                            position.y,
+                            position.z,
+                        );
+                    }
+                }
             }
         }
     }

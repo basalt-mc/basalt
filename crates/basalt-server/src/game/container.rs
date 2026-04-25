@@ -20,6 +20,53 @@ fn block_entity_kind(be: &BlockEntity) -> BlockEntityKind {
     }
 }
 
+/// Counts how many players have an `OpenContainer` component pointing
+/// at the same block-backed position as `backing`.
+///
+/// Returns 0 for `Virtual` backings (per-player, no co-viewing).
+pub(super) fn container_viewer_count(
+    ecs: &basalt_ecs::Ecs,
+    backing: &basalt_core::ContainerBacking,
+) -> u32 {
+    let basalt_core::ContainerBacking::Block { position } = backing else {
+        return 0;
+    };
+    let target = (position.x, position.y, position.z);
+    ecs.iter::<basalt_core::OpenContainer>()
+        .filter(|(_, oc)| {
+            matches!(
+                &oc.backing,
+                basalt_core::ContainerBacking::Block { position: p }
+                    if (p.x, p.y, p.z) == target
+            )
+        })
+        .count() as u32
+}
+
+/// Counts viewers like [`container_viewer_count`] but excludes the
+/// given entity. Used to compute the *remaining* viewer count for
+/// chest-lid close animations after a player closes the window.
+pub(super) fn container_viewer_count_excluding(
+    ecs: &basalt_ecs::Ecs,
+    backing: &basalt_core::ContainerBacking,
+    exclude: basalt_ecs::EntityId,
+) -> u32 {
+    let basalt_core::ContainerBacking::Block { position } = backing else {
+        return 0;
+    };
+    let target = (position.x, position.y, position.z);
+    ecs.iter::<basalt_core::OpenContainer>()
+        .filter(|(eid, oc)| {
+            *eid != exclude
+                && matches!(
+                    &oc.backing,
+                    basalt_core::ContainerBacking::Block { position: p }
+                        if (p.x, p.y, p.z) == target
+                )
+        })
+        .count() as u32
+}
+
 /// A part of a container backed by a block entity.
 ///
 /// Each part maps a range of window slots to a block entity at a
@@ -439,12 +486,19 @@ impl GameLoop {
             });
         });
 
+        // Compute the viewer count BEFORE dispatch — for block-backed
+        // containers this includes the just-opened viewer (the
+        // OpenContainer component was set on `eid` above), giving
+        // plugins the post-open count for the chest-lid animation.
+        let viewer_count = container_viewer_count(&self.ecs, &backing);
+
         // Dispatch ContainerOpenedEvent (Post stage)
         let ctx = self.make_context(uuid, entity_id, &username, yaw, pitch);
         let mut opened_event = ContainerOpenedEvent {
             window_id,
             inventory_type,
             backing,
+            viewer_count,
         };
         self.dispatch_event(&mut opened_event, &ctx);
         self.process_responses(uuid, &ctx.drain_responses());
@@ -452,13 +506,18 @@ impl GameLoop {
 
     /// Dispatches a `ContainerClosedEvent` for a player.
     ///
-    /// Reads the `OpenContainer` component to populate the event fields.
-    /// Must be called BEFORE the `OpenContainer` component is removed.
+    /// Reads the `OpenContainer` component to populate the event
+    /// fields. Must be called BEFORE the `OpenContainer` component
+    /// is removed (so the close-time backing/inventory_type are
+    /// observable). The `crafting_grid_state` snapshot is the
+    /// caller's responsibility — pass `None` for non-crafting
+    /// closures.
     pub(super) fn dispatch_container_closed(
         &mut self,
         eid: basalt_ecs::EntityId,
         uuid: Uuid,
         reason: CloseReason,
+        crafting_grid_state: Option<[basalt_types::Slot; 9]>,
     ) {
         let Some(oc) = self.ecs.get::<basalt_core::OpenContainer>(eid) else {
             return;
@@ -466,6 +525,9 @@ impl GameLoop {
         let window_id = oc.window_id;
         let inventory_type = oc.inventory_type;
         let backing = oc.backing;
+
+        // Remaining viewers exclude the closing player.
+        let viewer_count = container_viewer_count_excluding(&self.ecs, &backing, eid);
 
         let (entity_id, username, yaw, pitch) = match self.player_info(eid) {
             Some(info) => info,
@@ -477,6 +539,8 @@ impl GameLoop {
             inventory_type,
             backing,
             reason,
+            viewer_count,
+            crafting_grid_state,
         };
         self.dispatch_event(&mut event, &ctx);
         self.process_responses(uuid, &ctx.drain_responses());
@@ -549,8 +613,9 @@ impl GameLoop {
     /// with the last state.
     ///
     /// Returns the removed entity for the caller if needed. Returns
-    /// `None` if no block entity existed at the position.
-    #[allow(dead_code)] // infrastructure for future callers (plugin block entity removal)
+    /// `None` if no block entity existed at the position. Wired into
+    /// the plugin API via `Response::DestroyBlockEntity`
+    /// (`ctx.world_ctx().destroy_block_entity(...)`).
     pub(super) fn destroy_block_entity(
         &mut self,
         uuid: Uuid,

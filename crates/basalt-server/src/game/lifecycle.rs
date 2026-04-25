@@ -290,7 +290,26 @@ impl GameLoop {
 
         // Dispatch ContainerClosedEvent before despawn (if container is open)
         if self.ecs.has::<basalt_core::OpenContainer>(eid) {
-            self.dispatch_container_closed(eid, uuid, basalt_api::events::CloseReason::Disconnect);
+            // Snapshot crafting grid for the disconnect path so plugins
+            // can drop items even when the player crashes out.
+            let crafting_grid_state = if matches!(
+                self.ecs
+                    .get::<basalt_core::OpenContainer>(eid)
+                    .map(|oc| oc.inventory_type),
+                Some(basalt_core::InventoryType::Crafting)
+            ) {
+                self.ecs
+                    .get::<basalt_core::CraftingGrid>(eid)
+                    .map(|g| g.slots.clone())
+            } else {
+                None
+            };
+            self.dispatch_container_closed(
+                eid,
+                uuid,
+                basalt_api::events::CloseReason::Disconnect,
+                crafting_grid_state,
+            );
         }
 
         // Dispatch PlayerLeftEvent

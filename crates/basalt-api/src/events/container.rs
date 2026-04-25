@@ -118,6 +118,14 @@ pub struct ContainerOpenedEvent {
     pub inventory_type: InventoryType,
     /// How the container is backed.
     pub backing: ContainerBacking,
+    /// Number of players viewing the same block-backed container,
+    /// **including** the player who just opened it. Always at least 1
+    /// for `Block` backings, 0 for `Virtual` backings (each virtual
+    /// container is per-player).
+    ///
+    /// Used by `ContainerPlugin` to broadcast the chest-lid open
+    /// animation with the right viewer count.
+    pub viewer_count: u32,
 }
 crate::game_event!(ContainerOpenedEvent);
 
@@ -134,6 +142,21 @@ pub struct ContainerClosedEvent {
     pub backing: ContainerBacking,
     /// Why the container is closing.
     pub reason: CloseReason,
+    /// Number of remaining viewers on the same block-backed container
+    /// **excluding** the closing player. 0 for `Virtual` backings.
+    ///
+    /// Used by `ContainerPlugin` to broadcast the chest-lid close
+    /// animation with the right remaining-viewer count (action
+    /// param 0 closes the lid completely).
+    pub viewer_count: u32,
+    /// Snapshot of the player's `CraftingGrid` slots at the moment of
+    /// close, populated **only** when `inventory_type ==
+    /// InventoryType::Crafting` (3x3 crafting table). The server has
+    /// already reset the grid to 2x2 by the time this event fires —
+    /// plugins use the snapshot to spawn dropped items.
+    ///
+    /// `None` for any non-crafting close.
+    pub crafting_grid_state: Option<[Slot; 9]>,
 }
 crate::game_event!(ContainerClosedEvent);
 
@@ -360,9 +383,11 @@ mod tests {
             backing: ContainerBacking::Block {
                 position: BlockPosition { x: 5, y: 64, z: 3 },
             },
+            viewer_count: 1,
         };
         assert_eq!(event.window_id, 1);
         assert_eq!(event.inventory_type, InventoryType::Generic9x3);
+        assert_eq!(event.viewer_count, 1);
     }
 
     #[test]
@@ -371,6 +396,7 @@ mod tests {
             window_id: 1,
             inventory_type: InventoryType::Generic9x3,
             backing: ContainerBacking::Virtual,
+            viewer_count: 0,
         };
         event.cancel(); // no-op
         assert!(!event.is_cancelled());
@@ -389,6 +415,8 @@ mod tests {
                 },
             },
             reason: CloseReason::Manual,
+            viewer_count: 0,
+            crafting_grid_state: None,
         };
         assert_eq!(event.window_id, 2);
         assert_eq!(event.reason, CloseReason::Manual);
@@ -401,6 +429,8 @@ mod tests {
             inventory_type: InventoryType::Generic9x3,
             backing: ContainerBacking::Virtual,
             reason: CloseReason::Disconnect,
+            viewer_count: 0,
+            crafting_grid_state: None,
         };
         event.cancel();
         assert!(!event.is_cancelled());
@@ -604,12 +634,15 @@ mod tests {
                 window_id: 1,
                 inventory_type: InventoryType::Generic9x3,
                 backing: ContainerBacking::Virtual,
+                viewer_count: 0,
             }),
             Box::new(ContainerClosedEvent {
                 window_id: 1,
                 inventory_type: InventoryType::Generic9x3,
                 backing: ContainerBacking::Virtual,
                 reason: CloseReason::Manual,
+                viewer_count: 0,
+                crafting_grid_state: None,
             }),
             Box::new(ContainerClickEvent {
                 window_id: 1,

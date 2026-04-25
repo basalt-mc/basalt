@@ -56,6 +56,13 @@ pub trait WorldContext {
     fn stream_chunks(&self, cx: i32, cz: i32);
     /// Schedules a chunk for asynchronous persistence on the I/O thread.
     fn persist_chunk(&self, cx: i32, cz: i32);
+    /// Removes a block entity at the given position and fires a
+    /// `BlockEntityDestroyedEvent` carrying the last state.
+    ///
+    /// No-op if no block entity exists at the position. Plugins use
+    /// this from a `BlockBrokenEvent` Post handler to drive the
+    /// destroy → drop-items chain through the event pipeline.
+    fn destroy_block_entity(&self, x: i32, y: i32, z: i32);
 }
 
 /// Entity management: spawn, despawn, broadcast.
@@ -93,6 +100,22 @@ pub trait EntityContext {
     /// Prefer the typed broadcast methods when possible. This method
     /// is for server-internal broadcasts that don't have typed wrappers.
     fn broadcast_raw(&self, msg: BroadcastMessage);
+
+    /// Broadcasts a `BlockAction` packet to all connected players.
+    ///
+    /// Used for state-change animations driven by plugins (chest
+    /// lid open/close, door swing, note-block pitch chime, etc.).
+    /// The meaning of `action_id` and `action_param` is block-specific
+    /// — see the wiki for the full table.
+    fn broadcast_block_action(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+        action_id: u8,
+        action_param: u8,
+        block_id: i32,
+    );
 }
 
 /// Container interaction: chests, crafting tables, custom windows.
@@ -118,6 +141,16 @@ pub trait ContainerContext {
     /// ctx.containers().open(&SHOP);
     /// ```
     fn open(&self, container: &crate::container::Container);
+
+    /// Notifies every other player viewing the same block-backed
+    /// container that a slot changed.
+    ///
+    /// Sends `SetContainerSlot` to all players whose `OpenContainer`
+    /// component points at `(x, y, z)`, **excluding** the current
+    /// player. Used by `ContainerPlugin` from the
+    /// `ContainerSlotChangedEvent` handler to keep co-viewers in sync.
+    /// No-op for virtual containers (they are per-player).
+    fn notify_viewers(&self, x: i32, y: i32, z: i32, slot_index: i16, item: basalt_types::Slot);
 }
 
 // ── Main Context trait ───────────────────────────────────────────────

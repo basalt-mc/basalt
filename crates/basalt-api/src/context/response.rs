@@ -4,6 +4,7 @@ use std::cell::RefCell;
 
 use basalt_core::broadcast::BroadcastMessage;
 use basalt_core::components::{BlockPosition, ChunkPosition, Position, Rotation};
+use basalt_types::Slot;
 use basalt_types::nbt::NbtCompound;
 
 /// A deferred operation queued by a sync event handler.
@@ -67,6 +68,48 @@ pub enum Response {
     /// Accepts a [`Container`](basalt_core::container::Container) template
     /// value built via [`Container::builder()`](basalt_core::container::Container::builder).
     OpenContainer(basalt_core::container::Container),
+    /// Broadcast a `BlockAction` packet to all connected players.
+    ///
+    /// Used by container/door/note-block plugins for state-change
+    /// animations (chest lid open/close, door open/close, etc.). The
+    /// meaning of `action_id` and `action_param` depends on the
+    /// `block_id` registry value.
+    BroadcastBlockAction {
+        /// World position of the block.
+        position: BlockPosition,
+        /// Action identifier (block-specific).
+        action_id: u8,
+        /// Action parameter (block-specific; for chests this is the
+        /// number of viewers, 0 = closed).
+        action_param: u8,
+        /// Block registry ID (e.g. 185 for chest in 1.21.4).
+        block_id: i32,
+    },
+    /// Send a `SetContainerSlot` to every player viewing the same
+    /// block-backed container, **excluding** the current player.
+    ///
+    /// Used by `ContainerPlugin` to keep co-viewers' open chests in
+    /// sync when a slot is mutated by the source player. The server
+    /// resolves which players are co-viewers by scanning the
+    /// `OpenContainer` components.
+    NotifyContainerViewers {
+        /// World position of the block-backed container.
+        position: BlockPosition,
+        /// Protocol slot index that changed.
+        slot_index: i16,
+        /// New slot contents to broadcast.
+        item: Slot,
+    },
+    /// Remove a block entity at the given position and dispatch
+    /// `BlockEntityDestroyedEvent` with its last state.
+    ///
+    /// Used by `ContainerPlugin` on chest break to drive the destroy
+    /// → drop-items chain through the event pipeline. No-op if no
+    /// block entity exists at the position.
+    DestroyBlockEntity {
+        /// World position of the block entity to remove.
+        position: BlockPosition,
+    },
 }
 
 /// Thread-local queue for deferred async responses.

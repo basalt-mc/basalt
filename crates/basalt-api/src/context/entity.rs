@@ -73,4 +73,20 @@ impl EntityContext for ServerContext {
     fn broadcast_raw(&self, msg: BroadcastMessage) {
         self.responses.push(Response::Broadcast(msg));
     }
+    fn broadcast_block_action(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+        action_id: u8,
+        action_param: u8,
+        block_id: i32,
+    ) {
+        self.responses.push(Response::BroadcastBlockAction {
+            position: BlockPosition { x, y, z },
+            action_id,
+            action_param,
+            block_id,
+        });
+    }
 }

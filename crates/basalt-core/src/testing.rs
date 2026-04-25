@@ -58,6 +58,7 @@ impl WorldContext for NoopContext {
     fn send_block_ack(&self, _sequence: i32) {}
     fn stream_chunks(&self, _cx: i32, _cz: i32) {}
     fn persist_chunk(&self, _cx: i32, _cz: i32) {}
+    fn destroy_block_entity(&self, _x: i32, _y: i32, _z: i32) {}
 }
 
 impl EntityContext for NoopContext {
@@ -78,12 +79,31 @@ impl EntityContext for NoopContext {
     fn broadcast_player_joined(&self) {}
     fn broadcast_player_left(&self) {}
     fn broadcast_raw(&self, _msg: BroadcastMessage) {}
+    fn broadcast_block_action(
+        &self,
+        _x: i32,
+        _y: i32,
+        _z: i32,
+        _action_id: u8,
+        _action_param: u8,
+        _block_id: i32,
+    ) {
+    }
 }
 
 impl ContainerContext for NoopContext {
     fn open_chest(&self, _x: i32, _y: i32, _z: i32) {}
     fn open_crafting_table(&self, _x: i32, _y: i32, _z: i32) {}
     fn open(&self, _container: &crate::container::Container) {}
+    fn notify_viewers(
+        &self,
+        _x: i32,
+        _y: i32,
+        _z: i32,
+        _slot_index: i16,
+        _item: basalt_types::Slot,
+    ) {
+    }
 }
 
 impl Context for NoopContext {
