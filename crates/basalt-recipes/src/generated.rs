@@ -13,6 +13,12 @@
 /// (1-3 for standard crafting tables).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShapedRecipe {
+    /// Stable resource-location identifier (`namespace:path`).
+    ///
+    /// Vanilla ids are synthetic `minecraft:shaped_<n>` placeholders
+    /// derived from codegen sort order — minecraft-data does not
+    /// carry real recipe names.
+    pub id: &'static str,
     /// Grid width (1-3 for standard crafting table recipes).
     pub width: u8,
     /// Grid height (1-3 for standard crafting table recipes).
@@ -34,6 +40,12 @@ pub struct ShapedRecipe {
 /// Order does not matter; only the multiset of item IDs must match.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShapelessRecipe {
+    /// Stable resource-location identifier (`namespace:path`).
+    ///
+    /// Vanilla ids are synthetic `minecraft:shapeless_<n>` placeholders
+    /// derived from codegen sort order — minecraft-data does not
+    /// carry real recipe names.
+    pub id: &'static str,
     /// Unordered set of required ingredient item state IDs.
     ///
     /// Duplicates are allowed (e.g., two planks for pressure plate).
@@ -9181,6 +9193,7 @@ static SHAPELESS_271_INGR: [i32; 2] = [1274, 1375];
 /// All vanilla shaped recipes, indexed for grid-pattern matching.
 pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
     ShapedRecipe {
+        id: "minecraft:shaped_0",
         width: 3,
         height: 3,
         ingredients: &SHAPED_0_INGR,
@@ -9188,6 +9201,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 0,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1",
         width: 2,
         height: 2,
         ingredients: &SHAPED_1_INGR,
@@ -9195,6 +9209,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_2",
         width: 2,
         height: 2,
         ingredients: &SHAPED_2_INGR,
@@ -9202,6 +9217,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_3",
         width: 2,
         height: 2,
         ingredients: &SHAPED_3_INGR,
@@ -9209,6 +9225,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_4",
         width: 2,
         height: 2,
         ingredients: &SHAPED_4_INGR,
@@ -9216,6 +9233,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_5",
         width: 2,
         height: 2,
         ingredients: &SHAPED_5_INGR,
@@ -9223,6 +9241,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_6",
         width: 3,
         height: 1,
         ingredients: &SHAPED_6_INGR,
@@ -9230,6 +9249,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_7",
         width: 3,
         height: 3,
         ingredients: &SHAPED_7_INGR,
@@ -9237,6 +9257,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_8",
         width: 3,
         height: 2,
         ingredients: &SHAPED_8_INGR,
@@ -9244,6 +9265,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_9",
         width: 1,
         height: 2,
         ingredients: &SHAPED_9_INGR,
@@ -9251,6 +9273,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_10",
         width: 2,
         height: 2,
         ingredients: &SHAPED_10_INGR,
@@ -9258,6 +9281,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_11",
         width: 3,
         height: 1,
         ingredients: &SHAPED_11_INGR,
@@ -9265,6 +9289,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_12",
         width: 3,
         height: 3,
         ingredients: &SHAPED_12_INGR,
@@ -9272,6 +9297,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_13",
         width: 3,
         height: 2,
         ingredients: &SHAPED_13_INGR,
@@ -9279,6 +9305,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_14",
         width: 2,
         height: 2,
         ingredients: &SHAPED_14_INGR,
@@ -9286,6 +9313,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_15",
         width: 3,
         height: 1,
         ingredients: &SHAPED_15_INGR,
@@ -9293,6 +9321,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_16",
         width: 3,
         height: 3,
         ingredients: &SHAPED_16_INGR,
@@ -9300,6 +9329,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_17",
         width: 3,
         height: 2,
         ingredients: &SHAPED_17_INGR,
@@ -9307,6 +9337,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_18",
         width: 1,
         height: 2,
         ingredients: &SHAPED_18_INGR,
@@ -9314,6 +9345,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_19",
         width: 2,
         height: 2,
         ingredients: &SHAPED_19_INGR,
@@ -9321,6 +9353,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_20",
         width: 2,
         height: 2,
         ingredients: &SHAPED_20_INGR,
@@ -9328,6 +9361,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_21",
         width: 1,
         height: 2,
         ingredients: &SHAPED_21_INGR,
@@ -9335,6 +9369,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_22",
         width: 3,
         height: 3,
         ingredients: &SHAPED_22_INGR,
@@ -9342,6 +9377,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_23",
         width: 3,
         height: 3,
         ingredients: &SHAPED_23_INGR,
@@ -9349,6 +9385,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_24",
         width: 3,
         height: 3,
         ingredients: &SHAPED_24_INGR,
@@ -9356,6 +9393,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_25",
         width: 3,
         height: 3,
         ingredients: &SHAPED_25_INGR,
@@ -9363,6 +9401,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_26",
         width: 2,
         height: 2,
         ingredients: &SHAPED_26_INGR,
@@ -9370,6 +9409,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_27",
         width: 3,
         height: 3,
         ingredients: &SHAPED_27_INGR,
@@ -9377,6 +9417,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_28",
         width: 3,
         height: 3,
         ingredients: &SHAPED_28_INGR,
@@ -9384,6 +9425,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_29",
         width: 3,
         height: 3,
         ingredients: &SHAPED_29_INGR,
@@ -9391,6 +9433,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_30",
         width: 3,
         height: 3,
         ingredients: &SHAPED_30_INGR,
@@ -9398,6 +9441,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_31",
         width: 3,
         height: 3,
         ingredients: &SHAPED_31_INGR,
@@ -9405,6 +9449,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_32",
         width: 1,
         height: 2,
         ingredients: &SHAPED_32_INGR,
@@ -9412,6 +9457,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_33",
         width: 1,
         height: 2,
         ingredients: &SHAPED_33_INGR,
@@ -9419,6 +9465,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_34",
         width: 1,
         height: 2,
         ingredients: &SHAPED_34_INGR,
@@ -9426,6 +9473,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_35",
         width: 1,
         height: 2,
         ingredients: &SHAPED_35_INGR,
@@ -9433,6 +9481,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_36",
         width: 2,
         height: 2,
         ingredients: &SHAPED_36_INGR,
@@ -9440,6 +9489,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_37",
         width: 2,
         height: 2,
         ingredients: &SHAPED_37_INGR,
@@ -9447,6 +9497,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_38",
         width: 2,
         height: 2,
         ingredients: &SHAPED_38_INGR,
@@ -9454,6 +9505,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_39",
         width: 2,
         height: 2,
         ingredients: &SHAPED_39_INGR,
@@ -9461,6 +9513,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_40",
         width: 3,
         height: 3,
         ingredients: &SHAPED_40_INGR,
@@ -9468,6 +9521,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_41",
         width: 3,
         height: 3,
         ingredients: &SHAPED_41_INGR,
@@ -9475,6 +9529,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_42",
         width: 3,
         height: 3,
         ingredients: &SHAPED_42_INGR,
@@ -9482,6 +9537,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_43",
         width: 3,
         height: 3,
         ingredients: &SHAPED_43_INGR,
@@ -9489,6 +9545,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_44",
         width: 3,
         height: 1,
         ingredients: &SHAPED_44_INGR,
@@ -9496,6 +9553,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_45",
         width: 3,
         height: 1,
         ingredients: &SHAPED_45_INGR,
@@ -9503,6 +9561,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_46",
         width: 3,
         height: 1,
         ingredients: &SHAPED_46_INGR,
@@ -9510,6 +9569,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_47",
         width: 3,
         height: 1,
         ingredients: &SHAPED_47_INGR,
@@ -9517,6 +9577,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_48",
         width: 1,
         height: 2,
         ingredients: &SHAPED_48_INGR,
@@ -9524,6 +9585,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_49",
         width: 1,
         height: 2,
         ingredients: &SHAPED_49_INGR,
@@ -9531,6 +9593,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_50",
         width: 1,
         height: 2,
         ingredients: &SHAPED_50_INGR,
@@ -9538,6 +9601,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_51",
         width: 1,
         height: 2,
         ingredients: &SHAPED_51_INGR,
@@ -9545,6 +9609,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_52",
         width: 2,
         height: 2,
         ingredients: &SHAPED_52_INGR,
@@ -9552,6 +9617,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_53",
         width: 2,
         height: 2,
         ingredients: &SHAPED_53_INGR,
@@ -9559,6 +9625,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_54",
         width: 2,
         height: 2,
         ingredients: &SHAPED_54_INGR,
@@ -9566,6 +9633,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_55",
         width: 2,
         height: 2,
         ingredients: &SHAPED_55_INGR,
@@ -9573,6 +9641,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_56",
         width: 3,
         height: 3,
         ingredients: &SHAPED_56_INGR,
@@ -9580,6 +9649,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_57",
         width: 3,
         height: 3,
         ingredients: &SHAPED_57_INGR,
@@ -9587,6 +9657,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_58",
         width: 3,
         height: 3,
         ingredients: &SHAPED_58_INGR,
@@ -9594,6 +9665,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_59",
         width: 3,
         height: 3,
         ingredients: &SHAPED_59_INGR,
@@ -9601,6 +9673,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_60",
         width: 3,
         height: 1,
         ingredients: &SHAPED_60_INGR,
@@ -9608,6 +9681,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_61",
         width: 3,
         height: 1,
         ingredients: &SHAPED_61_INGR,
@@ -9615,6 +9689,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_62",
         width: 3,
         height: 1,
         ingredients: &SHAPED_62_INGR,
@@ -9622,6 +9697,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_63",
         width: 3,
         height: 1,
         ingredients: &SHAPED_63_INGR,
@@ -9629,6 +9705,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_64",
         width: 2,
         height: 2,
         ingredients: &SHAPED_64_INGR,
@@ -9636,6 +9713,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_65",
         width: 2,
         height: 2,
         ingredients: &SHAPED_65_INGR,
@@ -9643,6 +9721,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_66",
         width: 2,
         height: 2,
         ingredients: &SHAPED_66_INGR,
@@ -9650,6 +9729,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_67",
         width: 2,
         height: 2,
         ingredients: &SHAPED_67_INGR,
@@ -9657,6 +9737,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_68",
         width: 2,
         height: 2,
         ingredients: &SHAPED_68_INGR,
@@ -9664,6 +9745,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_69",
         width: 2,
         height: 2,
         ingredients: &SHAPED_69_INGR,
@@ -9671,6 +9753,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_70",
         width: 2,
         height: 2,
         ingredients: &SHAPED_70_INGR,
@@ -9678,6 +9761,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_71",
         width: 2,
         height: 2,
         ingredients: &SHAPED_71_INGR,
@@ -9685,6 +9769,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_72",
         width: 2,
         height: 2,
         ingredients: &SHAPED_72_INGR,
@@ -9692,6 +9777,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_73",
         width: 2,
         height: 2,
         ingredients: &SHAPED_73_INGR,
@@ -9699,6 +9785,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_74",
         width: 2,
         height: 2,
         ingredients: &SHAPED_74_INGR,
@@ -9706,6 +9793,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_75",
         width: 2,
         height: 2,
         ingredients: &SHAPED_75_INGR,
@@ -9713,6 +9801,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_76",
         width: 2,
         height: 2,
         ingredients: &SHAPED_76_INGR,
@@ -9720,6 +9809,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_77",
         width: 2,
         height: 2,
         ingredients: &SHAPED_77_INGR,
@@ -9727,6 +9817,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_78",
         width: 2,
         height: 2,
         ingredients: &SHAPED_78_INGR,
@@ -9734,6 +9825,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_79",
         width: 2,
         height: 2,
         ingredients: &SHAPED_79_INGR,
@@ -9741,6 +9833,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_80",
         width: 2,
         height: 2,
         ingredients: &SHAPED_80_INGR,
@@ -9748,6 +9841,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_81",
         width: 2,
         height: 2,
         ingredients: &SHAPED_81_INGR,
@@ -9755,6 +9849,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_82",
         width: 2,
         height: 2,
         ingredients: &SHAPED_82_INGR,
@@ -9762,6 +9857,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_83",
         width: 2,
         height: 2,
         ingredients: &SHAPED_83_INGR,
@@ -9769,6 +9865,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_84",
         width: 2,
         height: 2,
         ingredients: &SHAPED_84_INGR,
@@ -9776,6 +9873,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_85",
         width: 2,
         height: 2,
         ingredients: &SHAPED_85_INGR,
@@ -9783,6 +9881,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_86",
         width: 3,
         height: 3,
         ingredients: &SHAPED_86_INGR,
@@ -9790,6 +9889,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_87",
         width: 3,
         height: 3,
         ingredients: &SHAPED_87_INGR,
@@ -9797,6 +9897,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_88",
         width: 2,
         height: 2,
         ingredients: &SHAPED_88_INGR,
@@ -9804,6 +9905,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_89",
         width: 1,
         height: 2,
         ingredients: &SHAPED_89_INGR,
@@ -9811,6 +9913,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_90",
         width: 2,
         height: 2,
         ingredients: &SHAPED_90_INGR,
@@ -9818,6 +9921,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_91",
         width: 2,
         height: 2,
         ingredients: &SHAPED_91_INGR,
@@ -9825,6 +9929,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_92",
         width: 2,
         height: 1,
         ingredients: &SHAPED_92_INGR,
@@ -9832,6 +9937,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_93",
         width: 2,
         height: 1,
         ingredients: &SHAPED_93_INGR,
@@ -9839,6 +9945,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_94",
         width: 3,
         height: 1,
         ingredients: &SHAPED_94_INGR,
@@ -9846,6 +9953,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_95",
         width: 3,
         height: 1,
         ingredients: &SHAPED_95_INGR,
@@ -9853,6 +9961,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_96",
         width: 3,
         height: 1,
         ingredients: &SHAPED_96_INGR,
@@ -9860,6 +9969,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_97",
         width: 3,
         height: 1,
         ingredients: &SHAPED_97_INGR,
@@ -9867,6 +9977,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_98",
         width: 3,
         height: 1,
         ingredients: &SHAPED_98_INGR,
@@ -9874,6 +9985,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_99",
         width: 3,
         height: 1,
         ingredients: &SHAPED_99_INGR,
@@ -9881,6 +9993,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_100",
         width: 3,
         height: 1,
         ingredients: &SHAPED_100_INGR,
@@ -9888,6 +10001,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_101",
         width: 3,
         height: 1,
         ingredients: &SHAPED_101_INGR,
@@ -9895,6 +10009,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_102",
         width: 3,
         height: 1,
         ingredients: &SHAPED_102_INGR,
@@ -9902,6 +10017,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_103",
         width: 3,
         height: 1,
         ingredients: &SHAPED_103_INGR,
@@ -9909,6 +10025,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_104",
         width: 3,
         height: 1,
         ingredients: &SHAPED_104_INGR,
@@ -9916,6 +10033,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_105",
         width: 3,
         height: 1,
         ingredients: &SHAPED_105_INGR,
@@ -9923,6 +10041,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_106",
         width: 3,
         height: 1,
         ingredients: &SHAPED_106_INGR,
@@ -9930,6 +10049,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_107",
         width: 3,
         height: 1,
         ingredients: &SHAPED_107_INGR,
@@ -9937,6 +10057,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_108",
         width: 3,
         height: 1,
         ingredients: &SHAPED_108_INGR,
@@ -9944,6 +10065,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_109",
         width: 3,
         height: 1,
         ingredients: &SHAPED_109_INGR,
@@ -9951,6 +10073,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_110",
         width: 3,
         height: 1,
         ingredients: &SHAPED_110_INGR,
@@ -9958,6 +10081,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_111",
         width: 3,
         height: 1,
         ingredients: &SHAPED_111_INGR,
@@ -9965,6 +10089,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_112",
         width: 3,
         height: 1,
         ingredients: &SHAPED_112_INGR,
@@ -9972,6 +10097,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_113",
         width: 3,
         height: 1,
         ingredients: &SHAPED_113_INGR,
@@ -9979,6 +10105,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_114",
         width: 3,
         height: 1,
         ingredients: &SHAPED_114_INGR,
@@ -9986,6 +10113,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_115",
         width: 3,
         height: 1,
         ingredients: &SHAPED_115_INGR,
@@ -9993,6 +10121,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_116",
         width: 3,
         height: 1,
         ingredients: &SHAPED_116_INGR,
@@ -10000,6 +10129,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_117",
         width: 3,
         height: 1,
         ingredients: &SHAPED_117_INGR,
@@ -10007,6 +10137,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_118",
         width: 3,
         height: 1,
         ingredients: &SHAPED_118_INGR,
@@ -10014,6 +10145,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_119",
         width: 3,
         height: 1,
         ingredients: &SHAPED_119_INGR,
@@ -10021,6 +10153,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_120",
         width: 3,
         height: 1,
         ingredients: &SHAPED_120_INGR,
@@ -10028,6 +10161,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_121",
         width: 3,
         height: 1,
         ingredients: &SHAPED_121_INGR,
@@ -10035,6 +10169,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_122",
         width: 3,
         height: 1,
         ingredients: &SHAPED_122_INGR,
@@ -10042,6 +10177,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_123",
         width: 3,
         height: 1,
         ingredients: &SHAPED_123_INGR,
@@ -10049,6 +10185,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_124",
         width: 3,
         height: 1,
         ingredients: &SHAPED_124_INGR,
@@ -10056,6 +10193,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_125",
         width: 3,
         height: 1,
         ingredients: &SHAPED_125_INGR,
@@ -10063,6 +10201,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_126",
         width: 3,
         height: 1,
         ingredients: &SHAPED_126_INGR,
@@ -10070,6 +10209,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_127",
         width: 3,
         height: 1,
         ingredients: &SHAPED_127_INGR,
@@ -10077,6 +10217,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_128",
         width: 2,
         height: 2,
         ingredients: &SHAPED_128_INGR,
@@ -10084,6 +10225,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_129",
         width: 3,
         height: 3,
         ingredients: &SHAPED_129_INGR,
@@ -10091,6 +10233,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_130",
         width: 3,
         height: 3,
         ingredients: &SHAPED_130_INGR,
@@ -10098,6 +10241,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_131",
         width: 3,
         height: 3,
         ingredients: &SHAPED_131_INGR,
@@ -10105,6 +10249,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_132",
         width: 3,
         height: 3,
         ingredients: &SHAPED_132_INGR,
@@ -10112,6 +10257,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_133",
         width: 3,
         height: 3,
         ingredients: &SHAPED_133_INGR,
@@ -10119,6 +10265,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_134",
         width: 3,
         height: 3,
         ingredients: &SHAPED_134_INGR,
@@ -10126,6 +10273,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_135",
         width: 3,
         height: 3,
         ingredients: &SHAPED_135_INGR,
@@ -10133,6 +10281,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_136",
         width: 3,
         height: 3,
         ingredients: &SHAPED_136_INGR,
@@ -10140,6 +10289,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_137",
         width: 3,
         height: 3,
         ingredients: &SHAPED_137_INGR,
@@ -10147,6 +10297,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_138",
         width: 3,
         height: 3,
         ingredients: &SHAPED_138_INGR,
@@ -10154,6 +10305,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_139",
         width: 3,
         height: 3,
         ingredients: &SHAPED_139_INGR,
@@ -10161,6 +10313,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_140",
         width: 3,
         height: 3,
         ingredients: &SHAPED_140_INGR,
@@ -10168,6 +10321,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_141",
         width: 3,
         height: 3,
         ingredients: &SHAPED_141_INGR,
@@ -10175,6 +10329,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_142",
         width: 3,
         height: 3,
         ingredients: &SHAPED_142_INGR,
@@ -10182,6 +10337,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_143",
         width: 3,
         height: 3,
         ingredients: &SHAPED_143_INGR,
@@ -10189,6 +10345,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_144",
         width: 3,
         height: 3,
         ingredients: &SHAPED_144_INGR,
@@ -10196,6 +10353,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_145",
         width: 3,
         height: 3,
         ingredients: &SHAPED_145_INGR,
@@ -10203,6 +10361,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_146",
         width: 3,
         height: 3,
         ingredients: &SHAPED_146_INGR,
@@ -10210,6 +10369,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_147",
         width: 3,
         height: 3,
         ingredients: &SHAPED_147_INGR,
@@ -10217,6 +10377,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_148",
         width: 3,
         height: 3,
         ingredients: &SHAPED_148_INGR,
@@ -10224,6 +10385,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_149",
         width: 3,
         height: 3,
         ingredients: &SHAPED_149_INGR,
@@ -10231,6 +10393,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_150",
         width: 3,
         height: 3,
         ingredients: &SHAPED_150_INGR,
@@ -10238,6 +10401,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_151",
         width: 3,
         height: 3,
         ingredients: &SHAPED_151_INGR,
@@ -10245,6 +10409,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_152",
         width: 3,
         height: 3,
         ingredients: &SHAPED_152_INGR,
@@ -10252,6 +10417,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_153",
         width: 3,
         height: 3,
         ingredients: &SHAPED_153_INGR,
@@ -10259,6 +10425,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_154",
         width: 1,
         height: 2,
         ingredients: &SHAPED_154_INGR,
@@ -10266,6 +10433,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_155",
         width: 1,
         height: 2,
         ingredients: &SHAPED_155_INGR,
@@ -10273,6 +10441,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_156",
         width: 1,
         height: 2,
         ingredients: &SHAPED_156_INGR,
@@ -10280,6 +10449,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_157",
         width: 2,
         height: 2,
         ingredients: &SHAPED_157_INGR,
@@ -10287,6 +10457,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_158",
         width: 1,
         height: 2,
         ingredients: &SHAPED_158_INGR,
@@ -10294,6 +10465,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_159",
         width: 3,
         height: 3,
         ingredients: &SHAPED_159_INGR,
@@ -10301,6 +10473,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_160",
         width: 3,
         height: 3,
         ingredients: &SHAPED_160_INGR,
@@ -10308,6 +10481,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_161",
         width: 3,
         height: 3,
         ingredients: &SHAPED_161_INGR,
@@ -10315,6 +10489,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_162",
         width: 3,
         height: 3,
         ingredients: &SHAPED_162_INGR,
@@ -10322,6 +10497,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_163",
         width: 3,
         height: 3,
         ingredients: &SHAPED_163_INGR,
@@ -10329,6 +10505,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_164",
         width: 3,
         height: 3,
         ingredients: &SHAPED_164_INGR,
@@ -10336,6 +10513,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_165",
         width: 3,
         height: 3,
         ingredients: &SHAPED_165_INGR,
@@ -10343,6 +10521,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_166",
         width: 3,
         height: 3,
         ingredients: &SHAPED_166_INGR,
@@ -10350,6 +10529,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_167",
         width: 3,
         height: 3,
         ingredients: &SHAPED_167_INGR,
@@ -10357,6 +10537,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_168",
         width: 3,
         height: 3,
         ingredients: &SHAPED_168_INGR,
@@ -10364,6 +10545,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_169",
         width: 3,
         height: 3,
         ingredients: &SHAPED_169_INGR,
@@ -10371,6 +10553,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_170",
         width: 3,
         height: 3,
         ingredients: &SHAPED_170_INGR,
@@ -10378,6 +10561,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_171",
         width: 3,
         height: 3,
         ingredients: &SHAPED_171_INGR,
@@ -10385,6 +10569,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_172",
         width: 3,
         height: 3,
         ingredients: &SHAPED_172_INGR,
@@ -10392,6 +10577,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_173",
         width: 2,
         height: 2,
         ingredients: &SHAPED_173_INGR,
@@ -10399,6 +10585,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_174",
         width: 2,
         height: 2,
         ingredients: &SHAPED_174_INGR,
@@ -10406,6 +10593,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_175",
         width: 2,
         height: 2,
         ingredients: &SHAPED_175_INGR,
@@ -10413,6 +10601,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_176",
         width: 2,
         height: 2,
         ingredients: &SHAPED_176_INGR,
@@ -10420,6 +10609,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_177",
         width: 2,
         height: 2,
         ingredients: &SHAPED_177_INGR,
@@ -10427,6 +10617,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_178",
         width: 2,
         height: 2,
         ingredients: &SHAPED_178_INGR,
@@ -10434,6 +10625,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_179",
         width: 2,
         height: 2,
         ingredients: &SHAPED_179_INGR,
@@ -10441,6 +10633,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_180",
         width: 2,
         height: 2,
         ingredients: &SHAPED_180_INGR,
@@ -10448,6 +10641,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_181",
         width: 2,
         height: 2,
         ingredients: &SHAPED_181_INGR,
@@ -10455,6 +10649,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_182",
         width: 2,
         height: 2,
         ingredients: &SHAPED_182_INGR,
@@ -10462,6 +10657,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_183",
         width: 2,
         height: 2,
         ingredients: &SHAPED_183_INGR,
@@ -10469,6 +10665,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_184",
         width: 2,
         height: 2,
         ingredients: &SHAPED_184_INGR,
@@ -10476,6 +10673,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_185",
         width: 3,
         height: 3,
         ingredients: &SHAPED_185_INGR,
@@ -10483,6 +10681,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_186",
         width: 3,
         height: 3,
         ingredients: &SHAPED_186_INGR,
@@ -10490,6 +10689,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_187",
         width: 3,
         height: 3,
         ingredients: &SHAPED_187_INGR,
@@ -10497,6 +10697,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_188",
         width: 3,
         height: 3,
         ingredients: &SHAPED_188_INGR,
@@ -10504,6 +10705,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_189",
         width: 3,
         height: 3,
         ingredients: &SHAPED_189_INGR,
@@ -10511,6 +10713,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_190",
         width: 3,
         height: 1,
         ingredients: &SHAPED_190_INGR,
@@ -10518,6 +10721,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_191",
         width: 2,
         height: 2,
         ingredients: &SHAPED_191_INGR,
@@ -10525,6 +10729,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_192",
         width: 2,
         height: 2,
         ingredients: &SHAPED_192_INGR,
@@ -10532,6 +10737,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_193",
         width: 3,
         height: 3,
         ingredients: &SHAPED_193_INGR,
@@ -10539,6 +10745,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_194",
         width: 3,
         height: 3,
         ingredients: &SHAPED_194_INGR,
@@ -10546,6 +10753,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_195",
         width: 3,
         height: 3,
         ingredients: &SHAPED_195_INGR,
@@ -10553,6 +10761,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_196",
         width: 3,
         height: 3,
         ingredients: &SHAPED_196_INGR,
@@ -10560,6 +10769,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_197",
         width: 3,
         height: 3,
         ingredients: &SHAPED_197_INGR,
@@ -10567,6 +10777,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_198",
         width: 3,
         height: 3,
         ingredients: &SHAPED_198_INGR,
@@ -10574,6 +10785,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_199",
         width: 3,
         height: 3,
         ingredients: &SHAPED_199_INGR,
@@ -10581,6 +10793,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_200",
         width: 3,
         height: 3,
         ingredients: &SHAPED_200_INGR,
@@ -10588,6 +10801,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_201",
         width: 3,
         height: 3,
         ingredients: &SHAPED_201_INGR,
@@ -10595,6 +10809,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_202",
         width: 3,
         height: 3,
         ingredients: &SHAPED_202_INGR,
@@ -10602,6 +10817,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_203",
         width: 3,
         height: 3,
         ingredients: &SHAPED_203_INGR,
@@ -10609,6 +10825,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_204",
         width: 3,
         height: 3,
         ingredients: &SHAPED_204_INGR,
@@ -10616,6 +10833,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_205",
         width: 3,
         height: 2,
         ingredients: &SHAPED_205_INGR,
@@ -10623,6 +10841,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_206",
         width: 3,
         height: 2,
         ingredients: &SHAPED_206_INGR,
@@ -10630,6 +10849,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_207",
         width: 3,
         height: 2,
         ingredients: &SHAPED_207_INGR,
@@ -10637,6 +10857,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_208",
         width: 3,
         height: 2,
         ingredients: &SHAPED_208_INGR,
@@ -10644,6 +10865,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_209",
         width: 3,
         height: 2,
         ingredients: &SHAPED_209_INGR,
@@ -10651,6 +10873,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_210",
         width: 3,
         height: 2,
         ingredients: &SHAPED_210_INGR,
@@ -10658,6 +10881,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_211",
         width: 3,
         height: 2,
         ingredients: &SHAPED_211_INGR,
@@ -10665,6 +10889,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_212",
         width: 3,
         height: 2,
         ingredients: &SHAPED_212_INGR,
@@ -10672,6 +10897,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_213",
         width: 3,
         height: 2,
         ingredients: &SHAPED_213_INGR,
@@ -10679,6 +10905,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_214",
         width: 3,
         height: 2,
         ingredients: &SHAPED_214_INGR,
@@ -10686,6 +10913,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_215",
         width: 3,
         height: 2,
         ingredients: &SHAPED_215_INGR,
@@ -10693,6 +10921,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_216",
         width: 3,
         height: 2,
         ingredients: &SHAPED_216_INGR,
@@ -10700,6 +10929,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_217",
         width: 1,
         height: 2,
         ingredients: &SHAPED_217_INGR,
@@ -10707,6 +10937,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_218",
         width: 2,
         height: 2,
         ingredients: &SHAPED_218_INGR,
@@ -10714,6 +10945,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_219",
         width: 1,
         height: 3,
         ingredients: &SHAPED_219_INGR,
@@ -10721,6 +10953,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_220",
         width: 1,
         height: 3,
         ingredients: &SHAPED_220_INGR,
@@ -10728,6 +10961,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_221",
         width: 2,
         height: 2,
         ingredients: &SHAPED_221_INGR,
@@ -10735,6 +10969,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_222",
         width: 2,
         height: 2,
         ingredients: &SHAPED_222_INGR,
@@ -10742,6 +10977,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_223",
         width: 1,
         height: 2,
         ingredients: &SHAPED_223_INGR,
@@ -10749,6 +10985,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_224",
         width: 2,
         height: 2,
         ingredients: &SHAPED_224_INGR,
@@ -10756,6 +10993,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_225",
         width: 2,
         height: 2,
         ingredients: &SHAPED_225_INGR,
@@ -10763,6 +11001,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_226",
         width: 2,
         height: 2,
         ingredients: &SHAPED_226_INGR,
@@ -10770,6 +11009,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_227",
         width: 1,
         height: 2,
         ingredients: &SHAPED_227_INGR,
@@ -10777,6 +11017,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_228",
         width: 3,
         height: 2,
         ingredients: &SHAPED_228_INGR,
@@ -10784,6 +11025,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_229",
         width: 1,
         height: 3,
         ingredients: &SHAPED_229_INGR,
@@ -10791,6 +11033,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_230",
         width: 3,
         height: 2,
         ingredients: &SHAPED_230_INGR,
@@ -10798,6 +11041,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_231",
         width: 3,
         height: 3,
         ingredients: &SHAPED_231_INGR,
@@ -10805,6 +11049,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_232",
         width: 3,
         height: 3,
         ingredients: &SHAPED_232_INGR,
@@ -10812,6 +11057,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_233",
         width: 3,
         height: 3,
         ingredients: &SHAPED_233_INGR,
@@ -10819,6 +11065,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_234",
         width: 2,
         height: 2,
         ingredients: &SHAPED_234_INGR,
@@ -10826,6 +11073,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_235",
         width: 1,
         height: 2,
         ingredients: &SHAPED_235_INGR,
@@ -10833,6 +11081,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_236",
         width: 3,
         height: 2,
         ingredients: &SHAPED_236_INGR,
@@ -10840,6 +11089,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_237",
         width: 3,
         height: 3,
         ingredients: &SHAPED_237_INGR,
@@ -10847,6 +11097,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_238",
         width: 3,
         height: 3,
         ingredients: &SHAPED_238_INGR,
@@ -10854,6 +11105,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_239",
         width: 2,
         height: 2,
         ingredients: &SHAPED_239_INGR,
@@ -10861,6 +11113,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_240",
         width: 3,
         height: 3,
         ingredients: &SHAPED_240_INGR,
@@ -10868,6 +11121,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_241",
         width: 3,
         height: 3,
         ingredients: &SHAPED_241_INGR,
@@ -10875,6 +11129,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_242",
         width: 3,
         height: 3,
         ingredients: &SHAPED_242_INGR,
@@ -10882,6 +11137,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_243",
         width: 3,
         height: 3,
         ingredients: &SHAPED_243_INGR,
@@ -10889,6 +11145,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_244",
         width: 3,
         height: 3,
         ingredients: &SHAPED_244_INGR,
@@ -10896,6 +11153,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_245",
         width: 3,
         height: 3,
         ingredients: &SHAPED_245_INGR,
@@ -10903,6 +11161,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_246",
         width: 3,
         height: 3,
         ingredients: &SHAPED_246_INGR,
@@ -10910,6 +11169,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_247",
         width: 3,
         height: 3,
         ingredients: &SHAPED_247_INGR,
@@ -10917,6 +11177,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_248",
         width: 3,
         height: 3,
         ingredients: &SHAPED_248_INGR,
@@ -10924,6 +11185,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_249",
         width: 3,
         height: 3,
         ingredients: &SHAPED_249_INGR,
@@ -10931,6 +11193,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_250",
         width: 3,
         height: 3,
         ingredients: &SHAPED_250_INGR,
@@ -10938,6 +11201,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_251",
         width: 3,
         height: 3,
         ingredients: &SHAPED_251_INGR,
@@ -10945,6 +11209,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_252",
         width: 3,
         height: 3,
         ingredients: &SHAPED_252_INGR,
@@ -10952,6 +11217,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_253",
         width: 3,
         height: 3,
         ingredients: &SHAPED_253_INGR,
@@ -10959,6 +11225,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_254",
         width: 3,
         height: 3,
         ingredients: &SHAPED_254_INGR,
@@ -10966,6 +11233,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_255",
         width: 3,
         height: 3,
         ingredients: &SHAPED_255_INGR,
@@ -10973,6 +11241,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_256",
         width: 3,
         height: 3,
         ingredients: &SHAPED_256_INGR,
@@ -10980,6 +11249,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_257",
         width: 3,
         height: 3,
         ingredients: &SHAPED_257_INGR,
@@ -10987,6 +11257,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_258",
         width: 3,
         height: 3,
         ingredients: &SHAPED_258_INGR,
@@ -10994,6 +11265,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_259",
         width: 3,
         height: 2,
         ingredients: &SHAPED_259_INGR,
@@ -11001,6 +11273,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_260",
         width: 3,
         height: 2,
         ingredients: &SHAPED_260_INGR,
@@ -11008,6 +11281,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_261",
         width: 3,
         height: 2,
         ingredients: &SHAPED_261_INGR,
@@ -11015,6 +11289,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_262",
         width: 3,
         height: 2,
         ingredients: &SHAPED_262_INGR,
@@ -11022,6 +11297,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_263",
         width: 3,
         height: 2,
         ingredients: &SHAPED_263_INGR,
@@ -11029,6 +11305,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_264",
         width: 3,
         height: 2,
         ingredients: &SHAPED_264_INGR,
@@ -11036,6 +11313,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_265",
         width: 3,
         height: 2,
         ingredients: &SHAPED_265_INGR,
@@ -11043,6 +11321,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_266",
         width: 3,
         height: 2,
         ingredients: &SHAPED_266_INGR,
@@ -11050,6 +11329,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_267",
         width: 3,
         height: 2,
         ingredients: &SHAPED_267_INGR,
@@ -11057,6 +11337,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_268",
         width: 3,
         height: 2,
         ingredients: &SHAPED_268_INGR,
@@ -11064,6 +11345,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_269",
         width: 3,
         height: 2,
         ingredients: &SHAPED_269_INGR,
@@ -11071,6 +11353,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_270",
         width: 3,
         height: 2,
         ingredients: &SHAPED_270_INGR,
@@ -11078,6 +11361,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_271",
         width: 3,
         height: 2,
         ingredients: &SHAPED_271_INGR,
@@ -11085,6 +11369,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_272",
         width: 3,
         height: 2,
         ingredients: &SHAPED_272_INGR,
@@ -11092,6 +11377,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_273",
         width: 3,
         height: 2,
         ingredients: &SHAPED_273_INGR,
@@ -11099,6 +11385,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_274",
         width: 3,
         height: 2,
         ingredients: &SHAPED_274_INGR,
@@ -11106,6 +11393,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_275",
         width: 3,
         height: 2,
         ingredients: &SHAPED_275_INGR,
@@ -11113,6 +11401,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_276",
         width: 3,
         height: 2,
         ingredients: &SHAPED_276_INGR,
@@ -11120,6 +11409,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_277",
         width: 3,
         height: 2,
         ingredients: &SHAPED_277_INGR,
@@ -11127,6 +11417,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_278",
         width: 3,
         height: 2,
         ingredients: &SHAPED_278_INGR,
@@ -11134,6 +11425,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_279",
         width: 3,
         height: 2,
         ingredients: &SHAPED_279_INGR,
@@ -11141,6 +11433,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_280",
         width: 3,
         height: 2,
         ingredients: &SHAPED_280_INGR,
@@ -11148,6 +11441,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_281",
         width: 3,
         height: 3,
         ingredients: &SHAPED_281_INGR,
@@ -11155,6 +11449,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_282",
         width: 1,
         height: 2,
         ingredients: &SHAPED_282_INGR,
@@ -11162,6 +11457,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_283",
         width: 2,
         height: 2,
         ingredients: &SHAPED_283_INGR,
@@ -11169,6 +11465,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_284",
         width: 2,
         height: 2,
         ingredients: &SHAPED_284_INGR,
@@ -11176,6 +11473,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_285",
         width: 1,
         height: 2,
         ingredients: &SHAPED_285_INGR,
@@ -11183,6 +11481,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_286",
         width: 3,
         height: 3,
         ingredients: &SHAPED_286_INGR,
@@ -11190,6 +11489,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_287",
         width: 3,
         height: 3,
         ingredients: &SHAPED_287_INGR,
@@ -11197,6 +11497,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_288",
         width: 3,
         height: 3,
         ingredients: &SHAPED_288_INGR,
@@ -11204,6 +11505,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_289",
         width: 3,
         height: 3,
         ingredients: &SHAPED_289_INGR,
@@ -11211,6 +11513,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_290",
         width: 3,
         height: 3,
         ingredients: &SHAPED_290_INGR,
@@ -11218,6 +11521,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_291",
         width: 3,
         height: 3,
         ingredients: &SHAPED_291_INGR,
@@ -11225,6 +11529,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_292",
         width: 3,
         height: 3,
         ingredients: &SHAPED_292_INGR,
@@ -11232,6 +11537,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_293",
         width: 3,
         height: 3,
         ingredients: &SHAPED_293_INGR,
@@ -11239,6 +11545,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_294",
         width: 3,
         height: 3,
         ingredients: &SHAPED_294_INGR,
@@ -11246,6 +11553,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_295",
         width: 3,
         height: 3,
         ingredients: &SHAPED_295_INGR,
@@ -11253,6 +11561,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_296",
         width: 3,
         height: 3,
         ingredients: &SHAPED_296_INGR,
@@ -11260,6 +11569,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_297",
         width: 3,
         height: 3,
         ingredients: &SHAPED_297_INGR,
@@ -11267,6 +11577,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_298",
         width: 3,
         height: 3,
         ingredients: &SHAPED_298_INGR,
@@ -11274,6 +11585,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_299",
         width: 3,
         height: 3,
         ingredients: &SHAPED_299_INGR,
@@ -11281,6 +11593,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_300",
         width: 3,
         height: 3,
         ingredients: &SHAPED_300_INGR,
@@ -11288,6 +11601,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_301",
         width: 3,
         height: 3,
         ingredients: &SHAPED_301_INGR,
@@ -11295,6 +11609,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_302",
         width: 3,
         height: 3,
         ingredients: &SHAPED_302_INGR,
@@ -11302,6 +11617,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_303",
         width: 3,
         height: 3,
         ingredients: &SHAPED_303_INGR,
@@ -11309,6 +11625,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_304",
         width: 3,
         height: 3,
         ingredients: &SHAPED_304_INGR,
@@ -11316,6 +11633,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_305",
         width: 2,
         height: 1,
         ingredients: &SHAPED_305_INGR,
@@ -11323,6 +11641,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_306",
         width: 2,
         height: 1,
         ingredients: &SHAPED_306_INGR,
@@ -11330,6 +11649,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_307",
         width: 2,
         height: 1,
         ingredients: &SHAPED_307_INGR,
@@ -11337,6 +11657,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_308",
         width: 2,
         height: 1,
         ingredients: &SHAPED_308_INGR,
@@ -11344,6 +11665,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_309",
         width: 2,
         height: 1,
         ingredients: &SHAPED_309_INGR,
@@ -11351,6 +11673,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_310",
         width: 2,
         height: 1,
         ingredients: &SHAPED_310_INGR,
@@ -11358,6 +11681,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_311",
         width: 2,
         height: 1,
         ingredients: &SHAPED_311_INGR,
@@ -11365,6 +11689,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_312",
         width: 2,
         height: 1,
         ingredients: &SHAPED_312_INGR,
@@ -11372,6 +11697,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_313",
         width: 2,
         height: 1,
         ingredients: &SHAPED_313_INGR,
@@ -11379,6 +11705,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_314",
         width: 2,
         height: 1,
         ingredients: &SHAPED_314_INGR,
@@ -11386,6 +11713,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_315",
         width: 2,
         height: 1,
         ingredients: &SHAPED_315_INGR,
@@ -11393,6 +11721,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_316",
         width: 2,
         height: 1,
         ingredients: &SHAPED_316_INGR,
@@ -11400,6 +11729,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_317",
         width: 2,
         height: 1,
         ingredients: &SHAPED_317_INGR,
@@ -11407,6 +11737,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_318",
         width: 2,
         height: 1,
         ingredients: &SHAPED_318_INGR,
@@ -11414,6 +11745,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_319",
         width: 2,
         height: 1,
         ingredients: &SHAPED_319_INGR,
@@ -11421,6 +11753,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_320",
         width: 2,
         height: 1,
         ingredients: &SHAPED_320_INGR,
@@ -11428,6 +11761,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_321",
         width: 3,
         height: 3,
         ingredients: &SHAPED_321_INGR,
@@ -11435,6 +11769,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_322",
         width: 3,
         height: 3,
         ingredients: &SHAPED_322_INGR,
@@ -11442,6 +11777,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_323",
         width: 3,
         height: 3,
         ingredients: &SHAPED_323_INGR,
@@ -11449,6 +11785,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_324",
         width: 3,
         height: 3,
         ingredients: &SHAPED_324_INGR,
@@ -11456,6 +11793,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_325",
         width: 3,
         height: 3,
         ingredients: &SHAPED_325_INGR,
@@ -11463,6 +11801,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_326",
         width: 3,
         height: 3,
         ingredients: &SHAPED_326_INGR,
@@ -11470,6 +11809,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_327",
         width: 3,
         height: 3,
         ingredients: &SHAPED_327_INGR,
@@ -11477,6 +11817,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_328",
         width: 3,
         height: 3,
         ingredients: &SHAPED_328_INGR,
@@ -11484,6 +11825,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_329",
         width: 3,
         height: 3,
         ingredients: &SHAPED_329_INGR,
@@ -11491,6 +11833,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_330",
         width: 3,
         height: 3,
         ingredients: &SHAPED_330_INGR,
@@ -11498,6 +11841,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_331",
         width: 3,
         height: 3,
         ingredients: &SHAPED_331_INGR,
@@ -11505,6 +11849,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_332",
         width: 3,
         height: 3,
         ingredients: &SHAPED_332_INGR,
@@ -11512,6 +11857,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_333",
         width: 3,
         height: 3,
         ingredients: &SHAPED_333_INGR,
@@ -11519,6 +11865,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_334",
         width: 3,
         height: 3,
         ingredients: &SHAPED_334_INGR,
@@ -11526,6 +11873,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_335",
         width: 3,
         height: 3,
         ingredients: &SHAPED_335_INGR,
@@ -11533,6 +11881,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_336",
         width: 3,
         height: 3,
         ingredients: &SHAPED_336_INGR,
@@ -11540,6 +11889,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_337",
         width: 3,
         height: 3,
         ingredients: &SHAPED_337_INGR,
@@ -11547,6 +11897,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_338",
         width: 3,
         height: 2,
         ingredients: &SHAPED_338_INGR,
@@ -11554,6 +11905,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_339",
         width: 3,
         height: 3,
         ingredients: &SHAPED_339_INGR,
@@ -11561,6 +11913,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_340",
         width: 3,
         height: 2,
         ingredients: &SHAPED_340_INGR,
@@ -11568,6 +11921,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_341",
         width: 3,
         height: 3,
         ingredients: &SHAPED_341_INGR,
@@ -11575,6 +11929,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_342",
         width: 3,
         height: 2,
         ingredients: &SHAPED_342_INGR,
@@ -11582,6 +11937,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_343",
         width: 3,
         height: 3,
         ingredients: &SHAPED_343_INGR,
@@ -11589,6 +11945,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_344",
         width: 3,
         height: 2,
         ingredients: &SHAPED_344_INGR,
@@ -11596,6 +11953,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_345",
         width: 3,
         height: 3,
         ingredients: &SHAPED_345_INGR,
@@ -11603,6 +11961,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_346",
         width: 3,
         height: 2,
         ingredients: &SHAPED_346_INGR,
@@ -11610,6 +11969,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_347",
         width: 3,
         height: 3,
         ingredients: &SHAPED_347_INGR,
@@ -11617,6 +11977,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_348",
         width: 3,
         height: 2,
         ingredients: &SHAPED_348_INGR,
@@ -11624,6 +11985,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_349",
         width: 3,
         height: 3,
         ingredients: &SHAPED_349_INGR,
@@ -11631,6 +11993,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_350",
         width: 3,
         height: 2,
         ingredients: &SHAPED_350_INGR,
@@ -11638,6 +12001,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_351",
         width: 3,
         height: 3,
         ingredients: &SHAPED_351_INGR,
@@ -11645,6 +12009,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_352",
         width: 3,
         height: 2,
         ingredients: &SHAPED_352_INGR,
@@ -11652,6 +12017,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_353",
         width: 3,
         height: 3,
         ingredients: &SHAPED_353_INGR,
@@ -11659,6 +12025,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_354",
         width: 3,
         height: 2,
         ingredients: &SHAPED_354_INGR,
@@ -11666,6 +12033,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_355",
         width: 3,
         height: 3,
         ingredients: &SHAPED_355_INGR,
@@ -11673,6 +12041,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_356",
         width: 3,
         height: 2,
         ingredients: &SHAPED_356_INGR,
@@ -11680,6 +12049,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_357",
         width: 3,
         height: 3,
         ingredients: &SHAPED_357_INGR,
@@ -11687,6 +12057,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_358",
         width: 3,
         height: 2,
         ingredients: &SHAPED_358_INGR,
@@ -11694,6 +12065,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_359",
         width: 3,
         height: 3,
         ingredients: &SHAPED_359_INGR,
@@ -11701,6 +12073,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_360",
         width: 3,
         height: 2,
         ingredients: &SHAPED_360_INGR,
@@ -11708,6 +12081,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_361",
         width: 3,
         height: 3,
         ingredients: &SHAPED_361_INGR,
@@ -11715,6 +12089,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_362",
         width: 3,
         height: 2,
         ingredients: &SHAPED_362_INGR,
@@ -11722,6 +12097,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_363",
         width: 3,
         height: 3,
         ingredients: &SHAPED_363_INGR,
@@ -11729,6 +12105,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_364",
         width: 3,
         height: 2,
         ingredients: &SHAPED_364_INGR,
@@ -11736,6 +12113,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_365",
         width: 3,
         height: 3,
         ingredients: &SHAPED_365_INGR,
@@ -11743,6 +12121,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_366",
         width: 3,
         height: 2,
         ingredients: &SHAPED_366_INGR,
@@ -11750,6 +12129,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_367",
         width: 3,
         height: 3,
         ingredients: &SHAPED_367_INGR,
@@ -11757,6 +12137,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_368",
         width: 3,
         height: 2,
         ingredients: &SHAPED_368_INGR,
@@ -11764,6 +12145,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_369",
         width: 2,
         height: 2,
         ingredients: &SHAPED_369_INGR,
@@ -11771,6 +12153,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_370",
         width: 3,
         height: 3,
         ingredients: &SHAPED_370_INGR,
@@ -11778,6 +12161,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_371",
         width: 3,
         height: 3,
         ingredients: &SHAPED_371_INGR,
@@ -11785,6 +12169,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_372",
         width: 3,
         height: 3,
         ingredients: &SHAPED_372_INGR,
@@ -11792,6 +12177,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_373",
         width: 3,
         height: 3,
         ingredients: &SHAPED_373_INGR,
@@ -11799,6 +12185,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_374",
         width: 3,
         height: 3,
         ingredients: &SHAPED_374_INGR,
@@ -11806,6 +12193,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_375",
         width: 2,
         height: 2,
         ingredients: &SHAPED_375_INGR,
@@ -11813,6 +12201,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_376",
         width: 1,
         height: 2,
         ingredients: &SHAPED_376_INGR,
@@ -11820,6 +12209,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_377",
         width: 2,
         height: 2,
         ingredients: &SHAPED_377_INGR,
@@ -11827,6 +12217,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_378",
         width: 3,
         height: 3,
         ingredients: &SHAPED_378_INGR,
@@ -11834,6 +12225,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_379",
         width: 3,
         height: 3,
         ingredients: &SHAPED_379_INGR,
@@ -11841,6 +12233,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_380",
         width: 3,
         height: 3,
         ingredients: &SHAPED_380_INGR,
@@ -11848,6 +12241,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_381",
         width: 2,
         height: 2,
         ingredients: &SHAPED_381_INGR,
@@ -11855,6 +12249,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_382",
         width: 2,
         height: 2,
         ingredients: &SHAPED_382_INGR,
@@ -11862,6 +12257,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_383",
         width: 3,
         height: 3,
         ingredients: &SHAPED_383_INGR,
@@ -11869,6 +12265,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_384",
         width: 1,
         height: 3,
         ingredients: &SHAPED_384_INGR,
@@ -11876,6 +12273,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_385",
         width: 3,
         height: 3,
         ingredients: &SHAPED_385_INGR,
@@ -11883,6 +12281,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_386",
         width: 3,
         height: 3,
         ingredients: &SHAPED_386_INGR,
@@ -11890,6 +12289,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_387",
         width: 3,
         height: 3,
         ingredients: &SHAPED_387_INGR,
@@ -11897,6 +12297,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_388",
         width: 3,
         height: 3,
         ingredients: &SHAPED_388_INGR,
@@ -11904,6 +12305,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_389",
         width: 3,
         height: 3,
         ingredients: &SHAPED_389_INGR,
@@ -11911,6 +12313,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_390",
         width: 3,
         height: 3,
         ingredients: &SHAPED_390_INGR,
@@ -11918,6 +12321,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_391",
         width: 3,
         height: 3,
         ingredients: &SHAPED_391_INGR,
@@ -11925,6 +12329,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_392",
         width: 3,
         height: 3,
         ingredients: &SHAPED_392_INGR,
@@ -11932,6 +12337,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_393",
         width: 3,
         height: 3,
         ingredients: &SHAPED_393_INGR,
@@ -11939,6 +12345,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_394",
         width: 3,
         height: 3,
         ingredients: &SHAPED_394_INGR,
@@ -11946,6 +12353,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_395",
         width: 3,
         height: 3,
         ingredients: &SHAPED_395_INGR,
@@ -11953,6 +12361,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_396",
         width: 3,
         height: 3,
         ingredients: &SHAPED_396_INGR,
@@ -11960,6 +12369,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_397",
         width: 3,
         height: 3,
         ingredients: &SHAPED_397_INGR,
@@ -11967,6 +12377,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_398",
         width: 3,
         height: 3,
         ingredients: &SHAPED_398_INGR,
@@ -11974,6 +12385,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_399",
         width: 3,
         height: 3,
         ingredients: &SHAPED_399_INGR,
@@ -11981,6 +12393,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_400",
         width: 3,
         height: 3,
         ingredients: &SHAPED_400_INGR,
@@ -11988,6 +12401,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_401",
         width: 3,
         height: 3,
         ingredients: &SHAPED_401_INGR,
@@ -11995,6 +12409,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_402",
         width: 3,
         height: 3,
         ingredients: &SHAPED_402_INGR,
@@ -12002,6 +12417,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_403",
         width: 3,
         height: 3,
         ingredients: &SHAPED_403_INGR,
@@ -12009,6 +12425,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_404",
         width: 3,
         height: 1,
         ingredients: &SHAPED_404_INGR,
@@ -12016,6 +12433,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_405",
         width: 3,
         height: 1,
         ingredients: &SHAPED_405_INGR,
@@ -12023,6 +12441,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_406",
         width: 3,
         height: 1,
         ingredients: &SHAPED_406_INGR,
@@ -12030,6 +12449,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_407",
         width: 3,
         height: 1,
         ingredients: &SHAPED_407_INGR,
@@ -12037,6 +12457,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_408",
         width: 3,
         height: 1,
         ingredients: &SHAPED_408_INGR,
@@ -12044,6 +12465,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_409",
         width: 3,
         height: 1,
         ingredients: &SHAPED_409_INGR,
@@ -12051,6 +12473,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_410",
         width: 3,
         height: 1,
         ingredients: &SHAPED_410_INGR,
@@ -12058,6 +12481,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_411",
         width: 3,
         height: 1,
         ingredients: &SHAPED_411_INGR,
@@ -12065,6 +12489,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_412",
         width: 3,
         height: 1,
         ingredients: &SHAPED_412_INGR,
@@ -12072,6 +12497,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_413",
         width: 3,
         height: 1,
         ingredients: &SHAPED_413_INGR,
@@ -12079,6 +12505,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_414",
         width: 3,
         height: 1,
         ingredients: &SHAPED_414_INGR,
@@ -12086,6 +12513,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_415",
         width: 3,
         height: 1,
         ingredients: &SHAPED_415_INGR,
@@ -12093,6 +12521,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_416",
         width: 3,
         height: 1,
         ingredients: &SHAPED_416_INGR,
@@ -12100,6 +12529,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_417",
         width: 3,
         height: 1,
         ingredients: &SHAPED_417_INGR,
@@ -12107,6 +12537,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_418",
         width: 3,
         height: 1,
         ingredients: &SHAPED_418_INGR,
@@ -12114,6 +12545,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_419",
         width: 3,
         height: 1,
         ingredients: &SHAPED_419_INGR,
@@ -12121,6 +12553,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_420",
         width: 3,
         height: 1,
         ingredients: &SHAPED_420_INGR,
@@ -12128,6 +12561,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_421",
         width: 3,
         height: 3,
         ingredients: &SHAPED_421_INGR,
@@ -12135,6 +12569,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_422",
         width: 1,
         height: 2,
         ingredients: &SHAPED_422_INGR,
@@ -12142,6 +12577,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_423",
         width: 3,
         height: 3,
         ingredients: &SHAPED_423_INGR,
@@ -12149,6 +12585,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_424",
         width: 3,
         height: 2,
         ingredients: &SHAPED_424_INGR,
@@ -12156,6 +12593,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_425",
         width: 3,
         height: 3,
         ingredients: &SHAPED_425_INGR,
@@ -12163,6 +12601,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_426",
         width: 3,
         height: 3,
         ingredients: &SHAPED_426_INGR,
@@ -12170,6 +12609,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_427",
         width: 3,
         height: 3,
         ingredients: &SHAPED_427_INGR,
@@ -12177,6 +12617,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_428",
         width: 3,
         height: 3,
         ingredients: &SHAPED_428_INGR,
@@ -12184,6 +12625,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_429",
         width: 3,
         height: 3,
         ingredients: &SHAPED_429_INGR,
@@ -12191,6 +12633,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_430",
         width: 3,
         height: 3,
         ingredients: &SHAPED_430_INGR,
@@ -12198,6 +12641,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_431",
         width: 3,
         height: 3,
         ingredients: &SHAPED_431_INGR,
@@ -12205,6 +12649,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_432",
         width: 3,
         height: 3,
         ingredients: &SHAPED_432_INGR,
@@ -12212,6 +12657,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_433",
         width: 3,
         height: 3,
         ingredients: &SHAPED_433_INGR,
@@ -12219,6 +12665,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_434",
         width: 3,
         height: 3,
         ingredients: &SHAPED_434_INGR,
@@ -12226,6 +12673,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_435",
         width: 3,
         height: 3,
         ingredients: &SHAPED_435_INGR,
@@ -12233,6 +12681,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_436",
         width: 3,
         height: 3,
         ingredients: &SHAPED_436_INGR,
@@ -12240,6 +12689,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_437",
         width: 3,
         height: 3,
         ingredients: &SHAPED_437_INGR,
@@ -12247,6 +12697,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_438",
         width: 1,
         height: 2,
         ingredients: &SHAPED_438_INGR,
@@ -12254,6 +12705,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_439",
         width: 3,
         height: 3,
         ingredients: &SHAPED_439_INGR,
@@ -12261,6 +12713,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_440",
         width: 2,
         height: 2,
         ingredients: &SHAPED_440_INGR,
@@ -12268,6 +12721,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_441",
         width: 3,
         height: 3,
         ingredients: &SHAPED_441_INGR,
@@ -12275,6 +12729,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_442",
         width: 3,
         height: 3,
         ingredients: &SHAPED_442_INGR,
@@ -12282,6 +12737,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_443",
         width: 3,
         height: 3,
         ingredients: &SHAPED_443_INGR,
@@ -12289,6 +12745,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_444",
         width: 3,
         height: 3,
         ingredients: &SHAPED_444_INGR,
@@ -12296,6 +12753,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_445",
         width: 3,
         height: 3,
         ingredients: &SHAPED_445_INGR,
@@ -12303,6 +12761,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_446",
         width: 3,
         height: 3,
         ingredients: &SHAPED_446_INGR,
@@ -12310,6 +12769,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_447",
         width: 3,
         height: 3,
         ingredients: &SHAPED_447_INGR,
@@ -12317,6 +12777,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_448",
         width: 3,
         height: 3,
         ingredients: &SHAPED_448_INGR,
@@ -12324,6 +12785,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_449",
         width: 3,
         height: 3,
         ingredients: &SHAPED_449_INGR,
@@ -12331,6 +12793,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_450",
         width: 3,
         height: 3,
         ingredients: &SHAPED_450_INGR,
@@ -12338,6 +12801,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_451",
         width: 3,
         height: 3,
         ingredients: &SHAPED_451_INGR,
@@ -12345,6 +12809,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_452",
         width: 3,
         height: 3,
         ingredients: &SHAPED_452_INGR,
@@ -12352,6 +12817,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_453",
         width: 3,
         height: 3,
         ingredients: &SHAPED_453_INGR,
@@ -12359,6 +12825,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_454",
         width: 3,
         height: 3,
         ingredients: &SHAPED_454_INGR,
@@ -12366,6 +12833,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_455",
         width: 3,
         height: 3,
         ingredients: &SHAPED_455_INGR,
@@ -12373,6 +12841,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_456",
         width: 3,
         height: 3,
         ingredients: &SHAPED_456_INGR,
@@ -12380,6 +12849,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_457",
         width: 3,
         height: 3,
         ingredients: &SHAPED_457_INGR,
@@ -12387,6 +12857,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_458",
         width: 1,
         height: 2,
         ingredients: &SHAPED_458_INGR,
@@ -12394,6 +12865,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_459",
         width: 1,
         height: 3,
         ingredients: &SHAPED_459_INGR,
@@ -12401,6 +12873,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_460",
         width: 3,
         height: 3,
         ingredients: &SHAPED_460_INGR,
@@ -12408,6 +12881,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_461",
         width: 3,
         height: 3,
         ingredients: &SHAPED_461_INGR,
@@ -12415,6 +12889,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_462",
         width: 3,
         height: 3,
         ingredients: &SHAPED_462_INGR,
@@ -12422,6 +12897,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_463",
         width: 3,
         height: 3,
         ingredients: &SHAPED_463_INGR,
@@ -12429,6 +12905,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_464",
         width: 3,
         height: 3,
         ingredients: &SHAPED_464_INGR,
@@ -12436,6 +12913,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_465",
         width: 3,
         height: 3,
         ingredients: &SHAPED_465_INGR,
@@ -12443,6 +12921,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_466",
         width: 3,
         height: 3,
         ingredients: &SHAPED_466_INGR,
@@ -12450,6 +12929,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_467",
         width: 3,
         height: 3,
         ingredients: &SHAPED_467_INGR,
@@ -12457,6 +12937,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_468",
         width: 3,
         height: 3,
         ingredients: &SHAPED_468_INGR,
@@ -12464,6 +12945,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_469",
         width: 3,
         height: 3,
         ingredients: &SHAPED_469_INGR,
@@ -12471,6 +12953,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_470",
         width: 3,
         height: 3,
         ingredients: &SHAPED_470_INGR,
@@ -12478,6 +12961,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_471",
         width: 3,
         height: 3,
         ingredients: &SHAPED_471_INGR,
@@ -12485,6 +12969,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_472",
         width: 3,
         height: 2,
         ingredients: &SHAPED_472_INGR,
@@ -12492,6 +12977,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_473",
         width: 1,
         height: 3,
         ingredients: &SHAPED_473_INGR,
@@ -12499,6 +12985,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_474",
         width: 1,
         height: 3,
         ingredients: &SHAPED_474_INGR,
@@ -12506,6 +12993,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_475",
         width: 1,
         height: 3,
         ingredients: &SHAPED_475_INGR,
@@ -12513,6 +13001,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_476",
         width: 1,
         height: 3,
         ingredients: &SHAPED_476_INGR,
@@ -12520,6 +13009,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_477",
         width: 1,
         height: 3,
         ingredients: &SHAPED_477_INGR,
@@ -12527,6 +13017,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_478",
         width: 1,
         height: 3,
         ingredients: &SHAPED_478_INGR,
@@ -12534,6 +13025,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_479",
         width: 1,
         height: 3,
         ingredients: &SHAPED_479_INGR,
@@ -12541,6 +13033,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_480",
         width: 1,
         height: 3,
         ingredients: &SHAPED_480_INGR,
@@ -12548,6 +13041,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_481",
         width: 1,
         height: 3,
         ingredients: &SHAPED_481_INGR,
@@ -12555,6 +13049,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_482",
         width: 1,
         height: 3,
         ingredients: &SHAPED_482_INGR,
@@ -12562,6 +13057,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_483",
         width: 1,
         height: 3,
         ingredients: &SHAPED_483_INGR,
@@ -12569,6 +13065,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_484",
         width: 1,
         height: 3,
         ingredients: &SHAPED_484_INGR,
@@ -12576,6 +13073,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_485",
         width: 3,
         height: 3,
         ingredients: &SHAPED_485_INGR,
@@ -12583,6 +13081,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_486",
         width: 3,
         height: 3,
         ingredients: &SHAPED_486_INGR,
@@ -12590,6 +13089,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_487",
         width: 3,
         height: 3,
         ingredients: &SHAPED_487_INGR,
@@ -12597,6 +13097,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_488",
         width: 3,
         height: 3,
         ingredients: &SHAPED_488_INGR,
@@ -12604,6 +13105,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_489",
         width: 3,
         height: 3,
         ingredients: &SHAPED_489_INGR,
@@ -12611,6 +13113,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_490",
         width: 3,
         height: 3,
         ingredients: &SHAPED_490_INGR,
@@ -12618,6 +13121,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_491",
         width: 3,
         height: 3,
         ingredients: &SHAPED_491_INGR,
@@ -12625,6 +13129,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_492",
         width: 3,
         height: 3,
         ingredients: &SHAPED_492_INGR,
@@ -12632,6 +13137,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_493",
         width: 3,
         height: 3,
         ingredients: &SHAPED_493_INGR,
@@ -12639,6 +13145,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_494",
         width: 3,
         height: 3,
         ingredients: &SHAPED_494_INGR,
@@ -12646,6 +13153,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_495",
         width: 3,
         height: 3,
         ingredients: &SHAPED_495_INGR,
@@ -12653,6 +13161,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_496",
         width: 3,
         height: 3,
         ingredients: &SHAPED_496_INGR,
@@ -12660,6 +13169,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_497",
         width: 3,
         height: 3,
         ingredients: &SHAPED_497_INGR,
@@ -12667,6 +13177,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_498",
         width: 3,
         height: 3,
         ingredients: &SHAPED_498_INGR,
@@ -12674,6 +13185,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_499",
         width: 3,
         height: 3,
         ingredients: &SHAPED_499_INGR,
@@ -12681,6 +13193,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_500",
         width: 2,
         height: 1,
         ingredients: &SHAPED_500_INGR,
@@ -12688,6 +13201,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_501",
         width: 2,
         height: 1,
         ingredients: &SHAPED_501_INGR,
@@ -12695,6 +13209,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_502",
         width: 2,
         height: 1,
         ingredients: &SHAPED_502_INGR,
@@ -12702,6 +13217,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_503",
         width: 2,
         height: 1,
         ingredients: &SHAPED_503_INGR,
@@ -12709,6 +13225,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_504",
         width: 2,
         height: 1,
         ingredients: &SHAPED_504_INGR,
@@ -12716,6 +13233,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_505",
         width: 2,
         height: 1,
         ingredients: &SHAPED_505_INGR,
@@ -12723,6 +13241,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_506",
         width: 2,
         height: 1,
         ingredients: &SHAPED_506_INGR,
@@ -12730,6 +13249,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_507",
         width: 2,
         height: 1,
         ingredients: &SHAPED_507_INGR,
@@ -12737,6 +13257,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_508",
         width: 2,
         height: 1,
         ingredients: &SHAPED_508_INGR,
@@ -12744,6 +13265,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_509",
         width: 2,
         height: 1,
         ingredients: &SHAPED_509_INGR,
@@ -12751,6 +13273,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_510",
         width: 2,
         height: 1,
         ingredients: &SHAPED_510_INGR,
@@ -12758,6 +13281,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_511",
         width: 2,
         height: 1,
         ingredients: &SHAPED_511_INGR,
@@ -12765,6 +13289,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_512",
         width: 2,
         height: 1,
         ingredients: &SHAPED_512_INGR,
@@ -12772,6 +13297,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_513",
         width: 2,
         height: 1,
         ingredients: &SHAPED_513_INGR,
@@ -12779,6 +13305,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_514",
         width: 2,
         height: 1,
         ingredients: &SHAPED_514_INGR,
@@ -12786,6 +13313,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_515",
         width: 2,
         height: 1,
         ingredients: &SHAPED_515_INGR,
@@ -12793,6 +13321,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_516",
         width: 2,
         height: 3,
         ingredients: &SHAPED_516_INGR,
@@ -12800,6 +13329,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_517",
         width: 2,
         height: 3,
         ingredients: &SHAPED_517_INGR,
@@ -12807,6 +13337,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_518",
         width: 2,
         height: 3,
         ingredients: &SHAPED_518_INGR,
@@ -12814,6 +13345,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_519",
         width: 2,
         height: 3,
         ingredients: &SHAPED_519_INGR,
@@ -12821,6 +13353,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_520",
         width: 2,
         height: 3,
         ingredients: &SHAPED_520_INGR,
@@ -12828,6 +13361,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_521",
         width: 2,
         height: 3,
         ingredients: &SHAPED_521_INGR,
@@ -12835,6 +13369,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_522",
         width: 2,
         height: 3,
         ingredients: &SHAPED_522_INGR,
@@ -12842,6 +13377,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_523",
         width: 2,
         height: 3,
         ingredients: &SHAPED_523_INGR,
@@ -12849,6 +13385,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_524",
         width: 2,
         height: 3,
         ingredients: &SHAPED_524_INGR,
@@ -12856,6 +13393,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_525",
         width: 2,
         height: 3,
         ingredients: &SHAPED_525_INGR,
@@ -12863,6 +13401,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_526",
         width: 2,
         height: 3,
         ingredients: &SHAPED_526_INGR,
@@ -12870,6 +13409,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_527",
         width: 2,
         height: 3,
         ingredients: &SHAPED_527_INGR,
@@ -12877,6 +13417,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_528",
         width: 2,
         height: 3,
         ingredients: &SHAPED_528_INGR,
@@ -12884,6 +13425,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_529",
         width: 2,
         height: 3,
         ingredients: &SHAPED_529_INGR,
@@ -12891,6 +13433,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_530",
         width: 2,
         height: 2,
         ingredients: &SHAPED_530_INGR,
@@ -12898,6 +13441,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_531",
         width: 3,
         height: 2,
         ingredients: &SHAPED_531_INGR,
@@ -12905,6 +13449,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_532",
         width: 3,
         height: 2,
         ingredients: &SHAPED_532_INGR,
@@ -12912,6 +13457,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_533",
         width: 3,
         height: 2,
         ingredients: &SHAPED_533_INGR,
@@ -12919,6 +13465,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_534",
         width: 3,
         height: 2,
         ingredients: &SHAPED_534_INGR,
@@ -12926,6 +13473,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_535",
         width: 3,
         height: 2,
         ingredients: &SHAPED_535_INGR,
@@ -12933,6 +13481,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_536",
         width: 3,
         height: 2,
         ingredients: &SHAPED_536_INGR,
@@ -12940,6 +13489,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_537",
         width: 3,
         height: 2,
         ingredients: &SHAPED_537_INGR,
@@ -12947,6 +13497,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_538",
         width: 3,
         height: 2,
         ingredients: &SHAPED_538_INGR,
@@ -12954,6 +13505,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_539",
         width: 3,
         height: 2,
         ingredients: &SHAPED_539_INGR,
@@ -12961,6 +13513,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_540",
         width: 3,
         height: 2,
         ingredients: &SHAPED_540_INGR,
@@ -12968,6 +13521,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_541",
         width: 3,
         height: 2,
         ingredients: &SHAPED_541_INGR,
@@ -12975,6 +13529,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_542",
         width: 3,
         height: 2,
         ingredients: &SHAPED_542_INGR,
@@ -12982,6 +13537,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_543",
         width: 3,
         height: 2,
         ingredients: &SHAPED_543_INGR,
@@ -12989,6 +13545,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_544",
         width: 3,
         height: 2,
         ingredients: &SHAPED_544_INGR,
@@ -12996,6 +13553,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_545",
         width: 3,
         height: 2,
         ingredients: &SHAPED_545_INGR,
@@ -13003,6 +13561,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_546",
         width: 3,
         height: 2,
         ingredients: &SHAPED_546_INGR,
@@ -13010,6 +13569,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_547",
         width: 3,
         height: 2,
         ingredients: &SHAPED_547_INGR,
@@ -13017,6 +13577,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_548",
         width: 3,
         height: 2,
         ingredients: &SHAPED_548_INGR,
@@ -13024,6 +13585,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_549",
         width: 3,
         height: 2,
         ingredients: &SHAPED_549_INGR,
@@ -13031,6 +13593,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_550",
         width: 3,
         height: 2,
         ingredients: &SHAPED_550_INGR,
@@ -13038,6 +13601,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_551",
         width: 3,
         height: 2,
         ingredients: &SHAPED_551_INGR,
@@ -13045,6 +13609,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_552",
         width: 3,
         height: 2,
         ingredients: &SHAPED_552_INGR,
@@ -13052,6 +13617,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_553",
         width: 3,
         height: 2,
         ingredients: &SHAPED_553_INGR,
@@ -13059,6 +13625,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_554",
         width: 3,
         height: 2,
         ingredients: &SHAPED_554_INGR,
@@ -13066,6 +13633,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_555",
         width: 3,
         height: 2,
         ingredients: &SHAPED_555_INGR,
@@ -13073,6 +13641,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_556",
         width: 3,
         height: 3,
         ingredients: &SHAPED_556_INGR,
@@ -13080,6 +13649,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_557",
         width: 3,
         height: 3,
         ingredients: &SHAPED_557_INGR,
@@ -13087,6 +13657,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_558",
         width: 3,
         height: 3,
         ingredients: &SHAPED_558_INGR,
@@ -13094,6 +13665,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 16,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_559",
         width: 3,
         height: 3,
         ingredients: &SHAPED_559_INGR,
@@ -13101,6 +13673,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_560",
         width: 3,
         height: 2,
         ingredients: &SHAPED_560_INGR,
@@ -13108,6 +13681,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_561",
         width: 2,
         height: 2,
         ingredients: &SHAPED_561_INGR,
@@ -13115,6 +13689,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_562",
         width: 2,
         height: 2,
         ingredients: &SHAPED_562_INGR,
@@ -13122,6 +13697,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_563",
         width: 3,
         height: 2,
         ingredients: &SHAPED_563_INGR,
@@ -13129,6 +13705,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_564",
         width: 3,
         height: 2,
         ingredients: &SHAPED_564_INGR,
@@ -13136,6 +13713,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_565",
         width: 3,
         height: 2,
         ingredients: &SHAPED_565_INGR,
@@ -13143,6 +13721,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_566",
         width: 3,
         height: 2,
         ingredients: &SHAPED_566_INGR,
@@ -13150,6 +13729,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_567",
         width: 3,
         height: 2,
         ingredients: &SHAPED_567_INGR,
@@ -13157,6 +13737,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_568",
         width: 3,
         height: 2,
         ingredients: &SHAPED_568_INGR,
@@ -13164,6 +13745,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_569",
         width: 3,
         height: 2,
         ingredients: &SHAPED_569_INGR,
@@ -13171,6 +13753,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_570",
         width: 3,
         height: 2,
         ingredients: &SHAPED_570_INGR,
@@ -13178,6 +13761,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_571",
         width: 3,
         height: 2,
         ingredients: &SHAPED_571_INGR,
@@ -13185,6 +13769,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_572",
         width: 3,
         height: 2,
         ingredients: &SHAPED_572_INGR,
@@ -13192,6 +13777,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_573",
         width: 3,
         height: 2,
         ingredients: &SHAPED_573_INGR,
@@ -13199,6 +13785,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_574",
         width: 3,
         height: 3,
         ingredients: &SHAPED_574_INGR,
@@ -13206,6 +13793,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_575",
         width: 3,
         height: 2,
         ingredients: &SHAPED_575_INGR,
@@ -13213,6 +13801,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_576",
         width: 3,
         height: 2,
         ingredients: &SHAPED_576_INGR,
@@ -13220,6 +13809,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_577",
         width: 3,
         height: 2,
         ingredients: &SHAPED_577_INGR,
@@ -13227,6 +13817,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_578",
         width: 3,
         height: 2,
         ingredients: &SHAPED_578_INGR,
@@ -13234,6 +13825,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_579",
         width: 3,
         height: 2,
         ingredients: &SHAPED_579_INGR,
@@ -13241,6 +13833,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_580",
         width: 3,
         height: 2,
         ingredients: &SHAPED_580_INGR,
@@ -13248,6 +13841,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_581",
         width: 3,
         height: 2,
         ingredients: &SHAPED_581_INGR,
@@ -13255,6 +13849,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_582",
         width: 3,
         height: 2,
         ingredients: &SHAPED_582_INGR,
@@ -13262,6 +13857,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_583",
         width: 3,
         height: 2,
         ingredients: &SHAPED_583_INGR,
@@ -13269,6 +13865,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_584",
         width: 3,
         height: 2,
         ingredients: &SHAPED_584_INGR,
@@ -13276,6 +13873,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_585",
         width: 3,
         height: 2,
         ingredients: &SHAPED_585_INGR,
@@ -13283,6 +13881,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_586",
         width: 3,
         height: 2,
         ingredients: &SHAPED_586_INGR,
@@ -13290,6 +13889,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_587",
         width: 3,
         height: 3,
         ingredients: &SHAPED_587_INGR,
@@ -13297,6 +13897,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_588",
         width: 1,
         height: 3,
         ingredients: &SHAPED_588_INGR,
@@ -13304,6 +13905,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_589",
         width: 3,
         height: 3,
         ingredients: &SHAPED_589_INGR,
@@ -13311,6 +13913,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_590",
         width: 3,
         height: 3,
         ingredients: &SHAPED_590_INGR,
@@ -13318,6 +13921,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_591",
         width: 1,
         height: 3,
         ingredients: &SHAPED_591_INGR,
@@ -13325,6 +13929,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_592",
         width: 1,
         height: 3,
         ingredients: &SHAPED_592_INGR,
@@ -13332,6 +13937,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_593",
         width: 1,
         height: 3,
         ingredients: &SHAPED_593_INGR,
@@ -13339,6 +13945,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_594",
         width: 1,
         height: 3,
         ingredients: &SHAPED_594_INGR,
@@ -13346,6 +13953,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_595",
         width: 1,
         height: 3,
         ingredients: &SHAPED_595_INGR,
@@ -13353,6 +13961,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_596",
         width: 1,
         height: 3,
         ingredients: &SHAPED_596_INGR,
@@ -13360,6 +13969,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_597",
         width: 1,
         height: 3,
         ingredients: &SHAPED_597_INGR,
@@ -13367,6 +13977,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_598",
         width: 1,
         height: 3,
         ingredients: &SHAPED_598_INGR,
@@ -13374,6 +13985,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_599",
         width: 1,
         height: 3,
         ingredients: &SHAPED_599_INGR,
@@ -13381,6 +13993,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_600",
         width: 1,
         height: 3,
         ingredients: &SHAPED_600_INGR,
@@ -13388,6 +14001,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_601",
         width: 1,
         height: 3,
         ingredients: &SHAPED_601_INGR,
@@ -13395,6 +14009,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_602",
         width: 1,
         height: 3,
         ingredients: &SHAPED_602_INGR,
@@ -13402,6 +14017,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_603",
         width: 1,
         height: 3,
         ingredients: &SHAPED_603_INGR,
@@ -13409,6 +14025,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_604",
         width: 1,
         height: 3,
         ingredients: &SHAPED_604_INGR,
@@ -13416,6 +14033,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_605",
         width: 1,
         height: 3,
         ingredients: &SHAPED_605_INGR,
@@ -13423,6 +14041,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_606",
         width: 1,
         height: 3,
         ingredients: &SHAPED_606_INGR,
@@ -13430,6 +14049,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_607",
         width: 1,
         height: 3,
         ingredients: &SHAPED_607_INGR,
@@ -13437,6 +14057,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_608",
         width: 1,
         height: 3,
         ingredients: &SHAPED_608_INGR,
@@ -13444,6 +14065,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_609",
         width: 1,
         height: 3,
         ingredients: &SHAPED_609_INGR,
@@ -13451,6 +14073,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_610",
         width: 1,
         height: 3,
         ingredients: &SHAPED_610_INGR,
@@ -13458,6 +14081,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_611",
         width: 1,
         height: 3,
         ingredients: &SHAPED_611_INGR,
@@ -13465,6 +14089,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_612",
         width: 1,
         height: 3,
         ingredients: &SHAPED_612_INGR,
@@ -13472,6 +14097,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_613",
         width: 1,
         height: 3,
         ingredients: &SHAPED_613_INGR,
@@ -13479,6 +14105,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_614",
         width: 1,
         height: 3,
         ingredients: &SHAPED_614_INGR,
@@ -13486,6 +14113,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_615",
         width: 3,
         height: 3,
         ingredients: &SHAPED_615_INGR,
@@ -13493,6 +14121,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_616",
         width: 3,
         height: 3,
         ingredients: &SHAPED_616_INGR,
@@ -13500,6 +14129,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_617",
         width: 3,
         height: 3,
         ingredients: &SHAPED_617_INGR,
@@ -13507,6 +14137,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_618",
         width: 3,
         height: 3,
         ingredients: &SHAPED_618_INGR,
@@ -13514,6 +14145,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_619",
         width: 3,
         height: 3,
         ingredients: &SHAPED_619_INGR,
@@ -13521,6 +14153,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_620",
         width: 3,
         height: 3,
         ingredients: &SHAPED_620_INGR,
@@ -13528,6 +14161,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_621",
         width: 3,
         height: 3,
         ingredients: &SHAPED_621_INGR,
@@ -13535,6 +14169,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_622",
         width: 3,
         height: 3,
         ingredients: &SHAPED_622_INGR,
@@ -13542,6 +14177,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_623",
         width: 3,
         height: 3,
         ingredients: &SHAPED_623_INGR,
@@ -13549,6 +14185,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_624",
         width: 3,
         height: 3,
         ingredients: &SHAPED_624_INGR,
@@ -13556,6 +14193,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_625",
         width: 3,
         height: 3,
         ingredients: &SHAPED_625_INGR,
@@ -13563,6 +14201,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_626",
         width: 3,
         height: 3,
         ingredients: &SHAPED_626_INGR,
@@ -13570,6 +14209,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_627",
         width: 2,
         height: 3,
         ingredients: &SHAPED_627_INGR,
@@ -13577,6 +14217,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_628",
         width: 2,
         height: 3,
         ingredients: &SHAPED_628_INGR,
@@ -13584,6 +14225,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_629",
         width: 2,
         height: 3,
         ingredients: &SHAPED_629_INGR,
@@ -13591,6 +14233,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_630",
         width: 2,
         height: 3,
         ingredients: &SHAPED_630_INGR,
@@ -13598,6 +14241,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_631",
         width: 2,
         height: 3,
         ingredients: &SHAPED_631_INGR,
@@ -13605,6 +14249,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_632",
         width: 2,
         height: 3,
         ingredients: &SHAPED_632_INGR,
@@ -13612,6 +14257,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_633",
         width: 2,
         height: 3,
         ingredients: &SHAPED_633_INGR,
@@ -13619,6 +14265,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_634",
         width: 2,
         height: 3,
         ingredients: &SHAPED_634_INGR,
@@ -13626,6 +14273,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_635",
         width: 2,
         height: 3,
         ingredients: &SHAPED_635_INGR,
@@ -13633,6 +14281,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_636",
         width: 2,
         height: 3,
         ingredients: &SHAPED_636_INGR,
@@ -13640,6 +14289,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_637",
         width: 2,
         height: 3,
         ingredients: &SHAPED_637_INGR,
@@ -13647,6 +14297,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_638",
         width: 2,
         height: 3,
         ingredients: &SHAPED_638_INGR,
@@ -13654,6 +14305,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_639",
         width: 2,
         height: 3,
         ingredients: &SHAPED_639_INGR,
@@ -13661,6 +14313,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_640",
         width: 2,
         height: 3,
         ingredients: &SHAPED_640_INGR,
@@ -13668,6 +14321,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_641",
         width: 2,
         height: 3,
         ingredients: &SHAPED_641_INGR,
@@ -13675,6 +14329,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_642",
         width: 2,
         height: 3,
         ingredients: &SHAPED_642_INGR,
@@ -13682,6 +14337,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_643",
         width: 2,
         height: 3,
         ingredients: &SHAPED_643_INGR,
@@ -13689,6 +14345,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_644",
         width: 2,
         height: 3,
         ingredients: &SHAPED_644_INGR,
@@ -13696,6 +14353,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_645",
         width: 2,
         height: 3,
         ingredients: &SHAPED_645_INGR,
@@ -13703,6 +14361,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_646",
         width: 2,
         height: 3,
         ingredients: &SHAPED_646_INGR,
@@ -13710,6 +14369,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_647",
         width: 2,
         height: 3,
         ingredients: &SHAPED_647_INGR,
@@ -13717,6 +14377,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_648",
         width: 2,
         height: 3,
         ingredients: &SHAPED_648_INGR,
@@ -13724,6 +14385,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_649",
         width: 2,
         height: 3,
         ingredients: &SHAPED_649_INGR,
@@ -13731,6 +14393,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_650",
         width: 2,
         height: 3,
         ingredients: &SHAPED_650_INGR,
@@ -13738,6 +14401,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_651",
         width: 1,
         height: 3,
         ingredients: &SHAPED_651_INGR,
@@ -13745,6 +14409,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_652",
         width: 1,
         height: 3,
         ingredients: &SHAPED_652_INGR,
@@ -13752,6 +14417,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_653",
         width: 1,
         height: 3,
         ingredients: &SHAPED_653_INGR,
@@ -13759,6 +14425,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_654",
         width: 1,
         height: 3,
         ingredients: &SHAPED_654_INGR,
@@ -13766,6 +14433,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_655",
         width: 1,
         height: 3,
         ingredients: &SHAPED_655_INGR,
@@ -13773,6 +14441,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_656",
         width: 1,
         height: 3,
         ingredients: &SHAPED_656_INGR,
@@ -13780,6 +14449,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_657",
         width: 3,
         height: 3,
         ingredients: &SHAPED_657_INGR,
@@ -13787,6 +14457,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_658",
         width: 3,
         height: 3,
         ingredients: &SHAPED_658_INGR,
@@ -13794,6 +14465,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_659",
         width: 3,
         height: 3,
         ingredients: &SHAPED_659_INGR,
@@ -13801,6 +14473,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_660",
         width: 2,
         height: 3,
         ingredients: &SHAPED_660_INGR,
@@ -13808,6 +14481,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_661",
         width: 2,
         height: 3,
         ingredients: &SHAPED_661_INGR,
@@ -13815,6 +14489,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_662",
         width: 2,
         height: 3,
         ingredients: &SHAPED_662_INGR,
@@ -13822,6 +14497,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_663",
         width: 2,
         height: 3,
         ingredients: &SHAPED_663_INGR,
@@ -13829,6 +14505,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_664",
         width: 2,
         height: 3,
         ingredients: &SHAPED_664_INGR,
@@ -13836,6 +14513,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_665",
         width: 2,
         height: 3,
         ingredients: &SHAPED_665_INGR,
@@ -13843,6 +14521,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_666",
         width: 1,
         height: 3,
         ingredients: &SHAPED_666_INGR,
@@ -13850,6 +14529,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_667",
         width: 1,
         height: 3,
         ingredients: &SHAPED_667_INGR,
@@ -13857,6 +14537,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_668",
         width: 3,
         height: 3,
         ingredients: &SHAPED_668_INGR,
@@ -13864,6 +14545,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_669",
         width: 2,
         height: 3,
         ingredients: &SHAPED_669_INGR,
@@ -13871,6 +14553,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_670",
         width: 2,
         height: 3,
         ingredients: &SHAPED_670_INGR,
@@ -13878,6 +14561,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_671",
         width: 1,
         height: 3,
         ingredients: &SHAPED_671_INGR,
@@ -13885,6 +14569,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_672",
         width: 1,
         height: 3,
         ingredients: &SHAPED_672_INGR,
@@ -13892,6 +14577,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_673",
         width: 3,
         height: 3,
         ingredients: &SHAPED_673_INGR,
@@ -13899,6 +14585,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_674",
         width: 2,
         height: 3,
         ingredients: &SHAPED_674_INGR,
@@ -13906,6 +14593,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_675",
         width: 2,
         height: 3,
         ingredients: &SHAPED_675_INGR,
@@ -13913,6 +14601,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_676",
         width: 1,
         height: 3,
         ingredients: &SHAPED_676_INGR,
@@ -13920,6 +14609,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_677",
         width: 1,
         height: 3,
         ingredients: &SHAPED_677_INGR,
@@ -13927,6 +14617,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_678",
         width: 3,
         height: 3,
         ingredients: &SHAPED_678_INGR,
@@ -13934,6 +14625,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_679",
         width: 2,
         height: 3,
         ingredients: &SHAPED_679_INGR,
@@ -13941,6 +14633,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_680",
         width: 2,
         height: 3,
         ingredients: &SHAPED_680_INGR,
@@ -13948,6 +14641,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_681",
         width: 1,
         height: 2,
         ingredients: &SHAPED_681_INGR,
@@ -13955,6 +14649,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_682",
         width: 1,
         height: 2,
         ingredients: &SHAPED_682_INGR,
@@ -13962,6 +14657,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_683",
         width: 1,
         height: 2,
         ingredients: &SHAPED_683_INGR,
@@ -13969,6 +14665,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_684",
         width: 1,
         height: 2,
         ingredients: &SHAPED_684_INGR,
@@ -13976,6 +14673,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_685",
         width: 1,
         height: 2,
         ingredients: &SHAPED_685_INGR,
@@ -13983,6 +14681,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_686",
         width: 1,
         height: 2,
         ingredients: &SHAPED_686_INGR,
@@ -13990,6 +14689,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_687",
         width: 1,
         height: 2,
         ingredients: &SHAPED_687_INGR,
@@ -13997,6 +14697,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_688",
         width: 1,
         height: 2,
         ingredients: &SHAPED_688_INGR,
@@ -14004,6 +14705,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_689",
         width: 1,
         height: 2,
         ingredients: &SHAPED_689_INGR,
@@ -14011,6 +14713,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_690",
         width: 1,
         height: 2,
         ingredients: &SHAPED_690_INGR,
@@ -14018,6 +14721,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_691",
         width: 1,
         height: 2,
         ingredients: &SHAPED_691_INGR,
@@ -14025,6 +14729,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_692",
         width: 1,
         height: 2,
         ingredients: &SHAPED_692_INGR,
@@ -14032,6 +14737,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_693",
         width: 1,
         height: 2,
         ingredients: &SHAPED_693_INGR,
@@ -14039,6 +14745,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_694",
         width: 3,
         height: 1,
         ingredients: &SHAPED_694_INGR,
@@ -14046,6 +14753,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_695",
         width: 3,
         height: 2,
         ingredients: &SHAPED_695_INGR,
@@ -14053,6 +14761,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_696",
         width: 3,
         height: 3,
         ingredients: &SHAPED_696_INGR,
@@ -14060,6 +14769,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_697",
         width: 3,
         height: 3,
         ingredients: &SHAPED_697_INGR,
@@ -14067,6 +14777,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_698",
         width: 3,
         height: 2,
         ingredients: &SHAPED_698_INGR,
@@ -14074,6 +14785,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_699",
         width: 3,
         height: 2,
         ingredients: &SHAPED_699_INGR,
@@ -14081,6 +14793,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_700",
         width: 3,
         height: 3,
         ingredients: &SHAPED_700_INGR,
@@ -14088,6 +14801,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_701",
         width: 3,
         height: 3,
         ingredients: &SHAPED_701_INGR,
@@ -14095,6 +14809,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_702",
         width: 3,
         height: 2,
         ingredients: &SHAPED_702_INGR,
@@ -14102,6 +14817,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_703",
         width: 3,
         height: 2,
         ingredients: &SHAPED_703_INGR,
@@ -14109,6 +14825,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_704",
         width: 3,
         height: 3,
         ingredients: &SHAPED_704_INGR,
@@ -14116,6 +14833,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_705",
         width: 3,
         height: 3,
         ingredients: &SHAPED_705_INGR,
@@ -14123,6 +14841,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_706",
         width: 3,
         height: 2,
         ingredients: &SHAPED_706_INGR,
@@ -14130,6 +14849,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_707",
         width: 3,
         height: 2,
         ingredients: &SHAPED_707_INGR,
@@ -14137,6 +14857,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_708",
         width: 3,
         height: 3,
         ingredients: &SHAPED_708_INGR,
@@ -14144,6 +14865,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_709",
         width: 3,
         height: 3,
         ingredients: &SHAPED_709_INGR,
@@ -14151,6 +14873,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_710",
         width: 3,
         height: 2,
         ingredients: &SHAPED_710_INGR,
@@ -14158,6 +14881,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_711",
         width: 3,
         height: 3,
         ingredients: &SHAPED_711_INGR,
@@ -14165,6 +14889,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_712",
         width: 3,
         height: 3,
         ingredients: &SHAPED_712_INGR,
@@ -14172,6 +14897,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_713",
         width: 3,
         height: 3,
         ingredients: &SHAPED_713_INGR,
@@ -14179,6 +14905,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_714",
         width: 3,
         height: 3,
         ingredients: &SHAPED_714_INGR,
@@ -14186,6 +14913,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_715",
         width: 3,
         height: 3,
         ingredients: &SHAPED_715_INGR,
@@ -14193,6 +14921,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_716",
         width: 3,
         height: 3,
         ingredients: &SHAPED_716_INGR,
@@ -14200,6 +14929,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_717",
         width: 3,
         height: 3,
         ingredients: &SHAPED_717_INGR,
@@ -14207,6 +14937,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_718",
         width: 3,
         height: 3,
         ingredients: &SHAPED_718_INGR,
@@ -14214,6 +14945,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_719",
         width: 3,
         height: 3,
         ingredients: &SHAPED_719_INGR,
@@ -14221,6 +14953,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_720",
         width: 3,
         height: 3,
         ingredients: &SHAPED_720_INGR,
@@ -14228,6 +14961,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_721",
         width: 3,
         height: 3,
         ingredients: &SHAPED_721_INGR,
@@ -14235,6 +14969,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_722",
         width: 3,
         height: 3,
         ingredients: &SHAPED_722_INGR,
@@ -14242,6 +14977,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_723",
         width: 3,
         height: 3,
         ingredients: &SHAPED_723_INGR,
@@ -14249,6 +14985,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_724",
         width: 3,
         height: 3,
         ingredients: &SHAPED_724_INGR,
@@ -14256,6 +14993,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_725",
         width: 3,
         height: 3,
         ingredients: &SHAPED_725_INGR,
@@ -14263,6 +15001,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_726",
         width: 3,
         height: 3,
         ingredients: &SHAPED_726_INGR,
@@ -14270,6 +15009,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_727",
         width: 3,
         height: 3,
         ingredients: &SHAPED_727_INGR,
@@ -14277,6 +15017,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_728",
         width: 3,
         height: 3,
         ingredients: &SHAPED_728_INGR,
@@ -14284,6 +15025,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_729",
         width: 3,
         height: 3,
         ingredients: &SHAPED_729_INGR,
@@ -14291,6 +15033,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_730",
         width: 3,
         height: 3,
         ingredients: &SHAPED_730_INGR,
@@ -14298,6 +15041,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_731",
         width: 3,
         height: 3,
         ingredients: &SHAPED_731_INGR,
@@ -14305,6 +15049,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_732",
         width: 3,
         height: 3,
         ingredients: &SHAPED_732_INGR,
@@ -14312,6 +15057,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_733",
         width: 3,
         height: 3,
         ingredients: &SHAPED_733_INGR,
@@ -14319,6 +15065,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_734",
         width: 3,
         height: 3,
         ingredients: &SHAPED_734_INGR,
@@ -14326,6 +15073,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_735",
         width: 3,
         height: 3,
         ingredients: &SHAPED_735_INGR,
@@ -14333,6 +15081,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_736",
         width: 3,
         height: 3,
         ingredients: &SHAPED_736_INGR,
@@ -14340,6 +15089,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_737",
         width: 3,
         height: 3,
         ingredients: &SHAPED_737_INGR,
@@ -14347,6 +15097,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_738",
         width: 3,
         height: 3,
         ingredients: &SHAPED_738_INGR,
@@ -14354,6 +15105,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_739",
         width: 3,
         height: 3,
         ingredients: &SHAPED_739_INGR,
@@ -14361,6 +15113,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_740",
         width: 3,
         height: 3,
         ingredients: &SHAPED_740_INGR,
@@ -14368,6 +15121,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_741",
         width: 3,
         height: 3,
         ingredients: &SHAPED_741_INGR,
@@ -14375,6 +15129,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_742",
         width: 3,
         height: 3,
         ingredients: &SHAPED_742_INGR,
@@ -14382,6 +15137,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_743",
         width: 3,
         height: 3,
         ingredients: &SHAPED_743_INGR,
@@ -14389,6 +15145,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_744",
         width: 3,
         height: 3,
         ingredients: &SHAPED_744_INGR,
@@ -14396,6 +15153,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_745",
         width: 3,
         height: 3,
         ingredients: &SHAPED_745_INGR,
@@ -14403,6 +15161,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_746",
         width: 3,
         height: 3,
         ingredients: &SHAPED_746_INGR,
@@ -14410,6 +15169,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_747",
         width: 3,
         height: 3,
         ingredients: &SHAPED_747_INGR,
@@ -14417,6 +15177,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_748",
         width: 3,
         height: 3,
         ingredients: &SHAPED_748_INGR,
@@ -14424,6 +15185,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_749",
         width: 3,
         height: 3,
         ingredients: &SHAPED_749_INGR,
@@ -14431,6 +15193,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_750",
         width: 3,
         height: 3,
         ingredients: &SHAPED_750_INGR,
@@ -14438,6 +15201,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_751",
         width: 3,
         height: 3,
         ingredients: &SHAPED_751_INGR,
@@ -14445,6 +15209,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_752",
         width: 3,
         height: 2,
         ingredients: &SHAPED_752_INGR,
@@ -14452,6 +15217,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_753",
         width: 2,
         height: 2,
         ingredients: &SHAPED_753_INGR,
@@ -14459,6 +15225,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_754",
         width: 3,
         height: 3,
         ingredients: &SHAPED_754_INGR,
@@ -14466,6 +15233,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_755",
         width: 3,
         height: 1,
         ingredients: &SHAPED_755_INGR,
@@ -14473,6 +15241,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_756",
         width: 3,
         height: 3,
         ingredients: &SHAPED_756_INGR,
@@ -14480,6 +15249,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_757",
         width: 3,
         height: 3,
         ingredients: &SHAPED_757_INGR,
@@ -14487,6 +15257,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_758",
         width: 1,
         height: 2,
         ingredients: &SHAPED_758_INGR,
@@ -14494,6 +15265,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_759",
         width: 3,
         height: 3,
         ingredients: &SHAPED_759_INGR,
@@ -14501,6 +15273,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_760",
         width: 3,
         height: 3,
         ingredients: &SHAPED_760_INGR,
@@ -14508,6 +15281,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_761",
         width: 1,
         height: 3,
         ingredients: &SHAPED_761_INGR,
@@ -14515,6 +15289,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_762",
         width: 3,
         height: 3,
         ingredients: &SHAPED_762_INGR,
@@ -14522,6 +15297,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_763",
         width: 3,
         height: 2,
         ingredients: &SHAPED_763_INGR,
@@ -14529,6 +15305,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_764",
         width: 3,
         height: 2,
         ingredients: &SHAPED_764_INGR,
@@ -14536,6 +15313,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_765",
         width: 3,
         height: 2,
         ingredients: &SHAPED_765_INGR,
@@ -14543,6 +15321,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_766",
         width: 3,
         height: 2,
         ingredients: &SHAPED_766_INGR,
@@ -14550,6 +15329,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_767",
         width: 3,
         height: 2,
         ingredients: &SHAPED_767_INGR,
@@ -14557,6 +15337,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_768",
         width: 3,
         height: 2,
         ingredients: &SHAPED_768_INGR,
@@ -14564,6 +15345,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_769",
         width: 3,
         height: 2,
         ingredients: &SHAPED_769_INGR,
@@ -14571,6 +15353,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_770",
         width: 3,
         height: 2,
         ingredients: &SHAPED_770_INGR,
@@ -14578,6 +15361,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_771",
         width: 3,
         height: 2,
         ingredients: &SHAPED_771_INGR,
@@ -14585,6 +15369,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_772",
         width: 3,
         height: 2,
         ingredients: &SHAPED_772_INGR,
@@ -14592,6 +15377,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_773",
         width: 3,
         height: 2,
         ingredients: &SHAPED_773_INGR,
@@ -14599,6 +15385,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_774",
         width: 3,
         height: 2,
         ingredients: &SHAPED_774_INGR,
@@ -14606,6 +15393,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_775",
         width: 3,
         height: 2,
         ingredients: &SHAPED_775_INGR,
@@ -14613,6 +15401,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_776",
         width: 3,
         height: 2,
         ingredients: &SHAPED_776_INGR,
@@ -14620,6 +15409,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_777",
         width: 3,
         height: 2,
         ingredients: &SHAPED_777_INGR,
@@ -14627,6 +15417,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_778",
         width: 3,
         height: 2,
         ingredients: &SHAPED_778_INGR,
@@ -14634,6 +15425,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_779",
         width: 3,
         height: 2,
         ingredients: &SHAPED_779_INGR,
@@ -14641,6 +15433,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_780",
         width: 3,
         height: 2,
         ingredients: &SHAPED_780_INGR,
@@ -14648,6 +15441,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_781",
         width: 3,
         height: 2,
         ingredients: &SHAPED_781_INGR,
@@ -14655,6 +15449,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_782",
         width: 3,
         height: 2,
         ingredients: &SHAPED_782_INGR,
@@ -14662,6 +15457,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_783",
         width: 3,
         height: 2,
         ingredients: &SHAPED_783_INGR,
@@ -14669,6 +15465,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_784",
         width: 3,
         height: 2,
         ingredients: &SHAPED_784_INGR,
@@ -14676,6 +15473,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_785",
         width: 3,
         height: 2,
         ingredients: &SHAPED_785_INGR,
@@ -14683,6 +15481,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_786",
         width: 3,
         height: 2,
         ingredients: &SHAPED_786_INGR,
@@ -14690,6 +15489,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_787",
         width: 3,
         height: 2,
         ingredients: &SHAPED_787_INGR,
@@ -14697,6 +15497,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_788",
         width: 3,
         height: 2,
         ingredients: &SHAPED_788_INGR,
@@ -14704,6 +15505,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_789",
         width: 3,
         height: 2,
         ingredients: &SHAPED_789_INGR,
@@ -14711,6 +15513,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_790",
         width: 3,
         height: 2,
         ingredients: &SHAPED_790_INGR,
@@ -14718,6 +15521,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_791",
         width: 3,
         height: 2,
         ingredients: &SHAPED_791_INGR,
@@ -14725,6 +15529,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_792",
         width: 3,
         height: 2,
         ingredients: &SHAPED_792_INGR,
@@ -14732,6 +15537,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_793",
         width: 3,
         height: 2,
         ingredients: &SHAPED_793_INGR,
@@ -14739,6 +15545,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_794",
         width: 3,
         height: 2,
         ingredients: &SHAPED_794_INGR,
@@ -14746,6 +15553,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_795",
         width: 3,
         height: 2,
         ingredients: &SHAPED_795_INGR,
@@ -14753,6 +15561,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_796",
         width: 3,
         height: 2,
         ingredients: &SHAPED_796_INGR,
@@ -14760,6 +15569,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_797",
         width: 3,
         height: 2,
         ingredients: &SHAPED_797_INGR,
@@ -14767,6 +15577,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_798",
         width: 3,
         height: 2,
         ingredients: &SHAPED_798_INGR,
@@ -14774,6 +15585,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_799",
         width: 3,
         height: 2,
         ingredients: &SHAPED_799_INGR,
@@ -14781,6 +15593,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_800",
         width: 3,
         height: 2,
         ingredients: &SHAPED_800_INGR,
@@ -14788,6 +15601,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_801",
         width: 3,
         height: 2,
         ingredients: &SHAPED_801_INGR,
@@ -14795,6 +15609,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_802",
         width: 3,
         height: 2,
         ingredients: &SHAPED_802_INGR,
@@ -14802,6 +15617,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_803",
         width: 3,
         height: 2,
         ingredients: &SHAPED_803_INGR,
@@ -14809,6 +15625,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_804",
         width: 3,
         height: 2,
         ingredients: &SHAPED_804_INGR,
@@ -14816,6 +15633,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_805",
         width: 3,
         height: 2,
         ingredients: &SHAPED_805_INGR,
@@ -14823,6 +15641,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_806",
         width: 3,
         height: 2,
         ingredients: &SHAPED_806_INGR,
@@ -14830,6 +15649,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_807",
         width: 3,
         height: 2,
         ingredients: &SHAPED_807_INGR,
@@ -14837,6 +15657,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_808",
         width: 3,
         height: 2,
         ingredients: &SHAPED_808_INGR,
@@ -14844,6 +15665,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_809",
         width: 3,
         height: 2,
         ingredients: &SHAPED_809_INGR,
@@ -14851,6 +15673,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_810",
         width: 3,
         height: 2,
         ingredients: &SHAPED_810_INGR,
@@ -14858,6 +15681,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_811",
         width: 3,
         height: 2,
         ingredients: &SHAPED_811_INGR,
@@ -14865,6 +15689,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_812",
         width: 3,
         height: 2,
         ingredients: &SHAPED_812_INGR,
@@ -14872,6 +15697,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_813",
         width: 3,
         height: 2,
         ingredients: &SHAPED_813_INGR,
@@ -14879,6 +15705,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_814",
         width: 3,
         height: 2,
         ingredients: &SHAPED_814_INGR,
@@ -14886,6 +15713,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_815",
         width: 3,
         height: 2,
         ingredients: &SHAPED_815_INGR,
@@ -14893,6 +15721,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_816",
         width: 3,
         height: 2,
         ingredients: &SHAPED_816_INGR,
@@ -14900,6 +15729,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_817",
         width: 3,
         height: 2,
         ingredients: &SHAPED_817_INGR,
@@ -14907,6 +15737,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_818",
         width: 3,
         height: 2,
         ingredients: &SHAPED_818_INGR,
@@ -14914,6 +15745,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_819",
         width: 3,
         height: 2,
         ingredients: &SHAPED_819_INGR,
@@ -14921,6 +15753,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_820",
         width: 3,
         height: 2,
         ingredients: &SHAPED_820_INGR,
@@ -14928,6 +15761,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_821",
         width: 3,
         height: 2,
         ingredients: &SHAPED_821_INGR,
@@ -14935,6 +15769,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_822",
         width: 3,
         height: 2,
         ingredients: &SHAPED_822_INGR,
@@ -14942,6 +15777,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_823",
         width: 3,
         height: 2,
         ingredients: &SHAPED_823_INGR,
@@ -14949,6 +15785,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_824",
         width: 3,
         height: 2,
         ingredients: &SHAPED_824_INGR,
@@ -14956,6 +15793,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_825",
         width: 3,
         height: 2,
         ingredients: &SHAPED_825_INGR,
@@ -14963,6 +15801,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_826",
         width: 3,
         height: 2,
         ingredients: &SHAPED_826_INGR,
@@ -14970,6 +15809,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_827",
         width: 3,
         height: 2,
         ingredients: &SHAPED_827_INGR,
@@ -14977,6 +15817,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_828",
         width: 3,
         height: 2,
         ingredients: &SHAPED_828_INGR,
@@ -14984,6 +15825,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_829",
         width: 3,
         height: 2,
         ingredients: &SHAPED_829_INGR,
@@ -14991,6 +15833,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_830",
         width: 3,
         height: 2,
         ingredients: &SHAPED_830_INGR,
@@ -14998,6 +15841,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_831",
         width: 3,
         height: 2,
         ingredients: &SHAPED_831_INGR,
@@ -15005,6 +15849,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_832",
         width: 3,
         height: 2,
         ingredients: &SHAPED_832_INGR,
@@ -15012,6 +15857,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_833",
         width: 3,
         height: 2,
         ingredients: &SHAPED_833_INGR,
@@ -15019,6 +15865,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_834",
         width: 3,
         height: 2,
         ingredients: &SHAPED_834_INGR,
@@ -15026,6 +15873,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_835",
         width: 3,
         height: 2,
         ingredients: &SHAPED_835_INGR,
@@ -15033,6 +15881,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_836",
         width: 3,
         height: 2,
         ingredients: &SHAPED_836_INGR,
@@ -15040,6 +15889,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_837",
         width: 3,
         height: 2,
         ingredients: &SHAPED_837_INGR,
@@ -15047,6 +15897,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_838",
         width: 3,
         height: 2,
         ingredients: &SHAPED_838_INGR,
@@ -15054,6 +15905,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_839",
         width: 3,
         height: 2,
         ingredients: &SHAPED_839_INGR,
@@ -15061,6 +15913,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_840",
         width: 3,
         height: 2,
         ingredients: &SHAPED_840_INGR,
@@ -15068,6 +15921,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_841",
         width: 3,
         height: 2,
         ingredients: &SHAPED_841_INGR,
@@ -15075,6 +15929,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_842",
         width: 3,
         height: 2,
         ingredients: &SHAPED_842_INGR,
@@ -15082,6 +15937,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_843",
         width: 3,
         height: 2,
         ingredients: &SHAPED_843_INGR,
@@ -15089,6 +15945,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_844",
         width: 3,
         height: 2,
         ingredients: &SHAPED_844_INGR,
@@ -15096,6 +15953,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_845",
         width: 3,
         height: 2,
         ingredients: &SHAPED_845_INGR,
@@ -15103,6 +15961,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_846",
         width: 3,
         height: 2,
         ingredients: &SHAPED_846_INGR,
@@ -15110,6 +15969,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_847",
         width: 3,
         height: 2,
         ingredients: &SHAPED_847_INGR,
@@ -15117,6 +15977,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_848",
         width: 3,
         height: 2,
         ingredients: &SHAPED_848_INGR,
@@ -15124,6 +15985,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_849",
         width: 3,
         height: 2,
         ingredients: &SHAPED_849_INGR,
@@ -15131,6 +15993,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_850",
         width: 3,
         height: 2,
         ingredients: &SHAPED_850_INGR,
@@ -15138,6 +16001,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_851",
         width: 3,
         height: 2,
         ingredients: &SHAPED_851_INGR,
@@ -15145,6 +16009,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_852",
         width: 3,
         height: 2,
         ingredients: &SHAPED_852_INGR,
@@ -15152,6 +16017,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_853",
         width: 3,
         height: 2,
         ingredients: &SHAPED_853_INGR,
@@ -15159,6 +16025,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_854",
         width: 3,
         height: 2,
         ingredients: &SHAPED_854_INGR,
@@ -15166,6 +16033,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_855",
         width: 3,
         height: 2,
         ingredients: &SHAPED_855_INGR,
@@ -15173,6 +16041,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_856",
         width: 3,
         height: 2,
         ingredients: &SHAPED_856_INGR,
@@ -15180,6 +16049,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_857",
         width: 3,
         height: 2,
         ingredients: &SHAPED_857_INGR,
@@ -15187,6 +16057,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_858",
         width: 3,
         height: 2,
         ingredients: &SHAPED_858_INGR,
@@ -15194,6 +16065,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_859",
         width: 3,
         height: 2,
         ingredients: &SHAPED_859_INGR,
@@ -15201,6 +16073,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_860",
         width: 3,
         height: 2,
         ingredients: &SHAPED_860_INGR,
@@ -15208,6 +16081,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_861",
         width: 3,
         height: 2,
         ingredients: &SHAPED_861_INGR,
@@ -15215,6 +16089,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_862",
         width: 3,
         height: 2,
         ingredients: &SHAPED_862_INGR,
@@ -15222,6 +16097,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_863",
         width: 3,
         height: 2,
         ingredients: &SHAPED_863_INGR,
@@ -15229,6 +16105,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_864",
         width: 3,
         height: 2,
         ingredients: &SHAPED_864_INGR,
@@ -15236,6 +16113,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_865",
         width: 3,
         height: 2,
         ingredients: &SHAPED_865_INGR,
@@ -15243,6 +16121,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_866",
         width: 3,
         height: 2,
         ingredients: &SHAPED_866_INGR,
@@ -15250,6 +16129,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_867",
         width: 3,
         height: 2,
         ingredients: &SHAPED_867_INGR,
@@ -15257,6 +16137,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_868",
         width: 3,
         height: 2,
         ingredients: &SHAPED_868_INGR,
@@ -15264,6 +16145,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_869",
         width: 3,
         height: 2,
         ingredients: &SHAPED_869_INGR,
@@ -15271,6 +16153,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_870",
         width: 3,
         height: 2,
         ingredients: &SHAPED_870_INGR,
@@ -15278,6 +16161,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_871",
         width: 3,
         height: 2,
         ingredients: &SHAPED_871_INGR,
@@ -15285,6 +16169,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_872",
         width: 3,
         height: 2,
         ingredients: &SHAPED_872_INGR,
@@ -15292,6 +16177,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_873",
         width: 3,
         height: 2,
         ingredients: &SHAPED_873_INGR,
@@ -15299,6 +16185,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_874",
         width: 3,
         height: 2,
         ingredients: &SHAPED_874_INGR,
@@ -15306,6 +16193,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_875",
         width: 3,
         height: 2,
         ingredients: &SHAPED_875_INGR,
@@ -15313,6 +16201,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_876",
         width: 3,
         height: 2,
         ingredients: &SHAPED_876_INGR,
@@ -15320,6 +16209,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_877",
         width: 3,
         height: 2,
         ingredients: &SHAPED_877_INGR,
@@ -15327,6 +16217,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_878",
         width: 3,
         height: 2,
         ingredients: &SHAPED_878_INGR,
@@ -15334,6 +16225,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_879",
         width: 3,
         height: 2,
         ingredients: &SHAPED_879_INGR,
@@ -15341,6 +16233,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_880",
         width: 3,
         height: 2,
         ingredients: &SHAPED_880_INGR,
@@ -15348,6 +16241,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_881",
         width: 3,
         height: 2,
         ingredients: &SHAPED_881_INGR,
@@ -15355,6 +16249,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_882",
         width: 3,
         height: 2,
         ingredients: &SHAPED_882_INGR,
@@ -15362,6 +16257,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_883",
         width: 3,
         height: 2,
         ingredients: &SHAPED_883_INGR,
@@ -15369,6 +16265,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_884",
         width: 3,
         height: 2,
         ingredients: &SHAPED_884_INGR,
@@ -15376,6 +16273,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_885",
         width: 3,
         height: 2,
         ingredients: &SHAPED_885_INGR,
@@ -15383,6 +16281,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_886",
         width: 3,
         height: 2,
         ingredients: &SHAPED_886_INGR,
@@ -15390,6 +16289,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_887",
         width: 3,
         height: 2,
         ingredients: &SHAPED_887_INGR,
@@ -15397,6 +16297,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_888",
         width: 3,
         height: 2,
         ingredients: &SHAPED_888_INGR,
@@ -15404,6 +16305,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_889",
         width: 3,
         height: 2,
         ingredients: &SHAPED_889_INGR,
@@ -15411,6 +16313,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_890",
         width: 3,
         height: 2,
         ingredients: &SHAPED_890_INGR,
@@ -15418,6 +16321,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_891",
         width: 3,
         height: 2,
         ingredients: &SHAPED_891_INGR,
@@ -15425,6 +16329,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_892",
         width: 3,
         height: 2,
         ingredients: &SHAPED_892_INGR,
@@ -15432,6 +16337,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_893",
         width: 3,
         height: 2,
         ingredients: &SHAPED_893_INGR,
@@ -15439,6 +16345,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_894",
         width: 3,
         height: 2,
         ingredients: &SHAPED_894_INGR,
@@ -15446,6 +16353,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_895",
         width: 3,
         height: 2,
         ingredients: &SHAPED_895_INGR,
@@ -15453,6 +16361,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_896",
         width: 3,
         height: 2,
         ingredients: &SHAPED_896_INGR,
@@ -15460,6 +16369,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_897",
         width: 3,
         height: 2,
         ingredients: &SHAPED_897_INGR,
@@ -15467,6 +16377,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_898",
         width: 3,
         height: 2,
         ingredients: &SHAPED_898_INGR,
@@ -15474,6 +16385,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_899",
         width: 3,
         height: 2,
         ingredients: &SHAPED_899_INGR,
@@ -15481,6 +16393,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_900",
         width: 3,
         height: 2,
         ingredients: &SHAPED_900_INGR,
@@ -15488,6 +16401,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_901",
         width: 3,
         height: 2,
         ingredients: &SHAPED_901_INGR,
@@ -15495,6 +16409,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_902",
         width: 3,
         height: 2,
         ingredients: &SHAPED_902_INGR,
@@ -15502,6 +16417,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_903",
         width: 3,
         height: 2,
         ingredients: &SHAPED_903_INGR,
@@ -15509,6 +16425,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_904",
         width: 3,
         height: 2,
         ingredients: &SHAPED_904_INGR,
@@ -15516,6 +16433,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_905",
         width: 3,
         height: 2,
         ingredients: &SHAPED_905_INGR,
@@ -15523,6 +16441,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_906",
         width: 3,
         height: 2,
         ingredients: &SHAPED_906_INGR,
@@ -15530,6 +16449,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_907",
         width: 3,
         height: 2,
         ingredients: &SHAPED_907_INGR,
@@ -15537,6 +16457,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_908",
         width: 3,
         height: 2,
         ingredients: &SHAPED_908_INGR,
@@ -15544,6 +16465,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_909",
         width: 3,
         height: 2,
         ingredients: &SHAPED_909_INGR,
@@ -15551,6 +16473,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_910",
         width: 3,
         height: 2,
         ingredients: &SHAPED_910_INGR,
@@ -15558,6 +16481,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_911",
         width: 3,
         height: 2,
         ingredients: &SHAPED_911_INGR,
@@ -15565,6 +16489,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_912",
         width: 3,
         height: 2,
         ingredients: &SHAPED_912_INGR,
@@ -15572,6 +16497,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_913",
         width: 3,
         height: 2,
         ingredients: &SHAPED_913_INGR,
@@ -15579,6 +16505,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_914",
         width: 3,
         height: 2,
         ingredients: &SHAPED_914_INGR,
@@ -15586,6 +16513,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_915",
         width: 3,
         height: 2,
         ingredients: &SHAPED_915_INGR,
@@ -15593,6 +16521,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_916",
         width: 3,
         height: 2,
         ingredients: &SHAPED_916_INGR,
@@ -15600,6 +16529,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_917",
         width: 3,
         height: 2,
         ingredients: &SHAPED_917_INGR,
@@ -15607,6 +16537,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_918",
         width: 3,
         height: 2,
         ingredients: &SHAPED_918_INGR,
@@ -15614,6 +16545,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_919",
         width: 3,
         height: 2,
         ingredients: &SHAPED_919_INGR,
@@ -15621,6 +16553,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_920",
         width: 3,
         height: 2,
         ingredients: &SHAPED_920_INGR,
@@ -15628,6 +16561,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_921",
         width: 3,
         height: 2,
         ingredients: &SHAPED_921_INGR,
@@ -15635,6 +16569,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_922",
         width: 3,
         height: 2,
         ingredients: &SHAPED_922_INGR,
@@ -15642,6 +16577,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_923",
         width: 3,
         height: 2,
         ingredients: &SHAPED_923_INGR,
@@ -15649,6 +16585,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_924",
         width: 3,
         height: 2,
         ingredients: &SHAPED_924_INGR,
@@ -15656,6 +16593,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_925",
         width: 3,
         height: 2,
         ingredients: &SHAPED_925_INGR,
@@ -15663,6 +16601,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_926",
         width: 3,
         height: 2,
         ingredients: &SHAPED_926_INGR,
@@ -15670,6 +16609,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_927",
         width: 3,
         height: 2,
         ingredients: &SHAPED_927_INGR,
@@ -15677,6 +16617,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_928",
         width: 3,
         height: 2,
         ingredients: &SHAPED_928_INGR,
@@ -15684,6 +16625,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_929",
         width: 3,
         height: 2,
         ingredients: &SHAPED_929_INGR,
@@ -15691,6 +16633,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_930",
         width: 3,
         height: 2,
         ingredients: &SHAPED_930_INGR,
@@ -15698,6 +16641,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_931",
         width: 3,
         height: 2,
         ingredients: &SHAPED_931_INGR,
@@ -15705,6 +16649,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_932",
         width: 3,
         height: 2,
         ingredients: &SHAPED_932_INGR,
@@ -15712,6 +16657,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_933",
         width: 3,
         height: 2,
         ingredients: &SHAPED_933_INGR,
@@ -15719,6 +16665,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_934",
         width: 3,
         height: 2,
         ingredients: &SHAPED_934_INGR,
@@ -15726,6 +16673,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_935",
         width: 3,
         height: 2,
         ingredients: &SHAPED_935_INGR,
@@ -15733,6 +16681,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_936",
         width: 3,
         height: 2,
         ingredients: &SHAPED_936_INGR,
@@ -15740,6 +16689,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_937",
         width: 3,
         height: 2,
         ingredients: &SHAPED_937_INGR,
@@ -15747,6 +16697,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_938",
         width: 3,
         height: 2,
         ingredients: &SHAPED_938_INGR,
@@ -15754,6 +16705,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_939",
         width: 3,
         height: 2,
         ingredients: &SHAPED_939_INGR,
@@ -15761,6 +16713,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_940",
         width: 3,
         height: 2,
         ingredients: &SHAPED_940_INGR,
@@ -15768,6 +16721,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_941",
         width: 3,
         height: 2,
         ingredients: &SHAPED_941_INGR,
@@ -15775,6 +16729,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_942",
         width: 3,
         height: 2,
         ingredients: &SHAPED_942_INGR,
@@ -15782,6 +16737,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_943",
         width: 3,
         height: 2,
         ingredients: &SHAPED_943_INGR,
@@ -15789,6 +16745,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_944",
         width: 3,
         height: 2,
         ingredients: &SHAPED_944_INGR,
@@ -15796,6 +16753,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_945",
         width: 3,
         height: 2,
         ingredients: &SHAPED_945_INGR,
@@ -15803,6 +16761,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_946",
         width: 3,
         height: 2,
         ingredients: &SHAPED_946_INGR,
@@ -15810,6 +16769,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_947",
         width: 3,
         height: 2,
         ingredients: &SHAPED_947_INGR,
@@ -15817,6 +16777,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_948",
         width: 3,
         height: 2,
         ingredients: &SHAPED_948_INGR,
@@ -15824,6 +16785,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_949",
         width: 3,
         height: 2,
         ingredients: &SHAPED_949_INGR,
@@ -15831,6 +16793,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_950",
         width: 3,
         height: 2,
         ingredients: &SHAPED_950_INGR,
@@ -15838,6 +16801,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_951",
         width: 3,
         height: 2,
         ingredients: &SHAPED_951_INGR,
@@ -15845,6 +16809,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_952",
         width: 3,
         height: 2,
         ingredients: &SHAPED_952_INGR,
@@ -15852,6 +16817,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_953",
         width: 3,
         height: 2,
         ingredients: &SHAPED_953_INGR,
@@ -15859,6 +16825,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_954",
         width: 3,
         height: 2,
         ingredients: &SHAPED_954_INGR,
@@ -15866,6 +16833,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_955",
         width: 3,
         height: 1,
         ingredients: &SHAPED_955_INGR,
@@ -15873,6 +16841,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 8,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_956",
         width: 3,
         height: 3,
         ingredients: &SHAPED_956_INGR,
@@ -15880,6 +16849,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_957",
         width: 2,
         height: 2,
         ingredients: &SHAPED_957_INGR,
@@ -15887,6 +16857,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_958",
         width: 3,
         height: 2,
         ingredients: &SHAPED_958_INGR,
@@ -15894,6 +16865,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 3,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_959",
         width: 3,
         height: 2,
         ingredients: &SHAPED_959_INGR,
@@ -15901,6 +16873,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_960",
         width: 3,
         height: 2,
         ingredients: &SHAPED_960_INGR,
@@ -15908,6 +16881,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_961",
         width: 3,
         height: 2,
         ingredients: &SHAPED_961_INGR,
@@ -15915,6 +16889,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_962",
         width: 3,
         height: 3,
         ingredients: &SHAPED_962_INGR,
@@ -15922,6 +16897,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_963",
         width: 3,
         height: 3,
         ingredients: &SHAPED_963_INGR,
@@ -15929,6 +16905,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_964",
         width: 1,
         height: 2,
         ingredients: &SHAPED_964_INGR,
@@ -15936,6 +16913,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_965",
         width: 3,
         height: 3,
         ingredients: &SHAPED_965_INGR,
@@ -15943,6 +16921,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_966",
         width: 3,
         height: 2,
         ingredients: &SHAPED_966_INGR,
@@ -15950,6 +16929,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_967",
         width: 3,
         height: 3,
         ingredients: &SHAPED_967_INGR,
@@ -15957,6 +16937,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_968",
         width: 3,
         height: 3,
         ingredients: &SHAPED_968_INGR,
@@ -15964,6 +16945,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_969",
         width: 3,
         height: 3,
         ingredients: &SHAPED_969_INGR,
@@ -15971,6 +16953,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_970",
         width: 3,
         height: 3,
         ingredients: &SHAPED_970_INGR,
@@ -15978,6 +16961,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_971",
         width: 3,
         height: 3,
         ingredients: &SHAPED_971_INGR,
@@ -15985,6 +16969,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_972",
         width: 3,
         height: 3,
         ingredients: &SHAPED_972_INGR,
@@ -15992,6 +16977,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_973",
         width: 3,
         height: 3,
         ingredients: &SHAPED_973_INGR,
@@ -15999,6 +16985,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_974",
         width: 3,
         height: 3,
         ingredients: &SHAPED_974_INGR,
@@ -16006,6 +16993,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_975",
         width: 3,
         height: 3,
         ingredients: &SHAPED_975_INGR,
@@ -16013,6 +17001,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_976",
         width: 3,
         height: 3,
         ingredients: &SHAPED_976_INGR,
@@ -16020,6 +17009,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_977",
         width: 3,
         height: 3,
         ingredients: &SHAPED_977_INGR,
@@ -16027,6 +17017,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_978",
         width: 3,
         height: 3,
         ingredients: &SHAPED_978_INGR,
@@ -16034,6 +17025,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_979",
         width: 3,
         height: 3,
         ingredients: &SHAPED_979_INGR,
@@ -16041,6 +17033,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_980",
         width: 3,
         height: 3,
         ingredients: &SHAPED_980_INGR,
@@ -16048,6 +17041,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_981",
         width: 3,
         height: 3,
         ingredients: &SHAPED_981_INGR,
@@ -16055,6 +17049,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_982",
         width: 3,
         height: 3,
         ingredients: &SHAPED_982_INGR,
@@ -16062,6 +17057,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_983",
         width: 3,
         height: 3,
         ingredients: &SHAPED_983_INGR,
@@ -16069,6 +17065,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_984",
         width: 3,
         height: 3,
         ingredients: &SHAPED_984_INGR,
@@ -16076,6 +17073,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_985",
         width: 3,
         height: 3,
         ingredients: &SHAPED_985_INGR,
@@ -16083,6 +17081,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_986",
         width: 3,
         height: 3,
         ingredients: &SHAPED_986_INGR,
@@ -16090,6 +17089,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_987",
         width: 3,
         height: 3,
         ingredients: &SHAPED_987_INGR,
@@ -16097,6 +17097,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_988",
         width: 3,
         height: 3,
         ingredients: &SHAPED_988_INGR,
@@ -16104,6 +17105,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_989",
         width: 3,
         height: 3,
         ingredients: &SHAPED_989_INGR,
@@ -16111,6 +17113,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_990",
         width: 3,
         height: 3,
         ingredients: &SHAPED_990_INGR,
@@ -16118,6 +17121,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_991",
         width: 3,
         height: 3,
         ingredients: &SHAPED_991_INGR,
@@ -16125,6 +17129,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_992",
         width: 3,
         height: 3,
         ingredients: &SHAPED_992_INGR,
@@ -16132,6 +17137,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_993",
         width: 3,
         height: 3,
         ingredients: &SHAPED_993_INGR,
@@ -16139,6 +17145,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_994",
         width: 3,
         height: 3,
         ingredients: &SHAPED_994_INGR,
@@ -16146,6 +17153,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_995",
         width: 3,
         height: 3,
         ingredients: &SHAPED_995_INGR,
@@ -16153,6 +17161,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_996",
         width: 3,
         height: 3,
         ingredients: &SHAPED_996_INGR,
@@ -16160,6 +17169,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_997",
         width: 3,
         height: 3,
         ingredients: &SHAPED_997_INGR,
@@ -16167,6 +17177,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_998",
         width: 3,
         height: 3,
         ingredients: &SHAPED_998_INGR,
@@ -16174,6 +17185,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_999",
         width: 3,
         height: 3,
         ingredients: &SHAPED_999_INGR,
@@ -16181,6 +17193,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1000",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1000_INGR,
@@ -16188,6 +17201,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1001",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1001_INGR,
@@ -16195,6 +17209,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1002",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1002_INGR,
@@ -16202,6 +17217,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1003",
         width: 2,
         height: 2,
         ingredients: &SHAPED_1003_INGR,
@@ -16209,6 +17225,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1004",
         width: 2,
         height: 2,
         ingredients: &SHAPED_1004_INGR,
@@ -16216,6 +17233,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1005",
         width: 2,
         height: 2,
         ingredients: &SHAPED_1005_INGR,
@@ -16223,6 +17241,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1006",
         width: 2,
         height: 2,
         ingredients: &SHAPED_1006_INGR,
@@ -16230,6 +17249,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1007",
         width: 2,
         height: 2,
         ingredients: &SHAPED_1007_INGR,
@@ -16237,6 +17257,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1008",
         width: 2,
         height: 2,
         ingredients: &SHAPED_1008_INGR,
@@ -16244,6 +17265,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1009",
         width: 2,
         height: 2,
         ingredients: &SHAPED_1009_INGR,
@@ -16251,6 +17273,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1010",
         width: 2,
         height: 2,
         ingredients: &SHAPED_1010_INGR,
@@ -16258,6 +17281,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1011",
         width: 2,
         height: 2,
         ingredients: &SHAPED_1011_INGR,
@@ -16265,6 +17289,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1012",
         width: 2,
         height: 2,
         ingredients: &SHAPED_1012_INGR,
@@ -16272,6 +17297,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1013",
         width: 2,
         height: 2,
         ingredients: &SHAPED_1013_INGR,
@@ -16279,6 +17305,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1014",
         width: 2,
         height: 2,
         ingredients: &SHAPED_1014_INGR,
@@ -16286,6 +17313,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1015",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1015_INGR,
@@ -16293,6 +17321,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1016",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1016_INGR,
@@ -16300,6 +17329,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1017",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1017_INGR,
@@ -16307,6 +17337,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1018",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1018_INGR,
@@ -16314,6 +17345,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1019",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1019_INGR,
@@ -16321,6 +17353,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1020",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1020_INGR,
@@ -16328,6 +17361,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1021",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1021_INGR,
@@ -16335,6 +17369,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1022",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1022_INGR,
@@ -16342,6 +17377,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1023",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1023_INGR,
@@ -16349,6 +17385,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1024",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1024_INGR,
@@ -16356,6 +17393,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1025",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1025_INGR,
@@ -16363,6 +17401,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1026",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1026_INGR,
@@ -16370,6 +17409,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1027",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1027_INGR,
@@ -16377,6 +17417,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1028",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1028_INGR,
@@ -16384,6 +17425,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1029",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1029_INGR,
@@ -16391,6 +17433,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1030",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1030_INGR,
@@ -16398,6 +17441,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1031",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1031_INGR,
@@ -16405,6 +17449,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1032",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1032_INGR,
@@ -16412,6 +17457,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1033",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1033_INGR,
@@ -16419,6 +17465,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1034",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1034_INGR,
@@ -16426,6 +17473,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1035",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1035_INGR,
@@ -16433,6 +17481,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1036",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1036_INGR,
@@ -16440,6 +17489,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1037",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1037_INGR,
@@ -16447,6 +17497,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1038",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1038_INGR,
@@ -16454,6 +17505,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1039",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1039_INGR,
@@ -16461,6 +17513,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1040",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1040_INGR,
@@ -16468,6 +17521,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1041",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1041_INGR,
@@ -16475,6 +17529,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1042",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1042_INGR,
@@ -16482,6 +17537,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1043",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1043_INGR,
@@ -16489,6 +17545,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1044",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1044_INGR,
@@ -16496,6 +17553,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1045",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1045_INGR,
@@ -16503,6 +17561,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1046",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1046_INGR,
@@ -16510,6 +17569,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1047",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1047_INGR,
@@ -16517,6 +17577,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1048",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1048_INGR,
@@ -16524,6 +17585,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1049",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1049_INGR,
@@ -16531,6 +17593,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1050",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1050_INGR,
@@ -16538,6 +17601,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1051",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1051_INGR,
@@ -16545,6 +17609,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1052",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1052_INGR,
@@ -16552,6 +17617,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1053",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1053_INGR,
@@ -16559,6 +17625,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1054",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1054_INGR,
@@ -16566,6 +17633,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1055",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1055_INGR,
@@ -16573,6 +17641,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1056",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1056_INGR,
@@ -16580,6 +17649,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1057",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1057_INGR,
@@ -16587,6 +17657,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1058",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1058_INGR,
@@ -16594,6 +17665,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1059",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1059_INGR,
@@ -16601,6 +17673,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1060",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1060_INGR,
@@ -16608,6 +17681,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1061",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1061_INGR,
@@ -16615,6 +17689,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1062",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1062_INGR,
@@ -16622,6 +17697,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1063",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1063_INGR,
@@ -16629,6 +17705,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1064",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1064_INGR,
@@ -16636,6 +17713,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1065",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1065_INGR,
@@ -16643,6 +17721,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1066",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1066_INGR,
@@ -16650,6 +17729,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1067",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1067_INGR,
@@ -16657,6 +17737,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1068",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1068_INGR,
@@ -16664,6 +17745,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1069",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1069_INGR,
@@ -16671,6 +17753,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1070",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1070_INGR,
@@ -16678,6 +17761,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1071",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1071_INGR,
@@ -16685,6 +17769,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1072",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1072_INGR,
@@ -16692,6 +17777,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1073",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1073_INGR,
@@ -16699,6 +17785,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1074",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1074_INGR,
@@ -16706,6 +17793,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1075",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1075_INGR,
@@ -16713,6 +17801,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1076",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1076_INGR,
@@ -16720,6 +17809,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1077",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1077_INGR,
@@ -16727,6 +17817,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1078",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1078_INGR,
@@ -16734,6 +17825,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1079",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1079_INGR,
@@ -16741,6 +17833,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1080",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1080_INGR,
@@ -16748,6 +17841,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1081",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1081_INGR,
@@ -16755,6 +17849,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1082",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1082_INGR,
@@ -16762,6 +17857,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1083",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1083_INGR,
@@ -16769,6 +17865,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1084",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1084_INGR,
@@ -16776,6 +17873,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1085",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1085_INGR,
@@ -16783,6 +17881,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1086",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1086_INGR,
@@ -16790,6 +17889,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1087",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1087_INGR,
@@ -16797,6 +17897,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1088",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1088_INGR,
@@ -16804,6 +17905,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1089",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1089_INGR,
@@ -16811,6 +17913,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1090",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1090_INGR,
@@ -16818,6 +17921,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1091",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1091_INGR,
@@ -16825,6 +17929,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1092",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1092_INGR,
@@ -16832,6 +17937,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1093",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1093_INGR,
@@ -16839,6 +17945,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1094",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1094_INGR,
@@ -16846,6 +17953,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1095",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1095_INGR,
@@ -16853,6 +17961,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1096",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1096_INGR,
@@ -16860,6 +17969,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1097",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1097_INGR,
@@ -16867,6 +17977,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1098",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1098_INGR,
@@ -16874,6 +17985,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1099",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1099_INGR,
@@ -16881,6 +17993,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1100",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1100_INGR,
@@ -16888,6 +18001,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1101",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1101_INGR,
@@ -16895,6 +18009,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1102",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1102_INGR,
@@ -16902,6 +18017,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1103",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1103_INGR,
@@ -16909,6 +18025,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1104",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1104_INGR,
@@ -16916,6 +18033,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1105",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1105_INGR,
@@ -16923,6 +18041,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1106",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1106_INGR,
@@ -16930,6 +18049,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1107",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1107_INGR,
@@ -16937,6 +18057,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1108",
         width: 3,
         height: 2,
         ingredients: &SHAPED_1108_INGR,
@@ -16944,6 +18065,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1109",
         width: 3,
         height: 2,
         ingredients: &SHAPED_1109_INGR,
@@ -16951,6 +18073,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1110",
         width: 3,
         height: 2,
         ingredients: &SHAPED_1110_INGR,
@@ -16958,6 +18081,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1111",
         width: 3,
         height: 2,
         ingredients: &SHAPED_1111_INGR,
@@ -16965,6 +18089,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1112",
         width: 3,
         height: 2,
         ingredients: &SHAPED_1112_INGR,
@@ -16972,6 +18097,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1113",
         width: 3,
         height: 2,
         ingredients: &SHAPED_1113_INGR,
@@ -16979,6 +18105,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1114",
         width: 3,
         height: 2,
         ingredients: &SHAPED_1114_INGR,
@@ -16986,6 +18113,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1115",
         width: 3,
         height: 2,
         ingredients: &SHAPED_1115_INGR,
@@ -16993,6 +18121,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1116",
         width: 3,
         height: 2,
         ingredients: &SHAPED_1116_INGR,
@@ -17000,6 +18129,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1117",
         width: 3,
         height: 2,
         ingredients: &SHAPED_1117_INGR,
@@ -17007,6 +18137,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1118",
         width: 3,
         height: 2,
         ingredients: &SHAPED_1118_INGR,
@@ -17014,6 +18145,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1119",
         width: 3,
         height: 2,
         ingredients: &SHAPED_1119_INGR,
@@ -17021,6 +18153,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1120",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1120_INGR,
@@ -17028,6 +18161,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1121",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1121_INGR,
@@ -17035,6 +18169,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1122",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1122_INGR,
@@ -17042,6 +18177,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1123",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1123_INGR,
@@ -17049,6 +18185,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1124",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1124_INGR,
@@ -17056,6 +18193,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1125",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1125_INGR,
@@ -17063,6 +18201,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1126",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1126_INGR,
@@ -17070,6 +18209,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1127",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1127_INGR,
@@ -17077,6 +18217,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1128",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1128_INGR,
@@ -17084,6 +18225,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1129",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1129_INGR,
@@ -17091,6 +18233,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1130",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1130_INGR,
@@ -17098,6 +18241,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1131",
         width: 2,
         height: 3,
         ingredients: &SHAPED_1131_INGR,
@@ -17105,6 +18249,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1132",
         width: 3,
         height: 2,
         ingredients: &SHAPED_1132_INGR,
@@ -17112,6 +18257,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1133",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1133_INGR,
@@ -17119,6 +18265,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1134",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1134_INGR,
@@ -17126,6 +18273,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1135",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1135_INGR,
@@ -17133,6 +18281,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1136",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1136_INGR,
@@ -17140,6 +18289,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1137",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1137_INGR,
@@ -17147,6 +18297,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1138",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1138_INGR,
@@ -17154,6 +18305,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1139",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1139_INGR,
@@ -17161,6 +18313,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1140",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1140_INGR,
@@ -17168,6 +18321,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1141",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1141_INGR,
@@ -17175,6 +18329,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1142",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1142_INGR,
@@ -17182,6 +18337,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1143",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1143_INGR,
@@ -17189,6 +18345,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1144",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1144_INGR,
@@ -17196,6 +18353,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1145",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1145_INGR,
@@ -17203,6 +18361,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1146",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1146_INGR,
@@ -17210,6 +18369,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1147",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1147_INGR,
@@ -17217,6 +18377,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1148",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1148_INGR,
@@ -17224,6 +18385,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1149",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1149_INGR,
@@ -17231,6 +18393,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1150",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1150_INGR,
@@ -17238,6 +18401,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1151",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1151_INGR,
@@ -17245,6 +18409,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1152",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1152_INGR,
@@ -17252,6 +18417,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1153",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1153_INGR,
@@ -17259,6 +18425,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1154",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1154_INGR,
@@ -17266,6 +18433,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1155",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1155_INGR,
@@ -17273,6 +18441,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1156",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1156_INGR,
@@ -17280,6 +18449,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1157",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1157_INGR,
@@ -17287,6 +18457,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1158",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1158_INGR,
@@ -17294,6 +18465,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1159",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1159_INGR,
@@ -17301,6 +18473,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1160",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1160_INGR,
@@ -17308,6 +18481,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1161",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1161_INGR,
@@ -17315,6 +18489,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1162",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1162_INGR,
@@ -17322,6 +18497,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1163",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1163_INGR,
@@ -17329,6 +18505,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1164",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1164_INGR,
@@ -17336,6 +18513,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1165",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1165_INGR,
@@ -17343,6 +18521,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1166",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1166_INGR,
@@ -17350,6 +18529,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1167",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1167_INGR,
@@ -17357,6 +18537,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1168",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1168_INGR,
@@ -17364,6 +18545,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1169",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1169_INGR,
@@ -17371,6 +18553,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1170",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1170_INGR,
@@ -17378,6 +18561,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1171",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1171_INGR,
@@ -17385,6 +18569,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1172",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1172_INGR,
@@ -17392,6 +18577,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1173",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1173_INGR,
@@ -17399,6 +18585,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1174",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1174_INGR,
@@ -17406,6 +18593,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1175",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1175_INGR,
@@ -17413,6 +18601,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1176",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1176_INGR,
@@ -17420,6 +18609,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1177",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1177_INGR,
@@ -17427,6 +18617,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1178",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1178_INGR,
@@ -17434,6 +18625,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1179",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1179_INGR,
@@ -17441,6 +18633,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1180",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1180_INGR,
@@ -17448,6 +18641,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1181",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1181_INGR,
@@ -17455,6 +18649,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1182",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1182_INGR,
@@ -17462,6 +18657,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1183",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1183_INGR,
@@ -17469,6 +18665,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1184",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1184_INGR,
@@ -17476,6 +18673,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1185",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1185_INGR,
@@ -17483,6 +18681,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1186",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1186_INGR,
@@ -17490,6 +18689,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1187",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1187_INGR,
@@ -17497,6 +18697,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1188",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1188_INGR,
@@ -17504,6 +18705,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1189",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1189_INGR,
@@ -17511,6 +18713,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1190",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1190_INGR,
@@ -17518,6 +18721,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1191",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1191_INGR,
@@ -17525,6 +18729,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1192",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1192_INGR,
@@ -17532,6 +18737,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1193",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1193_INGR,
@@ -17539,6 +18745,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1194",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1194_INGR,
@@ -17546,6 +18753,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1195",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1195_INGR,
@@ -17553,6 +18761,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1196",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1196_INGR,
@@ -17560,6 +18769,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1197",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1197_INGR,
@@ -17567,6 +18777,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1198",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1198_INGR,
@@ -17574,6 +18785,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1199",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1199_INGR,
@@ -17581,6 +18793,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1200",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1200_INGR,
@@ -17588,6 +18801,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1201",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1201_INGR,
@@ -17595,6 +18809,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1202",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1202_INGR,
@@ -17602,6 +18817,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1203",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1203_INGR,
@@ -17609,6 +18825,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1204",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1204_INGR,
@@ -17616,6 +18833,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1205",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1205_INGR,
@@ -17623,6 +18841,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1206",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1206_INGR,
@@ -17630,6 +18849,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1207",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1207_INGR,
@@ -17637,6 +18857,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1208",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1208_INGR,
@@ -17644,6 +18865,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1209",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1209_INGR,
@@ -17651,6 +18873,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1210",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1210_INGR,
@@ -17658,6 +18881,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1211",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1211_INGR,
@@ -17665,6 +18889,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1212",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1212_INGR,
@@ -17672,6 +18897,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1213",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1213_INGR,
@@ -17679,6 +18905,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1214",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1214_INGR,
@@ -17686,6 +18913,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1215",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1215_INGR,
@@ -17693,6 +18921,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1216",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1216_INGR,
@@ -17700,6 +18929,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1217",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1217_INGR,
@@ -17707,6 +18937,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1218",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1218_INGR,
@@ -17714,6 +18945,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1219",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1219_INGR,
@@ -17721,6 +18953,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1220",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1220_INGR,
@@ -17728,6 +18961,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1221",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1221_INGR,
@@ -17735,6 +18969,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1222",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1222_INGR,
@@ -17742,6 +18977,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1223",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1223_INGR,
@@ -17749,6 +18985,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1224",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1224_INGR,
@@ -17756,6 +18993,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1225",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1225_INGR,
@@ -17763,6 +19001,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1226",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1226_INGR,
@@ -17770,6 +19009,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1227",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1227_INGR,
@@ -17777,6 +19017,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1228",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1228_INGR,
@@ -17784,6 +19025,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1229",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1229_INGR,
@@ -17791,6 +19033,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1230",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1230_INGR,
@@ -17798,6 +19041,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1231",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1231_INGR,
@@ -17805,6 +19049,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1232",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1232_INGR,
@@ -17812,6 +19057,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1233",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1233_INGR,
@@ -17819,6 +19065,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1234",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1234_INGR,
@@ -17826,6 +19073,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1235",
         width: 2,
         height: 2,
         ingredients: &SHAPED_1235_INGR,
@@ -17833,6 +19081,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1236",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1236_INGR,
@@ -17840,6 +19089,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1237",
         width: 3,
         height: 1,
         ingredients: &SHAPED_1237_INGR,
@@ -17847,6 +19097,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1238",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1238_INGR,
@@ -17854,6 +19105,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1239",
         width: 2,
         height: 2,
         ingredients: &SHAPED_1239_INGR,
@@ -17861,6 +19113,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1240",
         width: 3,
         height: 1,
         ingredients: &SHAPED_1240_INGR,
@@ -17868,6 +19121,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1241",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1241_INGR,
@@ -17875,6 +19129,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1242",
         width: 1,
         height: 2,
         ingredients: &SHAPED_1242_INGR,
@@ -17882,6 +19137,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1243",
         width: 2,
         height: 2,
         ingredients: &SHAPED_1243_INGR,
@@ -17889,6 +19145,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1244",
         width: 3,
         height: 1,
         ingredients: &SHAPED_1244_INGR,
@@ -17896,6 +19153,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 6,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1245",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1245_INGR,
@@ -17903,6 +19161,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1246",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1246_INGR,
@@ -17910,6 +19169,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1247",
         width: 1,
         height: 2,
         ingredients: &SHAPED_1247_INGR,
@@ -17917,6 +19177,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1248",
         width: 1,
         height: 3,
         ingredients: &SHAPED_1248_INGR,
@@ -17924,6 +19185,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 1,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1249",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1249_INGR,
@@ -17931,6 +19193,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1250",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1250_INGR,
@@ -17938,6 +19201,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1251",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1251_INGR,
@@ -17945,6 +19209,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1252",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1252_INGR,
@@ -17952,6 +19217,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1253",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1253_INGR,
@@ -17959,6 +19225,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1254",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1254_INGR,
@@ -17966,6 +19233,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1255",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1255_INGR,
@@ -17973,6 +19241,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1256",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1256_INGR,
@@ -17980,6 +19249,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1257",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1257_INGR,
@@ -17987,6 +19257,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1258",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1258_INGR,
@@ -17994,6 +19265,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1259",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1259_INGR,
@@ -18001,6 +19273,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1260",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1260_INGR,
@@ -18008,6 +19281,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1261",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1261_INGR,
@@ -18015,6 +19289,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1262",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1262_INGR,
@@ -18022,6 +19297,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1263",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1263_INGR,
@@ -18029,6 +19305,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1264",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1264_INGR,
@@ -18036,6 +19313,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1265",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1265_INGR,
@@ -18043,6 +19321,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1266",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1266_INGR,
@@ -18050,6 +19329,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1267",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1267_INGR,
@@ -18057,6 +19337,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1268",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1268_INGR,
@@ -18064,6 +19345,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 2,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1269",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1269_INGR,
@@ -18071,6 +19353,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1270",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1270_INGR,
@@ -18078,6 +19361,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1271",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1271_INGR,
@@ -18085,6 +19369,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1272",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1272_INGR,
@@ -18092,6 +19377,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1273",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1273_INGR,
@@ -18099,6 +19385,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1274",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1274_INGR,
@@ -18106,6 +19393,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1275",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1275_INGR,
@@ -18113,6 +19401,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1276",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1276_INGR,
@@ -18120,6 +19409,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1277",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1277_INGR,
@@ -18127,6 +19417,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1278",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1278_INGR,
@@ -18134,6 +19425,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1279",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1279_INGR,
@@ -18141,6 +19433,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1280",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1280_INGR,
@@ -18148,6 +19441,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1281",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1281_INGR,
@@ -18155,6 +19449,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1282",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1282_INGR,
@@ -18162,6 +19457,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1283",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1283_INGR,
@@ -18169,6 +19465,7 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
         result_count: 4,
     },
     ShapedRecipe {
+        id: "minecraft:shaped_1284",
         width: 3,
         height: 3,
         ingredients: &SHAPED_1284_INGR,
@@ -18180,1361 +19477,1633 @@ pub static SHAPED_RECIPES: &[ShapedRecipe] = &[
 /// All vanilla shapeless recipes, indexed for ingredient-set matching.
 pub static SHAPELESS_RECIPES: &[ShapelessRecipe] = &[
     ShapelessRecipe {
+        id: "minecraft:shapeless_0",
         ingredients: &SHAPELESS_0_INGR,
         result_id: 2,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_1",
         ingredients: &SHAPELESS_1_INGR,
         result_id: 6,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_2",
         ingredients: &SHAPELESS_2_INGR,
         result_id: 36,
         result_count: 4,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_3",
         ingredients: &SHAPELESS_3_INGR,
         result_id: 37,
         result_count: 4,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_4",
         ingredients: &SHAPELESS_4_INGR,
         result_id: 38,
         result_count: 4,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_5",
         ingredients: &SHAPELESS_5_INGR,
         result_id: 39,
         result_count: 4,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_6",
         ingredients: &SHAPELESS_6_INGR,
         result_id: 40,
         result_count: 4,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_7",
         ingredients: &SHAPELESS_7_INGR,
         result_id: 41,
         result_count: 4,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_8",
         ingredients: &SHAPELESS_8_INGR,
         result_id: 42,
         result_count: 4,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_9",
         ingredients: &SHAPELESS_9_INGR,
         result_id: 43,
         result_count: 4,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_10",
         ingredients: &SHAPELESS_10_INGR,
         result_id: 44,
         result_count: 4,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_11",
         ingredients: &SHAPELESS_11_INGR,
         result_id: 45,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_12",
         ingredients: &SHAPELESS_12_INGR,
         result_id: 46,
         result_count: 4,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_13",
         ingredients: &SHAPELESS_13_INGR,
         result_id: 47,
         result_count: 4,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_14",
         ingredients: &SHAPELESS_14_INGR,
         result_id: 114,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_15",
         ingredients: &SHAPELESS_15_INGR,
         result_id: 115,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_16",
         ingredients: &SHAPELESS_16_INGR,
         result_id: 116,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_17",
         ingredients: &SHAPELESS_17_INGR,
         result_id: 117,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_18",
         ingredients: &SHAPELESS_18_INGR,
         result_id: 118,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_19",
         ingredients: &SHAPELESS_19_INGR,
         result_id: 119,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_20",
         ingredients: &SHAPELESS_20_INGR,
         result_id: 120,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_21",
         ingredients: &SHAPELESS_21_INGR,
         result_id: 121,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_22",
         ingredients: &SHAPELESS_22_INGR,
         result_id: 122,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_23",
         ingredients: &SHAPELESS_23_INGR,
         result_id: 123,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_24",
         ingredients: &SHAPELESS_24_INGR,
         result_id: 124,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_25",
         ingredients: &SHAPELESS_25_INGR,
         result_id: 125,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_26",
         ingredients: &SHAPELESS_26_INGR,
         result_id: 126,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_27",
         ingredients: &SHAPELESS_27_INGR,
         result_id: 127,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_28",
         ingredients: &SHAPELESS_28_INGR,
         result_id: 128,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_29",
         ingredients: &SHAPELESS_29_INGR,
         result_id: 129,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_30",
         ingredients: &SHAPELESS_30_INGR,
         result_id: 130,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_31",
         ingredients: &SHAPELESS_31_INGR,
         result_id: 131,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_32",
         ingredients: &SHAPELESS_32_INGR,
         result_id: 132,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_33",
         ingredients: &SHAPELESS_33_INGR,
         result_id: 133,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_34",
         ingredients: &SHAPELESS_34_INGR,
         result_id: 144,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_35",
         ingredients: &SHAPELESS_35_INGR,
         result_id: 147,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_36",
         ingredients: &SHAPELESS_36_INGR,
         result_id: 209,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_37",
         ingredients: &SHAPELESS_37_INGR,
         result_id: 210,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_38",
         ingredients: &SHAPELESS_38_INGR,
         result_id: 211,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_39",
         ingredients: &SHAPELESS_39_INGR,
         result_id: 212,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_40",
         ingredients: &SHAPELESS_40_INGR,
         result_id: 213,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_41",
         ingredients: &SHAPELESS_41_INGR,
         result_id: 214,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_42",
         ingredients: &SHAPELESS_42_INGR,
         result_id: 215,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_43",
         ingredients: &SHAPELESS_43_INGR,
         result_id: 216,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_44",
         ingredients: &SHAPELESS_44_INGR,
         result_id: 217,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_45",
         ingredients: &SHAPELESS_45_INGR,
         result_id: 218,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_46",
         ingredients: &SHAPELESS_46_INGR,
         result_id: 219,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_47",
         ingredients: &SHAPELESS_47_INGR,
         result_id: 220,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_48",
         ingredients: &SHAPELESS_48_INGR,
         result_id: 221,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_49",
         ingredients: &SHAPELESS_49_INGR,
         result_id: 222,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_50",
         ingredients: &SHAPELESS_50_INGR,
         result_id: 223,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_51",
         ingredients: &SHAPELESS_51_INGR,
         result_id: 224,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_52",
         ingredients: &SHAPELESS_52_INGR,
         result_id: 302,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_53",
         ingredients: &SHAPELESS_53_INGR,
         result_id: 302,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_54",
         ingredients: &SHAPELESS_54_INGR,
         result_id: 356,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_55",
         ingredients: &SHAPELESS_55_INGR,
         result_id: 356,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_56",
         ingredients: &SHAPELESS_56_INGR,
         result_id: 359,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_57",
         ingredients: &SHAPELESS_57_INGR,
         result_id: 373,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_58",
         ingredients: &SHAPELESS_58_INGR,
         result_id: 468,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_59",
         ingredients: &SHAPELESS_59_INGR,
         result_id: 469,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_60",
         ingredients: &SHAPELESS_60_INGR,
         result_id: 470,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_61",
         ingredients: &SHAPELESS_61_INGR,
         result_id: 471,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_62",
         ingredients: &SHAPELESS_62_INGR,
         result_id: 472,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_63",
         ingredients: &SHAPELESS_63_INGR,
         result_id: 473,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_64",
         ingredients: &SHAPELESS_64_INGR,
         result_id: 474,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_65",
         ingredients: &SHAPELESS_65_INGR,
         result_id: 475,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_66",
         ingredients: &SHAPELESS_66_INGR,
         result_id: 476,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_67",
         ingredients: &SHAPELESS_67_INGR,
         result_id: 477,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_68",
         ingredients: &SHAPELESS_68_INGR,
         result_id: 478,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_69",
         ingredients: &SHAPELESS_69_INGR,
         result_id: 479,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_70",
         ingredients: &SHAPELESS_70_INGR,
         result_id: 480,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_71",
         ingredients: &SHAPELESS_71_INGR,
         result_id: 481,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_72",
         ingredients: &SHAPELESS_72_INGR,
         result_id: 482,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_73",
         ingredients: &SHAPELESS_73_INGR,
         result_id: 483,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_74",
         ingredients: &SHAPELESS_74_INGR,
         result_id: 484,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_75",
         ingredients: &SHAPELESS_75_INGR,
         result_id: 486,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_76",
         ingredients: &SHAPELESS_76_INGR,
         result_id: 527,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_77",
         ingredients: &SHAPELESS_77_INGR,
         result_id: 540,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_78",
         ingredients: &SHAPELESS_78_INGR,
         result_id: 594,
         result_count: 8,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_79",
         ingredients: &SHAPELESS_79_INGR,
         result_id: 595,
         result_count: 8,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_80",
         ingredients: &SHAPELESS_80_INGR,
         result_id: 596,
         result_count: 8,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_81",
         ingredients: &SHAPELESS_81_INGR,
         result_id: 597,
         result_count: 8,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_82",
         ingredients: &SHAPELESS_82_INGR,
         result_id: 598,
         result_count: 8,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_83",
         ingredients: &SHAPELESS_83_INGR,
         result_id: 599,
         result_count: 8,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_84",
         ingredients: &SHAPELESS_84_INGR,
         result_id: 600,
         result_count: 8,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_85",
         ingredients: &SHAPELESS_85_INGR,
         result_id: 601,
         result_count: 8,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_86",
         ingredients: &SHAPELESS_86_INGR,
         result_id: 602,
         result_count: 8,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_87",
         ingredients: &SHAPELESS_87_INGR,
         result_id: 603,
         result_count: 8,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_88",
         ingredients: &SHAPELESS_88_INGR,
         result_id: 604,
         result_count: 8,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_89",
         ingredients: &SHAPELESS_89_INGR,
         result_id: 605,
         result_count: 8,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_90",
         ingredients: &SHAPELESS_90_INGR,
         result_id: 606,
         result_count: 8,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_91",
         ingredients: &SHAPELESS_91_INGR,
         result_id: 607,
         result_count: 8,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_92",
         ingredients: &SHAPELESS_92_INGR,
         result_id: 608,
         result_count: 8,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_93",
         ingredients: &SHAPELESS_93_INGR,
         result_id: 609,
         result_count: 8,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_94",
         ingredients: &SHAPELESS_94_INGR,
         result_id: 642,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_95",
         ingredients: &SHAPELESS_95_INGR,
         result_id: 680,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_96",
         ingredients: &SHAPELESS_96_INGR,
         result_id: 701,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_97",
         ingredients: &SHAPELESS_97_INGR,
         result_id: 705,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_98",
         ingredients: &SHAPELESS_98_INGR,
         result_id: 706,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_99",
         ingredients: &SHAPELESS_99_INGR,
         result_id: 707,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_100",
         ingredients: &SHAPELESS_100_INGR,
         result_id: 708,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_101",
         ingredients: &SHAPELESS_101_INGR,
         result_id: 709,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_102",
         ingredients: &SHAPELESS_102_INGR,
         result_id: 710,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_103",
         ingredients: &SHAPELESS_103_INGR,
         result_id: 711,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_104",
         ingredients: &SHAPELESS_104_INGR,
         result_id: 712,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_105",
         ingredients: &SHAPELESS_105_INGR,
         result_id: 713,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_106",
         ingredients: &SHAPELESS_106_INGR,
         result_id: 714,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_107",
         ingredients: &SHAPELESS_107_INGR,
         result_id: 715,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_108",
         ingredients: &SHAPELESS_108_INGR,
         result_id: 716,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_109",
         ingredients: &SHAPELESS_109_INGR,
         result_id: 717,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_110",
         ingredients: &SHAPELESS_110_INGR,
         result_id: 718,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_111",
         ingredients: &SHAPELESS_111_INGR,
         result_id: 752,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_112",
         ingredients: &SHAPELESS_112_INGR,
         result_id: 753,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_113",
         ingredients: &SHAPELESS_113_INGR,
         result_id: 754,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_114",
         ingredients: &SHAPELESS_114_INGR,
         result_id: 755,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_115",
         ingredients: &SHAPELESS_115_INGR,
         result_id: 773,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_116",
         ingredients: &SHAPELESS_116_INGR,
         result_id: 774,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_117",
         ingredients: &SHAPELESS_117_INGR,
         result_id: 775,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_118",
         ingredients: &SHAPELESS_118_INGR,
         result_id: 776,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_119",
         ingredients: &SHAPELESS_119_INGR,
         result_id: 795,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_120",
         ingredients: &SHAPELESS_120_INGR,
         result_id: 796,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_121",
         ingredients: &SHAPELESS_121_INGR,
         result_id: 797,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_122",
         ingredients: &SHAPELESS_122_INGR,
         result_id: 798,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_123",
         ingredients: &SHAPELESS_123_INGR,
         result_id: 804,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_124",
         ingredients: &SHAPELESS_124_INGR,
         result_id: 806,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_125",
         ingredients: &SHAPELESS_125_INGR,
         result_id: 808,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_126",
         ingredients: &SHAPELESS_126_INGR,
         result_id: 810,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_127",
         ingredients: &SHAPELESS_127_INGR,
         result_id: 812,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_128",
         ingredients: &SHAPELESS_128_INGR,
         result_id: 814,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_129",
         ingredients: &SHAPELESS_129_INGR,
         result_id: 816,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_130",
         ingredients: &SHAPELESS_130_INGR,
         result_id: 818,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_131",
         ingredients: &SHAPELESS_131_INGR,
         result_id: 820,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_132",
         ingredients: &SHAPELESS_132_INGR,
         result_id: 822,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_133",
         ingredients: &SHAPELESS_133_INGR,
         result_id: 829,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_134",
         ingredients: &SHAPELESS_134_INGR,
         result_id: 834,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_135",
         ingredients: &SHAPELESS_135_INGR,
         result_id: 836,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_136",
         ingredients: &SHAPELESS_136_INGR,
         result_id: 837,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_137",
         ingredients: &SHAPELESS_137_INGR,
         result_id: 838,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_138",
         ingredients: &SHAPELESS_138_INGR,
         result_id: 841,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_139",
         ingredients: &SHAPELESS_139_INGR,
         result_id: 842,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_140",
         ingredients: &SHAPELESS_140_INGR,
         result_id: 843,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_141",
         ingredients: &SHAPELESS_141_INGR,
         result_id: 844,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_142",
         ingredients: &SHAPELESS_142_INGR,
         result_id: 844,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_143",
         ingredients: &SHAPELESS_143_INGR,
         result_id: 845,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_144",
         ingredients: &SHAPELESS_144_INGR,
         result_id: 846,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_145",
         ingredients: &SHAPELESS_145_INGR,
         result_id: 847,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_146",
         ingredients: &SHAPELESS_146_INGR,
         result_id: 847,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_147",
         ingredients: &SHAPELESS_147_INGR,
         result_id: 880,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_148",
         ingredients: &SHAPELESS_148_INGR,
         result_id: 885,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_149",
         ingredients: &SHAPELESS_149_INGR,
         result_id: 958,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_150",
         ingredients: &SHAPELESS_150_INGR,
         result_id: 959,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_151",
         ingredients: &SHAPELESS_151_INGR,
         result_id: 993,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_152",
         ingredients: &SHAPELESS_152_INGR,
         result_id: 993,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_153",
         ingredients: &SHAPELESS_153_INGR,
         result_id: 994,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_154",
         ingredients: &SHAPELESS_154_INGR,
         result_id: 994,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_155",
         ingredients: &SHAPELESS_155_INGR,
         result_id: 994,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_156",
         ingredients: &SHAPELESS_156_INGR,
         result_id: 995,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_157",
         ingredients: &SHAPELESS_157_INGR,
         result_id: 995,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_158",
         ingredients: &SHAPELESS_158_INGR,
         result_id: 995,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_159",
         ingredients: &SHAPELESS_159_INGR,
         result_id: 995,
         result_count: 3,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_160",
         ingredients: &SHAPELESS_160_INGR,
         result_id: 995,
         result_count: 4,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_161",
         ingredients: &SHAPELESS_161_INGR,
         result_id: 996,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_162",
         ingredients: &SHAPELESS_162_INGR,
         result_id: 996,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_163",
         ingredients: &SHAPELESS_163_INGR,
         result_id: 997,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_164",
         ingredients: &SHAPELESS_164_INGR,
         result_id: 997,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_165",
         ingredients: &SHAPELESS_165_INGR,
         result_id: 998,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_166",
         ingredients: &SHAPELESS_166_INGR,
         result_id: 999,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_167",
         ingredients: &SHAPELESS_167_INGR,
         result_id: 999,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_168",
         ingredients: &SHAPELESS_168_INGR,
         result_id: 999,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_169",
         ingredients: &SHAPELESS_169_INGR,
         result_id: 999,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_170",
         ingredients: &SHAPELESS_170_INGR,
         result_id: 1000,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_171",
         ingredients: &SHAPELESS_171_INGR,
         result_id: 1001,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_172",
         ingredients: &SHAPELESS_172_INGR,
         result_id: 1001,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_173",
         ingredients: &SHAPELESS_173_INGR,
         result_id: 1001,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_174",
         ingredients: &SHAPELESS_174_INGR,
         result_id: 1001,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_175",
         ingredients: &SHAPELESS_175_INGR,
         result_id: 1001,
         result_count: 3,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_176",
         ingredients: &SHAPELESS_176_INGR,
         result_id: 1002,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_177",
         ingredients: &SHAPELESS_177_INGR,
         result_id: 1002,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_178",
         ingredients: &SHAPELESS_178_INGR,
         result_id: 1003,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_179",
         ingredients: &SHAPELESS_179_INGR,
         result_id: 1004,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_180",
         ingredients: &SHAPELESS_180_INGR,
         result_id: 1004,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_181",
         ingredients: &SHAPELESS_181_INGR,
         result_id: 1005,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_182",
         ingredients: &SHAPELESS_182_INGR,
         result_id: 1007,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_183",
         ingredients: &SHAPELESS_183_INGR,
         result_id: 1007,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_184",
         ingredients: &SHAPELESS_184_INGR,
         result_id: 1007,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_185",
         ingredients: &SHAPELESS_185_INGR,
         result_id: 1007,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_186",
         ingredients: &SHAPELESS_186_INGR,
         result_id: 1008,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_187",
         ingredients: &SHAPELESS_187_INGR,
         result_id: 1008,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_188",
         ingredients: &SHAPELESS_188_INGR,
         result_id: 1009,
         result_count: 3,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_189",
         ingredients: &SHAPELESS_189_INGR,
         result_id: 1009,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_190",
         ingredients: &SHAPELESS_190_INGR,
         result_id: 1011,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_191",
         ingredients: &SHAPELESS_191_INGR,
         result_id: 1011,
         result_count: 3,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_192",
         ingredients: &SHAPELESS_192_INGR,
         result_id: 1013,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_193",
         ingredients: &SHAPELESS_193_INGR,
         result_id: 1014,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_194",
         ingredients: &SHAPELESS_194_INGR,
         result_id: 1015,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_195",
         ingredients: &SHAPELESS_195_INGR,
         result_id: 1016,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_196",
         ingredients: &SHAPELESS_196_INGR,
         result_id: 1017,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_197",
         ingredients: &SHAPELESS_197_INGR,
         result_id: 1018,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_198",
         ingredients: &SHAPELESS_198_INGR,
         result_id: 1019,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_199",
         ingredients: &SHAPELESS_199_INGR,
         result_id: 1020,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_200",
         ingredients: &SHAPELESS_200_INGR,
         result_id: 1021,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_201",
         ingredients: &SHAPELESS_201_INGR,
         result_id: 1022,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_202",
         ingredients: &SHAPELESS_202_INGR,
         result_id: 1023,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_203",
         ingredients: &SHAPELESS_203_INGR,
         result_id: 1024,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_204",
         ingredients: &SHAPELESS_204_INGR,
         result_id: 1025,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_205",
         ingredients: &SHAPELESS_205_INGR,
         result_id: 1026,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_206",
         ingredients: &SHAPELESS_206_INGR,
         result_id: 1027,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_207",
         ingredients: &SHAPELESS_207_INGR,
         result_id: 1028,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_208",
         ingredients: &SHAPELESS_208_INGR,
         result_id: 1034,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_209",
         ingredients: &SHAPELESS_209_INGR,
         result_id: 1035,
         result_count: 4,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_210",
         ingredients: &SHAPELESS_210_INGR,
         result_id: 1036,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_211",
         ingredients: &SHAPELESS_211_INGR,
         result_id: 1045,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_212",
         ingredients: &SHAPELESS_212_INGR,
         result_id: 1050,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_213",
         ingredients: &SHAPELESS_213_INGR,
         result_id: 1051,
         result_count: 2,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_214",
         ingredients: &SHAPELESS_214_INGR,
         result_id: 1052,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_215",
         ingredients: &SHAPELESS_215_INGR,
         result_id: 1055,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_216",
         ingredients: &SHAPELESS_216_INGR,
         result_id: 1139,
         result_count: 3,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_217",
         ingredients: &SHAPELESS_217_INGR,
         result_id: 1140,
         result_count: 4,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_218",
         ingredients: &SHAPELESS_218_INGR,
         result_id: 1141,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_219",
         ingredients: &SHAPELESS_219_INGR,
         result_id: 1146,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_220",
         ingredients: &SHAPELESS_220_INGR,
         result_id: 1162,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_221",
         ingredients: &SHAPELESS_221_INGR,
         result_id: 1163,
         result_count: 3,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_222",
         ingredients: &SHAPELESS_222_INGR,
         result_id: 1172,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_223",
         ingredients: &SHAPELESS_223_INGR,
         result_id: 1172,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_224",
         ingredients: &SHAPELESS_224_INGR,
         result_id: 1208,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_225",
         ingredients: &SHAPELESS_225_INGR,
         result_id: 1217,
         result_count: 9,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_226",
         ingredients: &SHAPELESS_226_INGR,
         result_id: 1236,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_227",
         ingredients: &SHAPELESS_227_INGR,
         result_id: 1244,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_228",
         ingredients: &SHAPELESS_228_INGR,
         result_id: 1244,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_229",
         ingredients: &SHAPELESS_229_INGR,
         result_id: 1244,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_230",
         ingredients: &SHAPELESS_230_INGR,
         result_id: 1244,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_231",
         ingredients: &SHAPELESS_231_INGR,
         result_id: 1244,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_232",
         ingredients: &SHAPELESS_232_INGR,
         result_id: 1244,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_233",
         ingredients: &SHAPELESS_233_INGR,
         result_id: 1244,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_234",
         ingredients: &SHAPELESS_234_INGR,
         result_id: 1244,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_235",
         ingredients: &SHAPELESS_235_INGR,
         result_id: 1244,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_236",
         ingredients: &SHAPELESS_236_INGR,
         result_id: 1244,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_237",
         ingredients: &SHAPELESS_237_INGR,
         result_id: 1244,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_238",
         ingredients: &SHAPELESS_238_INGR,
         result_id: 1244,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_239",
         ingredients: &SHAPELESS_239_INGR,
         result_id: 1244,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_240",
         ingredients: &SHAPELESS_240_INGR,
         result_id: 1244,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_241",
         ingredients: &SHAPELESS_241_INGR,
         result_id: 1246,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_242",
         ingredients: &SHAPELESS_242_INGR,
         result_id: 1247,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_243",
         ingredients: &SHAPELESS_243_INGR,
         result_id: 1248,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_244",
         ingredients: &SHAPELESS_244_INGR,
         result_id: 1249,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_245",
         ingredients: &SHAPELESS_245_INGR,
         result_id: 1254,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_246",
         ingredients: &SHAPELESS_246_INGR,
         result_id: 1255,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_247",
         ingredients: &SHAPELESS_247_INGR,
         result_id: 1277,
         result_count: 4,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_248",
         ingredients: &SHAPELESS_248_INGR,
         result_id: 1295,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_249",
         ingredients: &SHAPELESS_249_INGR,
         result_id: 1296,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_250",
         ingredients: &SHAPELESS_250_INGR,
         result_id: 1297,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_251",
         ingredients: &SHAPELESS_251_INGR,
         result_id: 1298,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_252",
         ingredients: &SHAPELESS_252_INGR,
         result_id: 1299,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_253",
         ingredients: &SHAPELESS_253_INGR,
         result_id: 1300,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_254",
         ingredients: &SHAPELESS_254_INGR,
         result_id: 1301,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_255",
         ingredients: &SHAPELESS_255_INGR,
         result_id: 1302,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_256",
         ingredients: &SHAPELESS_256_INGR,
         result_id: 1303,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_257",
         ingredients: &SHAPELESS_257_INGR,
         result_id: 1304,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_258",
         ingredients: &SHAPELESS_258_INGR,
         result_id: 1305,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_259",
         ingredients: &SHAPELESS_259_INGR,
         result_id: 1306,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_260",
         ingredients: &SHAPELESS_260_INGR,
         result_id: 1307,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_261",
         ingredients: &SHAPELESS_261_INGR,
         result_id: 1308,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_262",
         ingredients: &SHAPELESS_262_INGR,
         result_id: 1309,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_263",
         ingredients: &SHAPELESS_263_INGR,
         result_id: 1310,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_264",
         ingredients: &SHAPELESS_264_INGR,
         result_id: 1368,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_265",
         ingredients: &SHAPELESS_265_INGR,
         result_id: 1369,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_266",
         ingredients: &SHAPELESS_266_INGR,
         result_id: 1370,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_267",
         ingredients: &SHAPELESS_267_INGR,
         result_id: 1371,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_268",
         ingredients: &SHAPELESS_268_INGR,
         result_id: 1376,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_269",
         ingredients: &SHAPELESS_269_INGR,
         result_id: 1377,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_270",
         ingredients: &SHAPELESS_270_INGR,
         result_id: 1378,
         result_count: 1,
     },
     ShapelessRecipe {
+        id: "minecraft:shapeless_271",
         ingredients: &SHAPELESS_271_INGR,
         result_id: 1379,
         result_count: 1,

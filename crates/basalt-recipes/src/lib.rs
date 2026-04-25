@@ -16,7 +16,9 @@
 //!   loaded from files at runtime.
 
 pub mod generated;
+pub mod id;
 pub mod registry;
 
 pub use generated::{SHAPED_RECIPES, SHAPELESS_RECIPES, ShapedRecipe, ShapelessRecipe};
-pub use registry::{OwnedShapedRecipe, OwnedShapelessRecipe, RecipeRegistry};
+pub use id::RecipeId;
+pub use registry::{OwnedShapedRecipe, OwnedShapelessRecipe, Recipe, RecipeRegistry};
