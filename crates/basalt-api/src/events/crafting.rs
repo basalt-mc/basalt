@@ -211,6 +211,47 @@ pub struct RecipeLockedEvent {
 }
 crate::game_event!(RecipeLockedEvent);
 
+/// A player is about to auto-fill a recipe from the recipe book
+/// (cancellable).
+///
+/// Fired at the **Validate** stage on the **game** bus after the
+/// server has resolved the recipe and pre-checked that the player's
+/// inventory has enough ingredients, but **before** any item is
+/// moved. Cancelling the event aborts the auto-fill — the grid stays
+/// untouched and `RecipeBookFilledEvent` is not dispatched. Plugins
+/// use it for permission gating (admin-only recipes, anti-grief
+/// rate-limits, gated unlocks).
+///
+/// The crafting player is available via `ctx.player()`.
+#[derive(Debug, Clone)]
+pub struct RecipeBookFillRequestEvent {
+    /// Stable identifier of the recipe the player clicked.
+    pub recipe_id: RecipeId,
+    /// Whether the player shift-clicked (asking for the largest
+    /// possible batch). The Phase 2 server implementation always
+    /// behaves as if `false` — `true` is plumbed through but
+    /// silently degrades for now (Phase 3 will add real stacking).
+    pub make_all: bool,
+    /// Whether this event has been cancelled by a Validate handler.
+    pub cancelled: bool,
+}
+crate::game_cancellable_event!(RecipeBookFillRequestEvent);
+
+/// A player auto-filled a recipe from the recipe book.
+///
+/// Fired at the **Post** stage on the **game** bus after the
+/// inventory has been drained and the grid populated. The standard
+/// match cycle (`CraftingRecipeMatchedEvent` etc.) has already run
+/// at this point, so `ctx.player()`'s grid reflects the new state.
+#[derive(Debug, Clone)]
+pub struct RecipeBookFilledEvent {
+    /// Stable identifier of the filled recipe.
+    pub recipe_id: RecipeId,
+    /// Whether the original request was a shift-click.
+    pub make_all: bool,
+}
+crate::game_event!(RecipeBookFilledEvent);
+
 #[cfg(test)]
 mod tests {
     use basalt_events::{BusKind, Event, EventRouting};
@@ -367,5 +408,40 @@ mod tests {
         assert!(!event.is_cancelled());
         assert_eq!(event.recipe_id.path, "expired");
         assert_eq!(RecipeLockedEvent::BUS, BusKind::Game);
+    }
+
+    #[test]
+    fn fill_request_cancellation() {
+        let mut event = RecipeBookFillRequestEvent {
+            recipe_id: RecipeId::vanilla("oak_planks"),
+            make_all: false,
+            cancelled: false,
+        };
+        assert!(!event.is_cancelled());
+        event.cancel();
+        assert!(event.is_cancelled());
+        assert_eq!(RecipeBookFillRequestEvent::BUS, BusKind::Game);
+    }
+
+    #[test]
+    fn fill_request_carries_make_all() {
+        let event = RecipeBookFillRequestEvent {
+            recipe_id: RecipeId::vanilla("oak_planks"),
+            make_all: true,
+            cancelled: false,
+        };
+        assert!(event.make_all);
+    }
+
+    #[test]
+    fn filled_carries_id_and_make_all() {
+        let mut event = RecipeBookFilledEvent {
+            recipe_id: RecipeId::vanilla("crafting_table"),
+            make_all: false,
+        };
+        // not cancellable
+        event.cancel();
+        assert!(!event.is_cancelled());
+        assert_eq!(RecipeBookFilledEvent::BUS, BusKind::Game);
     }
 }
