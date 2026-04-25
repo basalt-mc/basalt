@@ -1,18 +1,16 @@
-//! Baseline benchmarks for the outbound packet-write hot path
-//! (issue #175, Phase 1).
+//! Microbenchmarks for the outbound packet-write hot path.
 //!
 //! `framing::write_raw_packet` allocates a fresh `Vec<u8>` per call.
 //! These benches replicate the synchronous alloc + encode pattern
-//! verbatim so the allocator signal is not masked by tokio runtime
-//! overhead — the goal is to decide whether a buffer pool would
-//! actually help, not to measure TCP throughput.
+//! verbatim so the allocator signal isn't masked by tokio runtime
+//! overhead.
 //!
 //! The single-packet benches cover four representative payload sizes
 //! (20 B / 28 B / 256 B / 10 KB). The burst benches run a tick's worth
 //! of packets in a single iteration to surface allocator amortization
 //! effects. The `prealloc` reference bench reuses one `Vec` across
 //! iterations — the delta against the fresh-alloc bench is the upper
-//! bound on what a pool can deliver.
+//! bound on what buffer reuse can deliver.
 
 #![feature(test)]
 extern crate test;
@@ -115,10 +113,8 @@ fn write_packet_burst_200_mixed(b: &mut Bencher) {
 //
 // Same logical work as `write_packet_movement`, but the buffer is
 // reused across iterations (cleared instead of dropped). The gap
-// between this bench and `write_packet_movement` is the maximum
-// improvement an ideal buffer pool could deliver — without writing
-// the pool itself. If the gap is below 10% the issue's threshold,
-// Phase 2 should not ship.
+// between this bench and `write_packet_movement` is the upper bound
+// on what buffer reuse can deliver.
 
 #[bench]
 fn write_packet_prealloc_movement(b: &mut Bencher) {
@@ -150,10 +146,10 @@ fn write_packet_prealloc_movement(b: &mut Bencher) {
 // reported `ns/iter` by 100 to estimate per-packet cost.
 //
 // **Expected per-packet cost**: a few tens of ns — close to the
-// allocator-free `write_packet_prealloc_movement` baseline
-// (~6 ns) plus the small `DuplexStream` write overhead. A
-// regression that pushes per-packet cost into the hundreds of ns
-// would mean the alloc savings from #175 Phase 2 were lost.
+// allocator-free `write_packet_prealloc_movement` baseline (~6 ns)
+// plus the small `DuplexStream` write overhead. A regression into
+// the hundreds of ns would indicate the buffer reuse on the write
+// path has been broken.
 
 const PROD_BENCH_PACKETS_PER_ITER: usize = 100;
 

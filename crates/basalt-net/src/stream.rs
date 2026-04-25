@@ -36,8 +36,8 @@ pub struct ProtocolStream<W = TcpStream> {
     encrypt_buf: Vec<u8>,
     /// Reusable staging buffer for the uncompressed packet body
     /// (`VarInt(packet_id)` + payload). Cleared and reused on every
-    /// `write_raw_packet` call, eliminating the per-packet `Vec`
-    /// allocation that dominated the broadcast hot path (#175).
+    /// `write_raw_packet` call so the broadcast hot path doesn't
+    /// allocate.
     packet_buf: Vec<u8>,
     /// Reusable staging buffer for the zlib-compressed frame content.
     /// Only populated when compression is active; otherwise stays empty
@@ -49,9 +49,8 @@ pub struct ProtocolStream<W = TcpStream> {
     frame_buf: Vec<u8>,
     /// Reusable read-side staging buffer for the raw decrypted frame
     /// (post-VarInt-length-prefix, pre-decompression). Cleared and
-    /// resized on every `read_raw_packet` call — eliminates the
-    /// per-packet `vec![0u8; length]` allocation that mirrored the
-    /// pre-#180 write-side waste.
+    /// resized on every `read_raw_packet` call so the receive path
+    /// doesn't allocate.
     read_buf: Vec<u8>,
 }
 
@@ -206,10 +205,9 @@ impl<W: AsyncReadExt + AsyncWriteExt + Unpin> ProtocolStream<W> {
     /// Reads exactly `length` bytes into the pooled `read_buf`,
     /// decrypting in place if encryption is active.
     ///
-    /// Private mirror of [`Self::write_buffered`] — extracted so the
-    /// borrow on `self.read_buf` and the `&mut self` access in
-    /// `self.stream.read_exact` can resolve as split borrows on
-    /// disjoint fields.
+    /// Takes `&mut self` so the read_buf / cipher / stream borrows
+    /// resolve as split borrows on disjoint fields rather than
+    /// conflicting at a `read_exact(&mut self.read_buf)` call site.
     async fn read_buffered(&mut self, length: usize) -> std::io::Result<()> {
         self.read_buf.clear();
         self.read_buf.resize(length, 0);
@@ -269,11 +267,9 @@ impl<W: AsyncReadExt + AsyncWriteExt + Unpin> ProtocolStream<W> {
     /// Writes the contents of `self.frame_buf` to the wire, encrypting
     /// through `self.encrypt_buf` if a cipher is active.
     ///
-    /// Private helper extracted from `write_raw_packet` Stage 4 — kept
-    /// inside `&mut self` so the cipher / encrypt_buf / frame_buf /
-    /// stream borrows resolve as split borrows on disjoint fields.
-    /// Mirrors the dispatch in [`Self::write_all`] but operates on the
-    /// stream-owned buffer rather than an arbitrary `&[u8]`.
+    /// The cipher / encrypt_buf / frame_buf / stream field accesses
+    /// resolve as split borrows on disjoint fields, which is why the
+    /// helper takes `&mut self` rather than the slice directly.
     async fn write_buffered(&mut self) -> std::io::Result<()> {
         if let Some(cipher) = &mut self.cipher {
             self.encrypt_buf.clear();

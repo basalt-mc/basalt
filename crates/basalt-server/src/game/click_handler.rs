@@ -13,7 +13,7 @@ const MAX_STACK: i32 = 64;
 /// Result of a single-slot click (left or right click).
 ///
 /// Contains the new state of the clicked slot and the cursor after
-/// the click is applied. Mirrors Minestom's `InventoryClickResult`.
+/// the click is applied.
 #[derive(Debug, Clone)]
 pub(super) struct ClickResult {
     /// New value of the clicked slot.
