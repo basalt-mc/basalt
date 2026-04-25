@@ -5,8 +5,8 @@
 //! to keep `inventory.rs` and `container.rs` focused on their domains.
 
 use basalt_api::events::{
-    CraftingGridChangedEvent, CraftingPreCraftEvent, CraftingRecipeClearedEvent,
-    CraftingRecipeMatchedEvent,
+    CraftingCraftedEvent, CraftingGridChangedEvent, CraftingPreCraftEvent,
+    CraftingRecipeClearedEvent, CraftingRecipeMatchedEvent, CraftingShiftClickBatchEvent,
 };
 use basalt_types::Slot;
 use basalt_types::Uuid;
@@ -140,6 +140,61 @@ impl GameLoop {
         self.dispatch_event(&mut event, &ctx);
         self.process_responses(uuid, &ctx.drain_responses());
         event.cancelled
+    }
+
+    /// Dispatches a `CraftingShiftClickBatchEvent` and returns the
+    /// resolved `(cancelled, max_count)` pair.
+    ///
+    /// Fired at Validate just before a shift-click crafting batch
+    /// begins. Plugins can cancel the entire batch or lower
+    /// `max_count` to cap iterations. The initial `max_count` is
+    /// `u32::MAX` — the natural inventory-space cap still applies on
+    /// top of any plugin-imposed limit.
+    pub(super) fn dispatch_crafting_shift_click_batch(
+        &mut self,
+        uuid: Uuid,
+        eid: basalt_ecs::EntityId,
+        result: Slot,
+    ) -> (bool, u32) {
+        let (entity_id, username, yaw, pitch) = match self.player_info(eid) {
+            Some(info) => info,
+            None => return (true, 0),
+        };
+
+        let ctx = self.make_context(uuid, entity_id, &username, yaw, pitch);
+        let mut event = CraftingShiftClickBatchEvent {
+            result,
+            max_count: u32::MAX,
+            cancelled: false,
+        };
+        self.dispatch_event(&mut event, &ctx);
+        self.process_responses(uuid, &ctx.drain_responses());
+        (event.cancelled, event.max_count)
+    }
+
+    /// Dispatches a `CraftingCraftedEvent` (Post) for one successful
+    /// craft.
+    ///
+    /// Fires once per crafted unit — for shift-click batches, the
+    /// caller must invoke this per loop iteration. `consumed` is the
+    /// snapshot of the grid slots **before** ingredient consumption
+    /// for this craft.
+    pub(super) fn dispatch_crafting_crafted(
+        &mut self,
+        uuid: Uuid,
+        eid: basalt_ecs::EntityId,
+        consumed: [Slot; 9],
+        produced: Slot,
+    ) {
+        let (entity_id, username, yaw, pitch) = match self.player_info(eid) {
+            Some(info) => info,
+            None => return,
+        };
+
+        let ctx = self.make_context(uuid, entity_id, &username, yaw, pitch);
+        let mut event = CraftingCraftedEvent { consumed, produced };
+        self.dispatch_event(&mut event, &ctx);
+        self.process_responses(uuid, &ctx.drain_responses());
     }
 
     /// Resolves the crafting result for the current grid contents.
@@ -347,14 +402,38 @@ impl GameLoop {
 
     /// Handles shift-click crafting: repeatedly consumes ingredients
     /// and inserts results into the player's inventory until either
-    /// no recipe matches or the inventory is full.
+    /// no recipe matches, the inventory is full, or a plugin-imposed
+    /// `max_count` is reached.
     ///
-    /// Between iterations, calls
+    /// Dispatches `CraftingShiftClickBatchEvent` once before the loop
+    /// (cancellable, `max_count` mutable), then `CraftingCraftedEvent`
+    /// once per successful iteration. Between iterations, calls
     /// [`compute_crafting_match`](Self::compute_crafting_match) to
-    /// resolve the next result through the event pipeline so plugins
-    /// can mutate the per-iteration result.
+    /// resolve the next result through the event pipeline.
     pub(super) fn handle_shift_click_craft(&mut self, uuid: Uuid, eid: basalt_ecs::EntityId) {
+        // Capture the initial result so plugins know what's about to
+        // be batched. Empty output means there's nothing to craft.
+        let initial = {
+            let Some(grid) = self.ecs.get::<basalt_core::CraftingGrid>(eid) else {
+                return;
+            };
+            if grid.output.is_empty() {
+                return;
+            }
+            grid.output.clone()
+        };
+
+        let (cancelled, max_count) = self.dispatch_crafting_shift_click_batch(uuid, eid, initial);
+        if cancelled {
+            return;
+        }
+
+        let mut crafted: u32 = 0;
         loop {
+            if crafted >= max_count {
+                break;
+            }
+
             // Read the current output (set by the prior iteration's
             // `compute_crafting_match` or by the initial click).
             let (result_id, result_count) = {
@@ -378,8 +457,22 @@ impl GameLoop {
                 break;
             }
 
+            // Snapshot the grid BEFORE consume so the CraftedEvent
+            // carries the pre-consumption state.
+            let consumed = {
+                let Some(grid) = self.ecs.get::<basalt_core::CraftingGrid>(eid) else {
+                    break;
+                };
+                grid.slots.clone()
+            };
+            let produced = Slot::new(result_id, result_count);
+
             // Consume ingredients (clears grid.output as a side effect)
             self.consume_crafting_ingredients(eid);
+
+            // Notify plugins of the successful craft.
+            self.dispatch_crafting_crafted(uuid, eid, consumed, produced);
+            crafted = crafted.saturating_add(1);
 
             // Resolve next iteration through the event pipeline so
             // plugins observe each match. `compute_crafting_match`

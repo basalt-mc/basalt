@@ -107,6 +107,15 @@ impl GameLoop {
             return false;
         }
 
+        // Snapshot grid contents BEFORE consume so the CraftedEvent
+        // carries the pre-consumption state.
+        let consumed = self
+            .ecs
+            .get::<basalt_core::CraftingGrid>(eid)
+            .map(|g| g.slots.clone())
+            .unwrap_or_else(|| std::array::from_fn(|_| basalt_types::Slot::empty()));
+        let produced = output.clone();
+
         if let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid) {
             if inv.cursor.is_empty() {
                 inv.cursor = output;
@@ -117,6 +126,9 @@ impl GameLoop {
 
         self.consume_crafting_ingredients(eid);
         self.sync_crafting_grid_to_client(eid);
+
+        // Notify plugins of the successful craft.
+        self.dispatch_crafting_crafted(uuid, eid, consumed, produced);
 
         // Re-match recipe after consuming — return true so caller
         // dispatches grid changed + updates output
