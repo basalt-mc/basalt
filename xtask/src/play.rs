@@ -489,12 +489,14 @@ fn collect_reexports(pt: &ProtocolType, category: &str, out: &mut String) {
                 collect_reexports(&field.protocol_type, category, out);
             }
         }
-        ProtocolType::SwitchEnum { name, kind, .. } => {
-            // Shared types are re-exported through `pub use types::*`
-            // already; skip them here to avoid duplicate re-exports.
-            if *kind == crate::types::SwitchEnumKind::Inline {
-                out.push_str(&format!("pub use {category}::{name};\n"));
-            }
+        // Shared types are re-exported through `pub use types::*`
+        // already; skip them here to avoid duplicate re-exports.
+        ProtocolType::SwitchEnum {
+            name,
+            kind: crate::types::SwitchEnumKind::Inline,
+            ..
+        } => {
+            out.push_str(&format!("pub use {category}::{name};\n"));
         }
         ProtocolType::Array { inner, .. } | ProtocolType::Optional(inner) => {
             collect_reexports(inner, category, out);
