@@ -7,7 +7,12 @@
 //! the [`Command`] trait + [`CommandRegistry`] are an alternative
 //! API for plugins that prefer trait-based dispatch.
 
-pub use basalt_command::{
-    Arg, ArgValue, Command, CommandArg, CommandArgs, CommandRegistry, Validation, parse_args,
-    parse_command_args,
+pub mod args;
+mod dispatch;
+mod registry;
+
+pub use args::{
+    Arg, ArgValue, CommandArg, CommandArgs, Validation, parse_args, parse_command_args,
 };
+pub use dispatch::Command;
+pub use registry::CommandRegistry;
