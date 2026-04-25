@@ -32,6 +32,10 @@ impl PlayerContext for ServerContext {
     fn pitch(&self) -> f32 {
         self.player.rotation.pitch
     }
+    fn position(&self) -> (f64, f64, f64) {
+        let p = self.player.position;
+        (p.x, p.y, p.z)
+    }
     fn teleport(&self, x: f64, y: f64, z: f64, yaw: f32, pitch: f32) {
         let teleport_id = GLOBAL_TELEPORT_COUNTER.fetch_add(1, Ordering::Relaxed);
         self.responses.push(Response::SendPosition {

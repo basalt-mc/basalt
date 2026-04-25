@@ -24,6 +24,9 @@ pub trait PlayerContext {
     fn yaw(&self) -> f32;
     /// Returns the player's current pitch rotation (vertical, degrees).
     fn pitch(&self) -> f32;
+    /// Returns the player's current world position. Captured at
+    /// context-construction time — stale by the next tick.
+    fn position(&self) -> (f64, f64, f64);
     /// Teleports the current player to the given coordinates.
     fn teleport(&self, x: f64, y: f64, z: f64, yaw: f32, pitch: f32);
     /// Changes the current player's gamemode.

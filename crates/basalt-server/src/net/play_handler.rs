@@ -74,6 +74,13 @@ pub(super) async fn handle_packet(
                         yaw: 0.0,
                         pitch: 0.0,
                     },
+                    // Net task lacks ECS access; instant events don't
+                    // currently expose position to plugins.
+                    position: basalt_core::Position {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                 },
             );
             let mut event = ChatMessageEvent {
@@ -112,6 +119,13 @@ pub(super) async fn handle_packet(
                     rotation: Rotation {
                         yaw: 0.0,
                         pitch: 0.0,
+                    },
+                    // Net task lacks ECS access; instant events don't
+                    // currently expose position to plugins.
+                    position: basalt_core::Position {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
                     },
                 },
             );

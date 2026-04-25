@@ -184,37 +184,16 @@ impl GameLoop {
                             let inventory_type = oc.inventory_type;
                             let backing = oc.backing;
 
-                            // If closing a crafting table, drop grid contents and reset to 2x2
-                            if matches!(inventory_type, basalt_core::InventoryType::Crafting) {
-                                // Collect slots to drop before mutable borrow
-                                let slots_to_drop: Vec<(i32, i32)> = self
-                                    .ecs
-                                    .get::<basalt_core::CraftingGrid>(eid)
-                                    .iter()
-                                    .flat_map(|grid| grid.slots.iter())
-                                    .filter_map(|slot| slot.item_id.map(|id| (id, slot.item_count)))
-                                    .collect();
-                                // Drop all items from the crafting grid
-                                for (item_id, count) in slots_to_drop {
-                                    if let Some(player_pos) =
-                                        self.ecs.get::<basalt_core::Position>(eid)
-                                    {
-                                        self.spawn_item_entity(
-                                            player_pos.x as i32,
-                                            player_pos.y as i32 + 1,
-                                            player_pos.z as i32,
-                                            item_id,
-                                            count,
-                                        );
-                                    }
-                                }
-                                // Reset to 2x2 mode
-                                if let Some(grid) =
+                            // Reset crafting grid to 2x2 after a crafting table close.
+                            // Drops are handled by RecipePlugin via
+                            // ContainerClosedEvent (already dispatched above with
+                            // crafting_grid_state populated).
+                            if matches!(inventory_type, basalt_core::InventoryType::Crafting)
+                                && let Some(grid) =
                                     self.ecs.get_mut::<basalt_core::CraftingGrid>(eid)
-                                {
-                                    grid.grid_size = 2;
-                                    grid.clear();
-                                }
+                            {
+                                grid.grid_size = 2;
+                                grid.clear();
                             }
                             // Chest close animation is now handled by ContainerPlugin
                             // listening to ContainerClosedEvent.

@@ -2,7 +2,7 @@
 
 use basalt_types::Uuid;
 
-use crate::components::Rotation;
+use crate::components::{Position, Rotation};
 
 /// Identity and state of the player who triggered an action.
 ///
@@ -18,4 +18,8 @@ pub struct PlayerInfo {
     pub username: String,
     /// Current facing direction.
     pub rotation: Rotation,
+    /// Current world position. Read at context-construction time, so
+    /// it reflects the player's location when the event fired —
+    /// stale by the next tick.
+    pub position: Position,
 }
