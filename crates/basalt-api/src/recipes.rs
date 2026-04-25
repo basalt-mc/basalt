@@ -169,7 +169,7 @@ mod tests {
     fn ctx() -> ServerContext {
         ServerContext::new(
             Arc::new(basalt_world::World::new_memory(42)),
-            basalt_core::player::PlayerInfo::stub(),
+            crate::player::PlayerInfo::stub(),
         )
     }
 

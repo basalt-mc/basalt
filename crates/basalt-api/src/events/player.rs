@@ -1,6 +1,6 @@
 //! Player lifecycle and movement events.
 
-use basalt_core::{ChunkPosition, Position, Rotation};
+use crate::components::{ChunkPosition, Position, Rotation};
 
 /// A player moved or changed look direction.
 ///

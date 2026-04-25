@@ -1,6 +1,6 @@
 //! Player inventory component with protocol slot remapping.
 
-use super::Component;
+use crate::components::Component;
 
 /// Player inventory — 36 slots (27 main + 9 hotbar).
 ///

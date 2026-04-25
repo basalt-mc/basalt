@@ -5,7 +5,7 @@
 //! types `/name args`, the registry looks up the command by name
 //! and calls `execute` with the arguments and context.
 
-use basalt_core::Context;
+use crate::context::Context;
 
 use super::args::CommandArgs;
 
@@ -15,7 +15,7 @@ use super::args::CommandArgs;
 ///
 /// ```ignore
 /// use basalt_api::command::Command;
-/// use basalt_core::Context;
+/// use crate::context::Context;
 ///
 /// pub struct PingCommand;
 ///

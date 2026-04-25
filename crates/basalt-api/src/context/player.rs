@@ -2,9 +2,9 @@
 
 use std::sync::atomic::{AtomicI32, Ordering};
 
-use basalt_core::PlayerContext;
-use basalt_core::components::{Position, Rotation};
-use basalt_core::gamemode::Gamemode;
+use crate::components::{Position, Rotation};
+use crate::context::PlayerContext;
+use crate::gamemode::Gamemode;
 use basalt_types::Uuid;
 
 use super::ServerContext;

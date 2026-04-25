@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 
 use basalt_recipes::RecipeId;
 
-use super::Component;
+use crate::components::Component;
 
 /// Set of recipes a player has unlocked, plus the protocol's
 /// numeric `display_id` mapping.

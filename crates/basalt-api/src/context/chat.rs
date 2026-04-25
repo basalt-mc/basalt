@@ -1,7 +1,7 @@
 //! ChatContext implementation for ServerContext.
 
-use basalt_core::ChatContext;
-use basalt_core::broadcast::BroadcastMessage;
+use crate::broadcast::BroadcastMessage;
+use crate::context::ChatContext;
 use basalt_types::TextComponent;
 
 use super::ServerContext;

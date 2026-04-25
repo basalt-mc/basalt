@@ -1,7 +1,7 @@
 //! WorldContext implementation for ServerContext.
 
-use basalt_core::WorldContext;
-use basalt_core::components::{BlockPosition, ChunkPosition};
+use crate::components::{BlockPosition, ChunkPosition};
+use crate::context::WorldContext;
 
 use super::ServerContext;
 use super::response::Response;

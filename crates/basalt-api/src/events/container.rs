@@ -1,7 +1,7 @@
 //! Container events: open/close lifecycle, clicks, drags, block entities.
 
-use basalt_core::BlockPosition;
-use basalt_core::container::{ContainerBacking, InventoryType};
+use crate::components::BlockPosition;
+use crate::container::{ContainerBacking, InventoryType};
 use basalt_types::Slot;
 use basalt_world::block_entity::BlockEntity;
 

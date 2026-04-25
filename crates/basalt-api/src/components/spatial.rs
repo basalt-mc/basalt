@@ -1,6 +1,6 @@
 //! Spatial components: position, rotation, velocity, bounding box.
 
-use super::Component;
+use crate::components::Component;
 
 /// World position of an entity.
 #[derive(Debug, Clone, Copy, PartialEq)]
