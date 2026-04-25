@@ -145,12 +145,6 @@ impl GameLoop {
         display_id: i32,
         make_all: bool,
     ) {
-        if make_all {
-            log::trace!(
-                target: "basalt::recipes",
-                "PlaceRecipe make_all=true degraded to single craft (Phase 3 follow-up)"
-            );
-        }
         let Some(eid) = self.find_by_uuid(source_uuid) else {
             return;
         };
@@ -181,7 +175,21 @@ impl GameLoop {
         let Some(plan) = build_placement_plan(&recipe, grid_size) else {
             return; // Recipe doesn't fit the open grid.
         };
-        let requirements = aggregate_requirements(&plan);
+
+        // Determine the per-slot stack count.
+        // - `make_all=false`: always 1 (single craft).
+        // - `make_all=true`: as many as the inventory supports, capped
+        //   at the per-slot stack limit (64). The bottleneck is the
+        //   ingredient with the lowest `available / slots_using_it`.
+        let multiplier = match self.ecs.get::<Inventory>(eid) {
+            Some(inv) if make_all => compute_max_craft_multiplier(&plan, inv).max(1),
+            Some(_) => 1,
+            None => return,
+        };
+        let requirements: Vec<(i32, i32)> = aggregate_requirements(&plan)
+            .into_iter()
+            .map(|(item_id, slots_using)| (item_id, slots_using * multiplier))
+            .collect();
 
         let drain = match self.ecs.get::<Inventory>(eid) {
             Some(inv) => match find_inventory_drain(inv, &requirements) {
@@ -263,7 +271,7 @@ impl GameLoop {
                 grid.slots[i] = Slot::empty();
             }
             for (grid_idx, item_id) in &plan {
-                grid.slots[*grid_idx] = Slot::new(*item_id, 1);
+                grid.slots[*grid_idx] = Slot::new(*item_id, multiplier);
             }
         }
 
@@ -434,14 +442,61 @@ pub(super) fn build_placement_plan(recipe: &Recipe, grid_size: u8) -> Option<Vec
     }
 }
 
-/// Aggregates a placement plan into `(item_id, total_count)` pairs
-/// so the inventory drain can be sized correctly per ingredient.
+/// Aggregates a placement plan into `(item_id, slots_using)` pairs.
+///
+/// The second value is the number of grid slots that need this
+/// ingredient — used both for sizing the inventory drain and for
+/// computing the `make_all` craft multiplier.
 pub(super) fn aggregate_requirements(plan: &[(usize, i32)]) -> Vec<(i32, i32)> {
     let mut by_id: HashMap<i32, i32> = HashMap::new();
     for (_, item_id) in plan {
         *by_id.entry(*item_id).or_insert(0) += 1;
     }
     by_id.into_iter().collect()
+}
+
+/// Per-slot stack-size cap (matches the universal vanilla limit).
+///
+/// Some items (tools, swords) cap at 1 in vanilla but those don't
+/// appear as recipe ingredients, so the universal 64 holds for the
+/// recipe book.
+const STACK_CAP: i32 = 64;
+
+/// Computes the maximum stack count that fits in every grid slot
+/// without exceeding either the per-slot cap or the inventory's
+/// supply of any ingredient.
+///
+/// For each unique ingredient `j` appearing in `S_j` slots, the
+/// inventory must supply `S_j × multiplier` items. The bottleneck
+/// is the smallest `available_j / S_j`. Returns `0` when any
+/// ingredient is missing — callers should treat that the same as a
+/// pre-check failure.
+pub(super) fn compute_max_craft_multiplier(
+    plan: &[(usize, i32)],
+    inv: &basalt_core::Inventory,
+) -> i32 {
+    if plan.is_empty() {
+        return 0;
+    }
+    let requirements = aggregate_requirements(plan);
+    let mut multiplier = STACK_CAP;
+    for (item_id, slots_using) in requirements {
+        let available: i32 = (0..36)
+            .map(|i| {
+                let s = &inv.slots[i];
+                if s.item_id == Some(item_id) {
+                    s.item_count
+                } else {
+                    0
+                }
+            })
+            .sum();
+        let per_slot = available / slots_using;
+        if per_slot < multiplier {
+            multiplier = per_slot;
+        }
+    }
+    multiplier
 }
 
 /// Greedy search for a way to drain the inventory to satisfy the
@@ -633,6 +688,57 @@ mod tests {
         let plan = find_inventory_drain(&inv, &[(43, 2), (879, 1)]).expect("sufficient");
         assert!(plan.contains(&(0, 2)));
         assert!(plan.contains(&(10, 1)));
+    }
+
+    /// 64 oak planks, 1×2 stick recipe (2 slots both planks) →
+    /// multiplier = 64 / 2 = 32 (capped under STACK_CAP=64).
+    #[test]
+    fn make_all_multiplier_with_ample_supply() {
+        let mut inv = basalt_core::Inventory::empty();
+        inv.slots[0] = Slot::new(43, 64);
+        let plan = vec![(0, 43), (3, 43)];
+        assert_eq!(compute_max_craft_multiplier(&plan, &inv), 32);
+    }
+
+    /// 200 oak planks, 1×2 recipe → 200 / 2 = 100, capped at STACK_CAP (64).
+    #[test]
+    fn make_all_multiplier_caps_at_stack_size() {
+        let mut inv = basalt_core::Inventory::empty();
+        inv.slots[0] = Slot::new(43, 64);
+        inv.slots[1] = Slot::new(43, 64);
+        inv.slots[2] = Slot::new(43, 64);
+        inv.slots[3] = Slot::new(43, 8); // 200 total
+        let plan = vec![(0, 43), (3, 43)];
+        assert_eq!(compute_max_craft_multiplier(&plan, &inv), 64);
+    }
+
+    /// Mixed-ingredient recipe — bottleneck is the rarer ingredient.
+    /// 64 planks (1 slot in plan) and 5 sticks (2 slots in plan) →
+    /// min(64, 5/2) = 2.
+    #[test]
+    fn make_all_multiplier_honors_per_ingredient_bottleneck() {
+        let mut inv = basalt_core::Inventory::empty();
+        inv.slots[0] = Slot::new(43, 64);
+        inv.slots[1] = Slot::new(879, 5);
+        // Plan: 1 plank slot + 2 stick slots.
+        let plan = vec![(0, 43), (1, 879), (2, 879)];
+        assert_eq!(compute_max_craft_multiplier(&plan, &inv), 2);
+    }
+
+    /// Inventory missing an ingredient → multiplier 0 (caller falls
+    /// back to the standard pre-check abort).
+    #[test]
+    fn make_all_multiplier_returns_zero_when_missing() {
+        let inv = basalt_core::Inventory::empty();
+        let plan = vec![(0, 43)];
+        assert_eq!(compute_max_craft_multiplier(&plan, &inv), 0);
+    }
+
+    /// Empty plan returns 0 — no ingredients, no crafts.
+    #[test]
+    fn make_all_multiplier_empty_plan() {
+        let inv = basalt_core::Inventory::empty();
+        assert_eq!(compute_max_craft_multiplier(&[], &inv), 0);
     }
 
     /// End-to-end auto-fill: 2 oak planks in hotbar slot 0 produce a
@@ -1041,5 +1147,157 @@ mod tests {
             inv.slots[0].item_count, 2,
             "cancellation should preserve the planks"
         );
+    }
+
+    /// Shift-click on a 1×2 stick recipe with 64 oak planks in
+    /// hotbar slot 0 fills each grid slot with 32 (the multiplier),
+    /// drains the entire stack, and the result slot shows 4 sticks
+    /// per craft (the count is per-craft, not per-batch).
+    #[test]
+    fn auto_fill_make_all_stacks_grid_to_multiplier() {
+        use basalt_recipes::{OwnedShapedRecipe, RecipeId};
+        use basalt_types::Uuid;
+
+        let (mut game_loop, game_tx, _io_rx) = super::super::tests::test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let mut rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
+
+        let recipe_id = RecipeId::new("plugin", "test_sticks");
+        let recipes =
+            std::sync::Arc::get_mut(&mut game_loop.recipes).expect("registry is unique here");
+        recipes.add_shaped(OwnedShapedRecipe {
+            id: recipe_id.clone(),
+            width: 1,
+            height: 2,
+            pattern: vec![Some(43), Some(43)],
+            result_id: 879,
+            result_count: 4,
+        });
+        game_loop.unlock_recipe(uuid, recipe_id.clone(), UnlockReason::Manual);
+
+        // 64 oak planks → multiplier 32 (64 / 2 slots).
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
+        if let Some(inv) = game_loop.ecs.get_mut::<Inventory>(eid) {
+            inv.slots[0] = Slot::new(43, 64);
+        }
+        while rx.try_recv().is_ok() {}
+
+        let display_id = game_loop
+            .ecs
+            .get::<KnownRecipes>(eid)
+            .and_then(|k| k.display_id(&recipe_id))
+            .unwrap();
+        game_loop.handle_place_recipe(uuid, 0, display_id, /* make_all */ true);
+
+        let grid = game_loop.ecs.get::<CraftingGrid>(eid).unwrap();
+        assert_eq!(grid.slots[0].item_count, 32, "row 0 fills to 32");
+        assert_eq!(grid.slots[2].item_count, 32, "row 1 fills to 32");
+        // Output is per-craft (4 sticks), not per-batch.
+        assert_eq!(grid.output.item_count, 4);
+
+        let inv = game_loop.ecs.get::<Inventory>(eid).unwrap();
+        assert!(inv.slots[0].is_empty(), "all 64 planks drained");
+    }
+
+    /// Mixed-ingredient bottleneck: 64 planks + 3 sticks for a
+    /// recipe needing 1 plank + 2 sticks per craft → multiplier
+    /// `min(64, 3 / 2) = 1`. Single craft is placed.
+    #[test]
+    fn auto_fill_make_all_honors_bottleneck_ingredient() {
+        use basalt_recipes::{OwnedShapedRecipe, RecipeId};
+        use basalt_types::Uuid;
+
+        let (mut game_loop, game_tx, _io_rx) = super::super::tests::test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let mut rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
+
+        // Recipe: plank in slot 0, stick in slots 1 and 2 (1×3).
+        let recipe_id = RecipeId::new("plugin", "test_mixed");
+        let recipes =
+            std::sync::Arc::get_mut(&mut game_loop.recipes).expect("registry is unique here");
+        recipes.add_shaped(OwnedShapedRecipe {
+            id: recipe_id.clone(),
+            width: 1,
+            height: 3,
+            pattern: vec![Some(43), Some(879), Some(879)],
+            result_id: 8888,
+            result_count: 1,
+        });
+        game_loop.unlock_recipe(uuid, recipe_id.clone(), UnlockReason::Manual);
+
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
+        if let Some(inv) = game_loop.ecs.get_mut::<Inventory>(eid) {
+            inv.slots[0] = Slot::new(43, 64);
+            inv.slots[1] = Slot::new(879, 3);
+        }
+        while rx.try_recv().is_ok() {}
+
+        let display_id = game_loop
+            .ecs
+            .get::<KnownRecipes>(eid)
+            .and_then(|k| k.display_id(&recipe_id))
+            .unwrap();
+        // Recipe is 1×3 — only fits the 3x3 crafting table grid.
+        // Force grid_size = 3 by simulating an open crafting table.
+        if let Some(g) = game_loop.ecs.get_mut::<CraftingGrid>(eid) {
+            g.grid_size = 3;
+        }
+        game_loop.handle_place_recipe(uuid, 0, display_id, /* make_all */ true);
+
+        let grid = game_loop.ecs.get::<CraftingGrid>(eid).unwrap();
+        // Multiplier = min(64, floor(3 / 2)) = 1.
+        assert_eq!(
+            grid.slots[0].item_count, 1,
+            "stick bottleneck caps multiplier at 1"
+        );
+        assert_eq!(grid.slots[3].item_count, 1, "stick slot 1");
+        assert_eq!(grid.slots[6].item_count, 1, "stick slot 2");
+
+        let inv = game_loop.ecs.get::<Inventory>(eid).unwrap();
+        assert_eq!(inv.slots[0].item_count, 63, "1 plank consumed");
+        assert_eq!(inv.slots[1].item_count, 1, "2 sticks consumed");
+    }
+
+    /// `make_all=true` with a single-ingredient recipe and inventory
+    /// barely sufficient for one craft falls back gracefully —
+    /// multiplier=1, single craft placed.
+    #[test]
+    fn auto_fill_make_all_falls_back_when_inventory_minimal() {
+        use basalt_recipes::{OwnedShapedRecipe, RecipeId};
+        use basalt_types::Uuid;
+
+        let (mut game_loop, game_tx, _io_rx) = super::super::tests::test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let mut rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
+
+        let recipe_id = RecipeId::new("plugin", "test_sticks");
+        let recipes =
+            std::sync::Arc::get_mut(&mut game_loop.recipes).expect("registry is unique here");
+        recipes.add_shaped(OwnedShapedRecipe {
+            id: recipe_id.clone(),
+            width: 1,
+            height: 2,
+            pattern: vec![Some(43), Some(43)],
+            result_id: 879,
+            result_count: 4,
+        });
+        game_loop.unlock_recipe(uuid, recipe_id.clone(), UnlockReason::Manual);
+
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
+        if let Some(inv) = game_loop.ecs.get_mut::<Inventory>(eid) {
+            inv.slots[0] = Slot::new(43, 2);
+        }
+        while rx.try_recv().is_ok() {}
+
+        let display_id = game_loop
+            .ecs
+            .get::<KnownRecipes>(eid)
+            .and_then(|k| k.display_id(&recipe_id))
+            .unwrap();
+        game_loop.handle_place_recipe(uuid, 0, display_id, /* make_all */ true);
+
+        let grid = game_loop.ecs.get::<CraftingGrid>(eid).unwrap();
+        assert_eq!(grid.slots[0].item_count, 1, "fallback to multiplier=1");
+        assert_eq!(grid.slots[2].item_count, 1);
     }
 }
