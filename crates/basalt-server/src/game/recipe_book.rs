@@ -14,7 +14,10 @@ use basalt_core::components::{CraftingGrid, Inventory, KnownRecipes, Position};
 use basalt_core::context::UnlockReason;
 use basalt_ecs::EntityId;
 use basalt_events::Event;
-use basalt_protocol::types::{RecipeBookEntry, RecipeDisplay, SlotDisplay};
+use basalt_protocol::packets::play::misc::{
+    ClientboundPlayRecipeBookAddEntries, ClientboundPlayRecipeBookAddEntriesRecipe,
+};
+use basalt_protocol::packets::play::types::{RecipeDisplay, SlotDisplay};
 use basalt_recipes::{Recipe, RecipeId};
 use basalt_types::{Slot, Uuid};
 
@@ -70,12 +73,14 @@ impl GameLoop {
             known.unlock(recipe_id.clone())
         };
 
-        let entry = RecipeBookEntry {
-            display_id,
-            display,
-            group: 0,
-            category: CATEGORY_CRAFTING_MISC,
-            crafting_requirements: None,
+        let entry = ClientboundPlayRecipeBookAddEntries {
+            recipe: ClientboundPlayRecipeBookAddEntriesRecipe {
+                display_id,
+                display,
+                group: 0,
+                category: CATEGORY_CRAFTING_MISC,
+                crafting_requirements: None,
+            },
             // 0x01 = notification (toast on add).
             flags: 0x01,
         };
@@ -336,12 +341,14 @@ impl GameLoop {
                     .iter()
                     .filter_map(|(id, display_id)| {
                         let recipe = self.recipes.find_by_id(id)?;
-                        Some(RecipeBookEntry {
-                            display_id,
-                            display: to_display(&recipe),
-                            group: 0,
-                            category: CATEGORY_CRAFTING_MISC,
-                            crafting_requirements: None,
+                        Some(ClientboundPlayRecipeBookAddEntries {
+                            recipe: ClientboundPlayRecipeBookAddEntriesRecipe {
+                                display_id,
+                                display: to_display(&recipe),
+                                group: 0,
+                                category: CATEGORY_CRAFTING_MISC,
+                                crafting_requirements: None,
+                            },
                             flags: 0,
                         })
                     })
@@ -372,23 +379,23 @@ pub fn to_display(recipe: &Recipe) -> RecipeDisplay {
             height: i32::from(r.height),
             ingredients: r.pattern.iter().map(slot_for_pattern).collect(),
             result: SlotDisplay::ItemStack {
-                slot: Slot::new(r.result_id, r.result_count),
+                data: Slot::new(r.result_id, r.result_count),
             },
             crafting_station: SlotDisplay::Item {
-                item_id: CRAFTING_TABLE_ITEM_ID,
+                data: CRAFTING_TABLE_ITEM_ID,
             },
         },
         Recipe::Shapeless(r) => RecipeDisplay::CraftingShapeless {
             ingredients: r
                 .ingredients
                 .iter()
-                .map(|item_id| SlotDisplay::Item { item_id: *item_id })
+                .map(|item_id| SlotDisplay::Item { data: *item_id })
                 .collect(),
             result: SlotDisplay::ItemStack {
-                slot: Slot::new(r.result_id, r.result_count),
+                data: Slot::new(r.result_id, r.result_count),
             },
             crafting_station: SlotDisplay::Item {
-                item_id: CRAFTING_TABLE_ITEM_ID,
+                data: CRAFTING_TABLE_ITEM_ID,
             },
         },
     }
@@ -396,7 +403,7 @@ pub fn to_display(recipe: &Recipe) -> RecipeDisplay {
 
 fn slot_for_pattern(slot: &Option<i32>) -> SlotDisplay {
     match slot {
-        Some(id) => SlotDisplay::Item { item_id: *id },
+        Some(id) => SlotDisplay::Item { data: *id },
         None => SlotDisplay::Empty,
     }
 }
@@ -571,10 +578,10 @@ mod tests {
                 assert_eq!(width, 2);
                 assert_eq!(height, 1);
                 assert_eq!(ingredients.len(), 2);
-                assert!(matches!(ingredients[0], SlotDisplay::Item { item_id: 43 }));
+                assert!(matches!(ingredients[0], SlotDisplay::Item { data: 43 }));
                 assert!(matches!(result, SlotDisplay::ItemStack { .. }));
                 assert!(
-                    matches!(crafting_station, SlotDisplay::Item { item_id } if item_id == CRAFTING_TABLE_ITEM_ID)
+                    matches!(crafting_station, SlotDisplay::Item { data } if data == CRAFTING_TABLE_ITEM_ID)
                 );
             }
             _ => panic!("expected CraftingShaped"),
@@ -586,10 +593,10 @@ mod tests {
         let r = shaped(2, 2, vec![Some(1), None, None, Some(2)]);
         match to_display(&r) {
             RecipeDisplay::CraftingShaped { ingredients, .. } => {
-                assert!(matches!(ingredients[0], SlotDisplay::Item { item_id: 1 }));
+                assert!(matches!(ingredients[0], SlotDisplay::Item { data: 1 }));
                 assert!(matches!(ingredients[1], SlotDisplay::Empty));
                 assert!(matches!(ingredients[2], SlotDisplay::Empty));
-                assert!(matches!(ingredients[3], SlotDisplay::Item { item_id: 2 }));
+                assert!(matches!(ingredients[3], SlotDisplay::Item { data: 2 }));
             }
             _ => panic!("expected CraftingShaped"),
         }
@@ -601,8 +608,8 @@ mod tests {
         match to_display(&r) {
             RecipeDisplay::CraftingShapeless { ingredients, .. } => {
                 assert_eq!(ingredients.len(), 3);
-                assert!(matches!(ingredients[0], SlotDisplay::Item { item_id: 10 }));
-                assert!(matches!(ingredients[2], SlotDisplay::Item { item_id: 30 }));
+                assert!(matches!(ingredients[0], SlotDisplay::Item { data: 10 }));
+                assert!(matches!(ingredients[2], SlotDisplay::Item { data: 30 }));
             }
             _ => panic!("expected CraftingShapeless"),
         }
@@ -918,7 +925,7 @@ mod tests {
             if let crate::messages::ServerOutput::RecipeBookAdd { entries, replace } = out {
                 assert!(!replace, "per-recipe unlock uses replace=false");
                 assert_eq!(entries.len(), 1);
-                assert_eq!(entries[0].display_id, 0);
+                assert_eq!(entries[0].recipe.display_id, 0);
                 saw_add = true;
             }
         }
