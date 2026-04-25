@@ -1,7 +1,7 @@
 [package]
 name = "basalt-api"
 version.workspace = true
-publish = false
+publish = true
 description = "Public plugin API for the Basalt Minecraft server: traits, components, events, and the plugin registration system"
 edition.workspace = true
 license.workspace = true
