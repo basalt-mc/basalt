@@ -79,8 +79,14 @@ impl PluginTestHarness {
     }
 
     /// Registers a plugin's event handlers and commands.
+    ///
+    /// Builds a stub `ServerContext` so that any registry-lifecycle
+    /// events fired during `on_enable` (e.g. `RecipeRegisteredEvent`)
+    /// dispatch through the harness in the same way the production
+    /// server does.
     pub fn register(&mut self, plugin: impl Plugin) {
         let mut systems = Vec::new();
+        let bootstrap_ctx = ServerContext::new(Arc::clone(&self.world), PlayerInfo::stub());
         let mut registrar = PluginRegistrar::new(
             &mut self.instant_bus,
             &mut self.game_bus,
@@ -88,6 +94,7 @@ impl PluginTestHarness {
             &mut systems,
             Arc::clone(&self.world),
             &mut self.recipes,
+            &bootstrap_ctx,
         );
         plugin.on_enable(&mut registrar);
     }
