@@ -15,6 +15,32 @@ pub trait EncodedSize {
     fn encoded_size(&self) -> usize;
 }
 
+// Blanket `Encode` / `Decode` / `EncodedSize` impls for `Box<T>`.
+//
+// The codegen wraps recursive struct/variant fields in `Box` to break
+// the infinite-size cycle (e.g. `SlotDisplay::SmithingTrim { base:
+// Box<SlotDisplay> }`). The wire format is identical to the inner
+// `T`'s — `Box` is a Rust-side concern only — so we forward to `T`
+// through a deref.
+
+impl<T: Encode + ?Sized> Encode for Box<T> {
+    fn encode(&self, buf: &mut Vec<u8>) -> Result<()> {
+        (**self).encode(buf)
+    }
+}
+
+impl<T: Decode> Decode for Box<T> {
+    fn decode(buf: &mut &[u8]) -> Result<Self> {
+        T::decode(buf).map(Box::new)
+    }
+}
+
+impl<T: EncodedSize + ?Sized> EncodedSize for Box<T> {
+    fn encoded_size(&self) -> usize {
+        (**self).encoded_size()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
