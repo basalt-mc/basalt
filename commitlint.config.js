@@ -304,12 +304,6 @@ const ecs = [
   'ecs/components',
 ];
 
-const testkit = [
-  // Testing framework: PluginTestHarness, SystemTestContext, NoopContext.
-  // Example: "feat(testkit): add SystemTestContext for system plugin tests"
-  'testkit',
-];
-
 const chat = [
   // Chat plugin: chat message broadcast to all players.
   // Example: "feat(chat): add chat formatting"
@@ -424,7 +418,7 @@ const keywords = [
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...ecs, ...testkit, ...chat, ...block, ...lifecycle, ...movement, ...physics, ...item, ...container, ...recipes, ...recipe, ...keywords]],
+    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...ecs, ...chat, ...block, ...lifecycle, ...movement, ...physics, ...item, ...container, ...recipes, ...recipe, ...keywords]],
     'scope-empty': [2, 'never'],
   },
 };
