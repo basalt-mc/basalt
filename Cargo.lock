@@ -150,7 +150,6 @@ name = "basalt-plugin-block"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-testkit",
 ]
 
 [[package]]
@@ -158,7 +157,6 @@ name = "basalt-plugin-chat"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-testkit",
 ]
 
 [[package]]
@@ -166,7 +164,6 @@ name = "basalt-plugin-command"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-testkit",
 ]
 
 [[package]]
@@ -175,7 +172,6 @@ version = "0.1.0"
 dependencies = [
  "basalt-api",
  "basalt-plugin-block",
- "basalt-testkit",
 ]
 
 [[package]]
@@ -184,7 +180,6 @@ version = "0.1.0"
 dependencies = [
  "basalt-api",
  "basalt-plugin-block",
- "basalt-testkit",
 ]
 
 [[package]]
@@ -192,7 +187,6 @@ name = "basalt-plugin-lifecycle"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-testkit",
 ]
 
 [[package]]
@@ -200,7 +194,6 @@ name = "basalt-plugin-movement"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-testkit",
 ]
 
 [[package]]
@@ -208,7 +201,6 @@ name = "basalt-plugin-physics"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-testkit",
 ]
 
 [[package]]
@@ -216,7 +208,6 @@ name = "basalt-plugin-recipe"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-testkit",
 ]
 
 [[package]]
@@ -225,7 +216,6 @@ version = "0.1.0"
 dependencies = [
  "basalt-api",
  "basalt-plugin-block",
- "basalt-testkit",
  "tempfile",
 ]
 
@@ -234,7 +224,6 @@ name = "basalt-plugin-world"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-testkit",
 ]
 
 [[package]]
@@ -292,17 +281,6 @@ version = "0.1.0"
 dependencies = [
  "lz4_flex",
  "tempfile",
-]
-
-[[package]]
-name = "basalt-testkit"
-version = "0.1.0"
-dependencies = [
- "basalt-api",
- "basalt-ecs",
- "basalt-recipes",
- "basalt-types",
- "basalt-world",
 ]
 
 [[package]]
