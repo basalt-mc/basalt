@@ -65,6 +65,13 @@ impl ServerState {
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::with_vanilla();
+        // Stub dispatch context for system-level events fired during
+        // plugin loading (today: recipe registry lifecycle). Carries
+        // `PlayerInfo::stub()` — handlers must ignore `ctx.player()`.
+        let bootstrap_ctx = basalt_api::context::ServerContext::new(
+            std::sync::Arc::clone(&world),
+            basalt_core::player::PlayerInfo::stub(),
+        );
         {
             let mut registrar = basalt_api::PluginRegistrar::new(
                 &mut instant_bus,
@@ -73,6 +80,7 @@ impl ServerState {
                 &mut systems,
                 std::sync::Arc::clone(&world),
                 &mut recipes,
+                &bootstrap_ctx,
             );
             for plugin in &plugins {
                 log::info!(target: "basalt::plugin", "Enabling {} v{}", plugin.metadata().name, plugin.metadata().version);
