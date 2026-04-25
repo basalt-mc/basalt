@@ -237,14 +237,16 @@ fn collect_imports_from_type(
         ProtocolType::InlineStruct { fields, .. } => {
             collect_imports_from_fields(fields, needs_derive, basalt_imports);
         }
-        ProtocolType::SwitchEnum { variants, kind, .. } => {
-            // Shared switch enums live in `play/types.rs` and pull
-            // their own imports there. Only descend into Inline
-            // variants (those emitted alongside this packet).
-            if *kind == crate::types::SwitchEnumKind::Inline {
-                for variant in variants {
-                    collect_imports_from_fields(&variant.fields, needs_derive, basalt_imports);
-                }
+        // Shared switch enums live in `play/types.rs` and pull their
+        // own imports there. Only descend into Inline variants (those
+        // emitted alongside this packet).
+        ProtocolType::SwitchEnum {
+            variants,
+            kind: crate::types::SwitchEnumKind::Inline,
+            ..
+        } => {
+            for variant in variants {
+                collect_imports_from_fields(&variant.fields, needs_derive, basalt_imports);
             }
         }
         ProtocolType::Boxed(inner) => {
