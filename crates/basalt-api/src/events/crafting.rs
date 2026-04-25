@@ -1,5 +1,7 @@
-//! Crafting events: grid changes, recipe matching, and craft execution.
+//! Crafting events: grid changes, recipe matching, craft execution,
+//! and recipe-registry lifecycle.
 
+use basalt_recipes::{Recipe, RecipeId};
 use basalt_types::Slot;
 
 /// The contents of a crafting grid have changed.
@@ -123,6 +125,62 @@ pub struct CraftingShiftClickBatchEvent {
 }
 crate::game_cancellable_event!(CraftingShiftClickBatchEvent);
 
+/// A plugin is about to register a recipe (cancellable).
+///
+/// Fired at the **Validate** stage on the **game** bus when a plugin
+/// calls `RecipeRegistrar::add_shaped` / `add_shapeless` from inside
+/// `Plugin::on_enable`. Cancellation aborts the registration —
+/// [`RecipeRegisteredEvent`] is **not** fired and the registry is
+/// left untouched.
+///
+/// Useful for permission gating ("only `recipe-admin` may register
+/// recipes") and compatibility checks ("a recipe with this id
+/// already exists, refuse").
+///
+/// Fires during plugin loading, **before** any player exists. The
+/// dispatch context (`ctx.player()`) returns sentinel data — handlers
+/// must rely on the event payload, not the context.
+#[derive(Debug, Clone)]
+pub struct RecipeRegisterEvent {
+    /// The recipe being registered.
+    pub recipe: Recipe,
+    /// Whether this event has been cancelled by a Validate handler.
+    pub cancelled: bool,
+}
+crate::game_cancellable_event!(RecipeRegisterEvent);
+
+/// A recipe has been registered with the runtime registry.
+///
+/// Fired at the **Post** stage on the **game** bus after a successful
+/// (i.e. non-cancelled) call to `RecipeRegistrar::add_shaped` or
+/// `add_shapeless`. Useful for plugins that index recipes (recipe
+/// book UI, search, dependency tracking, analytics).
+///
+/// Fires during plugin loading; see [`RecipeRegisterEvent`] for the
+/// context contract.
+#[derive(Debug, Clone)]
+pub struct RecipeRegisteredEvent {
+    /// Stable identifier of the newly registered recipe.
+    pub recipe_id: RecipeId,
+}
+crate::game_event!(RecipeRegisteredEvent);
+
+/// A recipe has been removed from the runtime registry.
+///
+/// Fired at the **Post** stage on the **game** bus once per removed
+/// recipe — including each entry removed by a single
+/// `remove_by_result` call or by `clear`. Useful for plugins that
+/// maintain a derived index of the registry.
+///
+/// Fires during plugin loading; see [`RecipeRegisterEvent`] for the
+/// context contract.
+#[derive(Debug, Clone)]
+pub struct RecipeUnregisteredEvent {
+    /// Stable identifier of the recipe that was removed.
+    pub recipe_id: RecipeId,
+}
+crate::game_event!(RecipeUnregisteredEvent);
+
 #[cfg(test)]
 mod tests {
     use basalt_events::{BusKind, Event, EventRouting};
@@ -209,5 +267,51 @@ mod tests {
         event.cancel();
         assert!(event.is_cancelled());
         assert_eq!(CraftingShiftClickBatchEvent::BUS, BusKind::Game);
+    }
+
+    fn sample_recipe(path: &str) -> Recipe {
+        Recipe::Shaped(basalt_recipes::OwnedShapedRecipe {
+            id: RecipeId::new("plugin", path),
+            width: 1,
+            height: 1,
+            pattern: vec![Some(1)],
+            result_id: 42,
+            result_count: 1,
+        })
+    }
+
+    #[test]
+    fn recipe_register_cancellation() {
+        let mut event = RecipeRegisterEvent {
+            recipe: sample_recipe("magic_sword"),
+            cancelled: false,
+        };
+        assert!(!event.is_cancelled());
+        event.cancel();
+        assert!(event.is_cancelled());
+        assert_eq!(RecipeRegisterEvent::BUS, BusKind::Game);
+    }
+
+    #[test]
+    fn recipe_registered_carries_id() {
+        let mut event = RecipeRegisteredEvent {
+            recipe_id: RecipeId::vanilla("crafting_table"),
+        };
+        // not cancellable
+        event.cancel();
+        assert!(!event.is_cancelled());
+        assert_eq!(event.recipe_id.namespace, "minecraft");
+        assert_eq!(RecipeRegisteredEvent::BUS, BusKind::Game);
+    }
+
+    #[test]
+    fn recipe_unregistered_carries_id() {
+        let mut event = RecipeUnregisteredEvent {
+            recipe_id: RecipeId::new("plugin", "obsolete"),
+        };
+        event.cancel();
+        assert!(!event.is_cancelled());
+        assert_eq!(event.recipe_id.path, "obsolete");
+        assert_eq!(RecipeUnregisteredEvent::BUS, BusKind::Game);
     }
 }
