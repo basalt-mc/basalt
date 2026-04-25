@@ -14,6 +14,7 @@ mod block;
 mod chat;
 mod container;
 mod crafting;
+mod packet;
 mod player;
 
 pub use block::{BlockBrokenEvent, BlockPlacedEvent, PlayerInteractEvent};
@@ -25,6 +26,7 @@ pub use crafting::{
     RecipeBookFillRequestEvent, RecipeBookFilledEvent, RecipeLockedEvent, RecipeRegisterEvent,
     RecipeRegisteredEvent, RecipeUnlockedEvent, RecipeUnregisteredEvent,
 };
+pub use packet::RawPacketEvent;
 pub use player::{PlayerJoinedEvent, PlayerLeftEvent, PlayerMovedEvent};
 
 /// Implements [`Event`](basalt_events::Event) and

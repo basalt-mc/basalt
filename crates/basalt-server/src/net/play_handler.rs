@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use basalt_api::context::{Response, ServerContext};
-use basalt_api::events::{ChatMessageEvent, CommandEvent};
+use basalt_api::events::{ChatMessageEvent, CommandEvent, RawPacketEvent};
 use basalt_core::PlayerInfo;
 use basalt_core::components::Rotation;
 use basalt_events::EventBus;
@@ -47,6 +47,45 @@ pub(super) async fn handle_packet(
     last_keep_alive_id: &mut i64,
     last_keep_alive_sent: &Instant,
 ) -> crate::error::Result<()> {
+    // Pre-dispatch hook — fire `RawPacketEvent` so plugins (anti-cheat,
+    // telemetry, packet logging) can inspect or cancel the packet
+    // before any domain logic runs. Cancellation drops the packet.
+    let raw_ctx = ServerContext::new(
+        Arc::clone(world),
+        PlayerInfo {
+            uuid,
+            entity_id,
+            username: username.to_string(),
+            rotation: Rotation {
+                yaw: 0.0,
+                pitch: 0.0,
+            },
+            position: basalt_core::Position {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+        },
+    );
+    let mut raw_event = RawPacketEvent {
+        packet: packet.clone(),
+        cancelled: false,
+    };
+    if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        instant_bus.dispatch(&mut raw_event, &raw_ctx);
+    })) {
+        let msg = panic
+            .downcast_ref::<&str>()
+            .copied()
+            .or_else(|| panic.downcast_ref::<String>().map(|s| s.as_str()))
+            .unwrap_or("unknown panic");
+        log::error!(target: "basalt::net_task", "[{addr}] Plugin handler panicked on RawPacketEvent: {msg}");
+    }
+    if raw_event.cancelled {
+        log::trace!(target: "basalt::net_task", "[{addr}] {username} packet cancelled by plugin");
+        return Ok(());
+    }
+
     match packet {
         // -- Keep-alive: inline --
         ServerboundPlayPacket::KeepAlive(ka) => {
