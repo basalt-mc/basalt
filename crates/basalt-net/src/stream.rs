@@ -47,6 +47,12 @@ pub struct ProtocolStream<W = TcpStream> {
     /// (`VarInt(frame_length)` + frame content). Same lifecycle as
     /// `packet_buf`.
     frame_buf: Vec<u8>,
+    /// Reusable read-side staging buffer for the raw decrypted frame
+    /// (post-VarInt-length-prefix, pre-decompression). Cleared and
+    /// resized on every `read_raw_packet` call — eliminates the
+    /// per-packet `vec![0u8; length]` allocation that mirrored the
+    /// pre-#180 write-side waste.
+    read_buf: Vec<u8>,
 }
 
 impl<W> ProtocolStream<W> {
@@ -61,6 +67,7 @@ impl<W> ProtocolStream<W> {
             packet_buf: Vec::new(),
             compressed_buf: Vec::new(),
             frame_buf: Vec::new(),
+            read_buf: Vec::new(),
         }
     }
 
@@ -168,19 +175,25 @@ impl<W: AsyncReadExt + AsyncWriteExt + Unpin> ProtocolStream<W> {
             });
         }
 
-        // Read full frame (decrypted transparently)
-        let mut frame = vec![0u8; length];
-        self.read_exact(&mut frame).await.map_err(Error::Io)?;
+        // Read full frame into the pooled buffer (decrypted transparently).
+        self.read_buffered(length).await.map_err(Error::Io)?;
 
-        // Decompress if compression is enabled
-        let data = if self.compression_threshold.is_some() {
-            compression::decompress_packet(&frame)?
+        // Decompress if compression is enabled. The compression branch
+        // still allocates inside `decompress_packet`; pooling it would
+        // require a `decompress_packet_into` mirror — separate concern,
+        // out of scope for this PR (issue #183 covers the frame buffer
+        // only). The `decompressed` storage binding lives in the outer
+        // scope so `data: &[u8]` can refer into either buffer.
+        let decompressed: Vec<u8>;
+        let data: &[u8] = if self.compression_threshold.is_some() {
+            decompressed = compression::decompress_packet(&self.read_buf)?;
+            &decompressed
         } else {
-            frame
+            &self.read_buf
         };
 
         // Extract packet ID
-        let mut cursor = data.as_slice();
+        let mut cursor = data;
         let packet_id = VarInt::decode(&mut cursor)
             .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
 
@@ -188,6 +201,23 @@ impl<W: AsyncReadExt + AsyncWriteExt + Unpin> ProtocolStream<W> {
             id: packet_id.0,
             payload: cursor.to_vec(),
         }))
+    }
+
+    /// Reads exactly `length` bytes into the pooled `read_buf`,
+    /// decrypting in place if encryption is active.
+    ///
+    /// Private mirror of [`Self::write_buffered`] — extracted so the
+    /// borrow on `self.read_buf` and the `&mut self` access in
+    /// `self.stream.read_exact` can resolve as split borrows on
+    /// disjoint fields.
+    async fn read_buffered(&mut self, length: usize) -> std::io::Result<()> {
+        self.read_buf.clear();
+        self.read_buf.resize(length, 0);
+        self.stream.read_exact(&mut self.read_buf).await?;
+        if let Some(cipher) = &mut self.cipher {
+            cipher.decrypt(&mut self.read_buf);
+        }
+        Ok(())
     }
 
     /// Writes a single VarInt length-prefixed packet, with optional
