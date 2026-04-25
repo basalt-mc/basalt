@@ -144,6 +144,8 @@ jobs:
             crate: basalt-world
           - bench: ecs
             crate: basalt-ecs
+          - bench: write_packet
+            crate: basalt-net
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
