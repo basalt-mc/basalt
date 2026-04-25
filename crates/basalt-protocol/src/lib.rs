@@ -14,6 +14,7 @@ pub mod packets;
 pub mod registry;
 pub mod registry_data;
 pub mod state;
+pub mod types;
 pub mod version;
 
 pub use error::{Error, Result};
