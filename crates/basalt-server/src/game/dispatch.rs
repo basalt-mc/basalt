@@ -215,42 +215,10 @@ impl GameLoop {
                                     grid.grid_size = 2;
                                     grid.clear();
                                 }
-                            } else if let basalt_core::ContainerBacking::Block { position } =
-                                backing
-                            {
-                                // Broadcast chest close animation if no other viewers
-                                let pos = (position.x, position.y, position.z);
-                                let remaining = self
-                                    .ecs
-                                    .iter::<basalt_core::OpenContainer>()
-                                    .filter(|(id, oc2)| {
-                                        *id != eid
-                                            && matches!(
-                                                &oc2.backing,
-                                                basalt_core::ContainerBacking::Block { position: p }
-                                                    if (p.x, p.y, p.z) == pos
-                                            )
-                                    })
-                                    .count() as u8;
-                                let view = self.build_chest_view(pos.0, pos.1, pos.2);
-                                for part in &view.parts {
-                                    let (px, py, pz) = part.position;
-                                    for (e, _) in self.ecs.iter::<super::OutputHandle>() {
-                                        self.send_to(e, |tx| {
-                                            let _ = tx.try_send(
-                                                crate::messages::ServerOutput::BlockAction {
-                                                    x: px,
-                                                    y: py,
-                                                    z: pz,
-                                                    action_id: 1,
-                                                    action_param: remaining,
-                                                    block_id: 185,
-                                                },
-                                            );
-                                        });
-                                    }
-                                }
                             }
+                            // Chest close animation is now handled by ContainerPlugin
+                            // listening to ContainerClosedEvent.
+                            //
                             // If backing is Virtual, remove VirtualContainerSlots component
                             if matches!(backing, basalt_core::ContainerBacking::Virtual) {
                                 self.ecs

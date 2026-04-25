@@ -368,6 +368,27 @@ impl DispatchResult {
             .iter()
             .any(|r| matches!(r, Response::SpawnDroppedItem { .. }))
     }
+
+    /// Returns true if any response broadcasts a `BlockAction` packet.
+    pub fn has_broadcast_block_action(&self) -> bool {
+        self.responses
+            .iter()
+            .any(|r| matches!(r, Response::BroadcastBlockAction { .. }))
+    }
+
+    /// Returns true if any response notifies co-viewers of a slot change.
+    pub fn has_notify_viewers(&self) -> bool {
+        self.responses
+            .iter()
+            .any(|r| matches!(r, Response::NotifyContainerViewers { .. }))
+    }
+
+    /// Returns true if any response queues a block-entity destroy.
+    pub fn has_destroy_block_entity(&self) -> bool {
+        self.responses
+            .iter()
+            .any(|r| matches!(r, Response::DestroyBlockEntity { .. }))
+    }
 }
 
 /// Test context for system plugins.

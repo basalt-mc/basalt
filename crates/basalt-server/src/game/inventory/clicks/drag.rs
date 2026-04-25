@@ -80,10 +80,7 @@ impl GameLoop {
             if Self::is_craft_slot(ws) {
                 grid_changed = true;
             }
-            if let WindowSlot::Container(ci) = ws {
-                if let Some(pos) = container_pos {
-                    self.notify_container_viewers(pos, eid, *ci as i16, &new_values[i]);
-                }
+            if let WindowSlot::Container(_) = ws {
                 self.dispatch_container_slot_changed(
                     uuid,
                     eid,

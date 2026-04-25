@@ -77,9 +77,6 @@ impl GameLoop {
         self.sync_slot(eid, wt, ws, new_item.clone());
 
         if let WindowSlot::Container(i) = ws {
-            if let Some(pos) = container_pos {
-                self.notify_container_viewers(pos, eid, *i as i16, &new_item);
-            }
             self.dispatch_container_slot_changed(uuid, eid, wt, *i as i16, item, new_item);
         }
     }

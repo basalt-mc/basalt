@@ -54,11 +54,9 @@ impl GameLoop {
         }
         self.sync_slot(eid, wt, &ws, new_slot.clone());
 
-        // Notify other container viewers and dispatch slot changed event
+        // Dispatch ContainerSlotChangedEvent — `ContainerPlugin` listens at
+        // Post and notifies co-viewers via `ctx.containers().notify_viewers`.
         if let WindowSlot::Container(i) = &ws {
-            if let Some(pos) = container_pos {
-                self.notify_container_viewers(pos, eid, *i as i16, &new_slot);
-            }
             let proto_slot = *i as i16;
             self.dispatch_container_slot_changed(uuid, eid, wt, proto_slot, slot_item, new_slot);
         }
