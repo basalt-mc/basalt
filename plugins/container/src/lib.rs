@@ -32,10 +32,15 @@ const CHEST_BLOCK_ID: i32 = 185;
 /// halves so the lid animation can play on each. Falls back to a
 /// single position if the world doesn't currently report a chest at
 /// `(x, y, z)` (e.g. the block was already broken).
-fn chest_parts(world: &basalt_api::world::World, x: i32, y: i32, z: i32) -> Vec<(i32, i32, i32)> {
+fn chest_parts(
+    world_ctx: &dyn basalt_api::context::WorldContext,
+    x: i32,
+    y: i32,
+    z: i32,
+) -> Vec<(i32, i32, i32)> {
     let mut parts: Vec<(i32, i32, i32)> = Vec::with_capacity(2);
     parts.push((x, y, z));
-    let state = world.get_block(x, y, z);
+    let state = world_ctx.get_block(x, y, z);
     if !block::is_chest(state) || block::chest_type(state) == 0 {
         return parts;
     }
@@ -43,7 +48,7 @@ fn chest_parts(world: &basalt_api::world::World, x: i32, y: i32, z: i32) -> Vec<
     for &(dx, dz) in &block::chest_adjacent_offsets(facing) {
         let nx = x + dx;
         let nz = z + dz;
-        let neighbor = world.get_block(nx, y, nz);
+        let neighbor = world_ctx.get_block(nx, y, nz);
         if block::is_chest(neighbor) && block::chest_facing(neighbor) == facing {
             parts.push((nx, y, nz));
             break;
@@ -82,10 +87,10 @@ impl Plugin for ContainerPlugin {
                 return;
             }
 
-            let world = ctx.world_ctx().world();
+            let wctx = ctx.world_ctx();
 
             // Create block entity
-            world.set_block_entity(
+            wctx.set_block_entity(
                 event.position.x,
                 event.position.y,
                 event.position.z,
@@ -95,7 +100,7 @@ impl Plugin for ContainerPlugin {
             // Orient chest based on player yaw
             let yaw = ctx.player().yaw();
             let oriented = block::chest_state_for_yaw(yaw);
-            world.set_block(
+            wctx.set_block(
                 event.position.x,
                 event.position.y,
                 event.position.z,
@@ -114,22 +119,22 @@ impl Plugin for ContainerPlugin {
             for &(dx, dz) in &offsets {
                 let nx = event.position.x + dx;
                 let nz = event.position.z + dz;
-                let neighbor = world.get_block(nx, event.position.y, nz);
+                let neighbor = wctx.get_block(nx, event.position.y, nz);
                 if block::is_single_chest(neighbor) && block::chest_facing(neighbor) == facing {
                     let ddx = nx - event.position.x;
                     let ddz = nz - event.position.z;
                     let (new_type, existing_type) = block::chest_double_types(facing, ddx, ddz);
                     let new_state = block::chest_state(facing, new_type);
                     let neighbor_state = block::chest_state(facing, existing_type);
-                    world.set_block(
+                    wctx.set_block(
                         event.position.x,
                         event.position.y,
                         event.position.z,
                         new_state,
                     );
-                    world.set_block(nx, event.position.y, nz, neighbor_state);
-                    world.mark_chunk_dirty(event.position.x >> 4, event.position.z >> 4);
-                    world.mark_chunk_dirty(nx >> 4, nz >> 4);
+                    wctx.set_block(nx, event.position.y, nz, neighbor_state);
+                    wctx.mark_chunk_dirty(event.position.x >> 4, event.position.z >> 4);
+                    wctx.mark_chunk_dirty(nx >> 4, nz >> 4);
                     ctx.entities().broadcast_block_change(
                         event.position.x,
                         event.position.y,
@@ -168,20 +173,20 @@ impl Plugin for ContainerPlugin {
 
             // Revert double-chest partner to single
             if block::chest_type(state) != 0 {
-                let world = ctx.world_ctx().world();
+                let wctx = ctx.world_ctx();
                 let facing = block::chest_facing(state);
                 let offsets = block::chest_adjacent_offsets(facing);
                 for &(dx, dz) in &offsets {
                     let nx = event.position.x + dx;
                     let nz = event.position.z + dz;
-                    let neighbor = world.get_block(nx, event.position.y, nz);
+                    let neighbor = wctx.get_block(nx, event.position.y, nz);
                     if block::is_chest(neighbor)
                         && block::chest_facing(neighbor) == facing
                         && block::chest_type(neighbor) != 0
                     {
                         let single = block::chest_state(facing, 0);
-                        world.set_block(nx, event.position.y, nz, single);
-                        world.mark_chunk_dirty(nx >> 4, nz >> 4);
+                        wctx.set_block(nx, event.position.y, nz, single);
+                        wctx.mark_chunk_dirty(nx >> 4, nz >> 4);
                         ctx.entities().broadcast_block_change(
                             nx,
                             event.position.y,
@@ -200,13 +205,13 @@ impl Plugin for ContainerPlugin {
                 ContainerBacking::Block { position } => position,
                 ContainerBacking::Virtual => return,
             };
-            let world = ctx.world_ctx().world();
-            if !block::is_chest(world.get_block(position.x, position.y, position.z)) {
+            let wctx = ctx.world_ctx();
+            if !block::is_chest(wctx.get_block(position.x, position.y, position.z)) {
                 return;
             }
 
             let action_param = event.viewer_count.min(u32::from(u8::MAX)) as u8;
-            for (px, py, pz) in chest_parts(world, position.x, position.y, position.z) {
+            for (px, py, pz) in chest_parts(wctx, position.x, position.y, position.z) {
                 ctx.entities().broadcast_block_action(
                     px,
                     py,
@@ -226,13 +231,13 @@ impl Plugin for ContainerPlugin {
                 ContainerBacking::Block { position } => position,
                 ContainerBacking::Virtual => return,
             };
-            let world = ctx.world_ctx().world();
-            if !block::is_chest(world.get_block(position.x, position.y, position.z)) {
+            let wctx = ctx.world_ctx();
+            if !block::is_chest(wctx.get_block(position.x, position.y, position.z)) {
                 return;
             }
 
             let action_param = event.viewer_count.min(u32::from(u8::MAX)) as u8;
-            for (px, py, pz) in chest_parts(world, position.x, position.y, position.z) {
+            for (px, py, pz) in chest_parts(wctx, position.x, position.y, position.z) {
                 ctx.entities()
                     .broadcast_block_action(px, py, pz, 1, action_param, CHEST_BLOCK_ID);
             }
