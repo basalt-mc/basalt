@@ -288,6 +288,10 @@ pub(super) mod tests {
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::with_vanilla();
+        let bootstrap_ctx = basalt_api::context::ServerContext::new(
+            Arc::clone(&world),
+            basalt_core::player::PlayerInfo::stub(),
+        );
         {
             let mut registrar = basalt_api::PluginRegistrar::new(
                 &mut instant_bus,
@@ -296,6 +300,7 @@ pub(super) mod tests {
                 &mut systems,
                 Arc::clone(&world),
                 &mut recipes,
+                &bootstrap_ctx,
             );
             basalt_plugin_block::BlockPlugin.on_enable(&mut registrar);
             basalt_plugin_item::ItemPlugin.on_enable(&mut registrar);
