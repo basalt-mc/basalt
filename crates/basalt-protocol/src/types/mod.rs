@@ -1,13 +1,13 @@
-//! Hand-rolled protocol types that the codegen IR cannot represent.
+//! Hand-rolled protocol types — used as a deliberate exception when
+//! the codegen IR cannot model a Mojang protocol pattern cleanly.
 //!
-//! These are switch-on-tag union types whose variant data is laid out
-//! directly after the tag with no length prefix. The codegen falls back
-//! to opaque `Vec<u8>` for them, which produces invalid wire bytes (the
-//! default `Encode for Vec<u8>` adds a varint length prefix that the
-//! protocol does not expect). Anything in this module is the
-//! authoritative encoding — the matching codegen'd structs in
-//! `crate::packets` are dead code today.
+//! Today only [`IDSet`] qualifies: its wire format encodes the
+//! variant count in the discriminator tag itself (`tag = N + 1` for
+//! `N` inline varints), which no other Mojang type uses. Everything
+//! else — including the recursive switch-on-tag unions
+//! `RecipeDisplay` / `SlotDisplay` — is now produced by the codegen
+//! and lives under [`crate::packets::play::types`].
 
-pub mod recipe_display;
+pub mod id_set;
 
-pub use recipe_display::{IDSet, RecipeBookEntry, RecipeDisplay, SlotDisplay};
+pub use id_set::IDSet;
