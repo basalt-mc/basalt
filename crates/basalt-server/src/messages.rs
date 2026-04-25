@@ -534,8 +534,17 @@ pub enum BroadcastEvent {
 ///
 /// Rust only allows one non-auto trait in `dyn`, so this combines both
 /// serialization traits into a single trait object-compatible trait.
-pub(crate) trait PacketPayload: Encode + EncodedSize + Send + Sync {}
-impl<T: Encode + EncodedSize + Send + Sync> PacketPayload for T {}
+pub(crate) trait PacketPayload: Encode + EncodedSize + Send + Sync + 'static {
+    /// Returns a reference to the payload as `dyn Any` for downcasting.
+    /// Used by [`EncodablePacket::downcast`] in tests.
+    #[allow(dead_code)]
+    fn as_any(&self) -> &dyn std::any::Any;
+}
+impl<T: Encode + EncodedSize + Send + Sync + 'static> PacketPayload for T {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
 
 /// A type-erased protocol packet that can be encoded by the net task.
 ///
@@ -552,11 +561,29 @@ pub struct EncodablePacket {
 
 impl EncodablePacket {
     /// Creates a new encodable packet from any protocol packet struct.
-    pub(crate) fn new<P: PacketPayload + 'static>(id: i32, packet: P) -> Self {
+    pub(crate) fn new<P: PacketPayload>(id: i32, packet: P) -> Self {
         Self {
             id,
             payload: Arc::new(packet),
         }
+    }
+
+    /// Returns the wire packet ID this carrier holds.
+    #[allow(dead_code)]
+    pub fn id(&self) -> i32 {
+        self.id
+    }
+
+    /// Attempts to downcast the type-erased payload to a concrete
+    /// packet type. Returns `Some(&T)` if the underlying payload is
+    /// exactly `T`, otherwise `None`.
+    ///
+    /// Used by tests to inspect packet fields. Production code only
+    /// needs to encode and write the payload; downcasting is
+    /// exclusively a test affordance.
+    #[allow(dead_code)]
+    pub fn downcast<T: PacketPayload>(&self) -> Option<&T> {
+        self.payload.as_any().downcast_ref::<T>()
     }
 }
 
