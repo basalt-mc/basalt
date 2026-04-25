@@ -161,8 +161,9 @@ pub enum GameInput {
         action_id: i32,
     },
     /// Player clicked a recipe in their book — the client expects
-    /// a `CraftRecipeResponse` (ghost recipe) reply showing the
-    /// ingredient layout in the open crafting window.
+    /// a `CraftRecipeResponse` (ghost recipe) reply and the
+    /// ingredients to be moved from the inventory into the crafting
+    /// grid (auto-fill).
     PlaceRecipe {
         /// UUID of the requesting player.
         uuid: Uuid,
@@ -170,6 +171,10 @@ pub enum GameInput {
         window_id: i32,
         /// Per-player numeric `display_id` of the chosen recipe.
         display_id: i32,
+        /// Whether the player shift-clicked (asks for the largest
+        /// possible batch). The current Phase 2 implementation
+        /// degrades this to a single craft.
+        make_all: bool,
     },
 }
 

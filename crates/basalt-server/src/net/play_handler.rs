@@ -260,12 +260,13 @@ pub(super) async fn handle_packet(
             });
         }
 
-        // -- Game loop: place recipe (ghost preview) --
+        // -- Game loop: place recipe (ghost preview + auto-fill) --
         ServerboundPlayPacket::CraftRecipeRequest(req) => {
             let _ = game_tx.send(GameInput::PlaceRecipe {
                 uuid,
                 window_id: req.window_id,
                 display_id: req.recipe_id,
+                make_all: req.make_all,
             });
         }
 

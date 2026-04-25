@@ -226,8 +226,9 @@ impl GameLoop {
                     uuid,
                     window_id,
                     display_id,
+                    make_all,
                 } => {
-                    self.handle_place_recipe(uuid, window_id, display_id);
+                    self.handle_place_recipe(uuid, window_id, display_id, make_all);
                 }
             }
         }
