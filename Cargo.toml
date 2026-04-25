@@ -20,7 +20,6 @@ basalt-world = { path = "crates/basalt-world" }
 basalt-api = { path = "crates/basalt-api" }
 basalt-storage = { path = "crates/basalt-storage" }
 basalt-ecs = { path = "crates/basalt-ecs" }
-basalt-testkit = { path = "crates/basalt-testkit" }
 basalt-recipes = { path = "crates/basalt-recipes" }
 
 # Error handling
