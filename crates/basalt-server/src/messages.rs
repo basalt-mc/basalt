@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use basalt_core::broadcast::ProfileProperty;
-use basalt_types::nbt::NbtCompound;
 use basalt_types::{Encode, EncodedSize, Slot, Uuid};
 use tokio::sync::mpsc;
 
@@ -172,8 +171,7 @@ pub enum GameInput {
         /// Per-player numeric `display_id` of the chosen recipe.
         display_id: i32,
         /// Whether the player shift-clicked (asks for the largest
-        /// possible batch). The current Phase 2 implementation
-        /// degrades this to a single craft.
+        /// possible batch). Currently degraded to a single craft.
         make_all: bool,
     },
     /// Client report of how many chunks per tick it can decode.
@@ -193,347 +191,136 @@ pub enum GameInput {
 
 /// Output from the game loop to a player's net task.
 ///
-/// Represents **game events**, not encoded packets. The net task matches
-/// on each variant, constructs the appropriate protocol packet(s), and
-/// encodes them onto the wire.
-///
-/// Variants are split by allocation cost:
-/// - **Hot path**: small inline structs, zero heap allocation, cloned cheaply for broadcasts.
-/// - **Chunk path**: coordinates only, net task looks up the shared [`ChunkPacketCache`].
-/// - **Cold path**: rare events (connect/disconnect), one Arc alloc per event.
+/// Sealed taxonomy of byte-production strategies, orthogonal to the
+/// domain event that produced the send. The variant selects *how* the
+/// payload bytes are materialised on the wire; the encoding work
+/// itself happens at the construction site in `game/`, not in the
+/// net task's dispatch.
 #[derive(Clone, Debug)]
 pub enum ServerOutput {
-    // ── Hot path (targeted, zero alloc) ─────────────────────────────────
-    /// A block changed in the world. Net task sends BlockChange.
-    BlockChanged {
-        /// Block X coordinate.
-        x: i32,
-        /// Block Y coordinate.
-        y: i32,
-        /// Block Z coordinate.
-        z: i32,
-        /// New block state ID.
-        state: i32,
-    },
-    /// Acknowledge a block dig/place sequence. Net task sends AcknowledgePlayerDigging.
-    BlockAck {
-        /// Sequence number to acknowledge.
-        sequence: i32,
-    },
-    /// A system chat message. Net task sends SystemChat.
-    SystemChat {
-        /// NBT-encoded text component content.
-        content: NbtCompound,
-        /// Whether to display as action bar text.
-        action_bar: bool,
-    },
-    /// A game state change. Net task sends GameStateChange.
-    GameStateChange {
-        /// Reason code (e.g., 13 = wait for chunks, 3 = change game mode).
-        reason: u8,
-        /// Associated float value (meaning depends on reason).
-        value: f32,
-    },
-    /// Teleport or set player position. Net task sends Position.
-    SetPosition {
-        /// Teleport confirmation ID.
-        teleport_id: i32,
-        /// Target X coordinate.
-        x: f64,
-        /// Target Y coordinate.
-        y: f64,
-        /// Target Z coordinate.
-        z: f64,
-        /// Target yaw (degrees).
-        yaw: f32,
-        /// Target pitch (degrees).
-        pitch: f32,
-    },
-    /// Update a single inventory slot on the client.
-    SetSlot {
-        /// Protocol slot index.
-        slot: i16,
-        /// The item in the slot.
-        item: basalt_types::Slot,
-    },
-    /// Sync the full player inventory to the client.
-    SyncInventory {
-        /// All 46 protocol slots (crafting + armor + main + hotbar + offhand).
-        slots: Vec<basalt_types::Slot>,
-    },
-    /// Open a container window on the client.
-    OpenWindow {
-        /// Window ID (1-127).
-        window_id: u8,
-        /// Inventory type (e.g., 2 = generic_9x3 for chests).
-        inventory_type: i32,
-        /// Window title (NBT text component).
-        title: basalt_types::nbt::NbtCompound,
-        /// Container slots + player inventory slots.
-        slots: Vec<basalt_types::Slot>,
-    },
-    /// Update a slot in an open container window.
-    ///
-    /// The `window_id` is a signed protocol field:
-    /// - `-2`: direct player inventory access (ignores state_id, no animation)
-    /// - `-1`: set the cursor (carried item)
-    /// - `0`: player inventory window (when no container is open)
-    /// - `1+`: open container window
-    SetContainerSlot {
-        /// Protocol window ID (negative values have special meaning).
-        window_id: i32,
-        /// Slot index within the window.
-        slot: i16,
-        /// The item in the slot.
-        item: basalt_types::Slot,
-    },
+    /// Encode at write time. Single-packet payload carried by an
+    /// [`EncodablePacket`] (Arc-wrapped for cheap cloning across the
+    /// broadcast channel).
+    Plain(EncodablePacket),
 
-    /// Trigger a block action (e.g. chest open/close animation).
-    /// Net task sends BlockAction packet.
-    BlockAction {
-        /// Block position.
-        x: i32,
-        /// Block Y.
-        y: i32,
-        /// Block Z.
-        z: i32,
-        /// Action ID (1 for chest open/close).
-        action_id: u8,
-        /// Action parameter (viewer count for chests).
-        action_param: u8,
-        /// Block registry ID (not state ID).
-        block_id: i32,
-    },
+    /// Encode-once, share via `OnceLock` across N consumers.
+    /// The first net task to drain it triggers the encode; every
+    /// subsequent consumer reads the cached bytes — one encode per
+    /// broadcast event regardless of the player count.
+    Cached(Arc<SharedBroadcast>),
 
-    /// Inform client of a block entity at a position.
-    /// Net task sends TileEntityData packet.
-    BlockEntityData {
-        /// Block position.
-        x: i32,
-        /// Block Y.
-        y: i32,
-        /// Block Z.
-        z: i32,
-        /// Block entity type (2 = chest).
-        action: i32,
-    },
-
-    /// Push entries into the player's recipe book.
-    ///
-    /// `replace = true` clears the existing book first (used on join);
-    /// `replace = false` adds to the current set (used per-unlock).
-    /// Entries carry per-player `display_id`s allocated by `KnownRecipes`.
-    /// Net task encodes packet id `0x44`.
-    RecipeBookAdd {
-        /// Recipe-display entries to add.
-        entries: Vec<basalt_protocol::packets::play::misc::ClientboundPlayRecipeBookAddEntries>,
-        /// Replace the existing book contents.
-        replace: bool,
-    },
-
-    /// Remove the given `display_id`s from the player's recipe book.
-    ///
-    /// Net task encodes packet id `0x45`.
-    RecipeBookRemove {
-        /// Display IDs whose entries should be removed.
-        display_ids: Vec<i32>,
-    },
-
-    /// Reply to a `Place Recipe` C2S with the ghost-recipe display so
-    /// the client can show the ingredient layout in the open crafting
-    /// window. Net task encodes packet id `0x39`.
-    SendGhostRecipe {
-        /// Window id of the open crafting window the ghost is for.
-        window_id: i32,
-        /// Recipe display payload (variant + slots).
-        display: basalt_protocol::packets::play::types::RecipeDisplay,
-    },
-
-    // ── Chunk path (cache-based, zero alloc) ──────────────────────────
-    /// Send a chunk to the client. Net task looks up the ChunkPacketCache.
-    SendChunk {
-        /// Chunk X coordinate.
-        cx: i32,
-        /// Chunk Z coordinate.
-        cz: i32,
-    },
-    /// Unload a chunk from the client.
-    UnloadChunk {
-        /// Chunk X coordinate.
-        cx: i32,
-        /// Chunk Z coordinate.
-        cz: i32,
-    },
-    /// Start a chunk batch.
-    ChunkBatchStart,
-    /// Finish a chunk batch with the number of chunks sent.
-    ChunkBatchFinished {
-        /// Number of chunks in the batch.
-        batch_size: i32,
-    },
-    /// Update the client's view position (center chunk).
-    UpdateViewPosition {
-        /// Center chunk X coordinate.
-        cx: i32,
-        /// Center chunk Z coordinate.
-        cz: i32,
-    },
-
-    // ── Broadcast (shared, encoded once by first consumer) ──────────
-    /// A broadcast game event shared across N players via `Arc`.
-    ///
-    /// The first net task to consume it encodes the protocol packets
-    /// into the [`SharedBroadcast`]'s `OnceLock`. All subsequent net
-    /// tasks read the cached bytes — one encode for N players.
-    Broadcast(Arc<SharedBroadcast>),
-
-    // ── Cold path (rare, Arc alloc OK) ────────────────────────────────
-    /// A protocol packet to encode. Used for rare events (login, spawn)
-    /// where a dedicated variant would add enum bloat.
-    Packet(EncodablePacket),
-    /// Pre-encoded packet bytes. Used for packets with manual encoding
-    /// (PlayerInfo switch fields, DeclareCommands).
-    Raw {
+    /// Pre-encoded bytes valid for the entire process lifetime.
+    /// Used for payloads computed once at boot (registry data, motd
+    /// icon, etc.).
+    #[allow(dead_code)]
+    Static {
         /// Minecraft packet ID.
         id: i32,
-        /// Encoded packet payload (without length prefix).
-        data: Vec<u8>,
+        /// `'static` byte slice — typically pointing into a `LazyLock`
+        /// or `OnceLock` initialised at boot.
+        bytes: &'static [u8],
+    },
+
+    /// Pre-encoded reference-counted bytes. The `Arc<Vec<u8>>` lets
+    /// multiple players consume the same encoded payload without
+    /// cloning the underlying bytes — the chunk-packet cache and
+    /// manually-encoded payloads (DeclareCommands, PlayerInfo) flow
+    /// through this variant.
+    RawBorrowed {
+        /// Minecraft packet ID.
+        id: i32,
+        /// Reference-counted encoded payload.
+        bytes: Arc<Vec<u8>>,
     },
 }
 
-/// A game event broadcast to multiple players.
+impl ServerOutput {
+    /// Convenience constructor for [`ServerOutput::Plain`] from a
+    /// concrete protocol packet — wraps it in an [`EncodablePacket`]
+    /// so call sites stay terse.
+    pub(crate) fn plain<P: PacketPayload>(id: i32, packet: P) -> Self {
+        Self::Plain(EncodablePacket::new(id, packet))
+    }
+
+    /// Convenience constructor for [`ServerOutput::RawBorrowed`] from
+    /// an owned `Vec<u8>`. Used by call sites that build the bytes
+    /// inline (manual encodings) and only need ref-counting for the
+    /// channel hop.
+    pub(crate) fn raw_owned(id: i32, data: Vec<u8>) -> Self {
+        Self::RawBorrowed {
+            id,
+            bytes: Arc::new(data),
+        }
+    }
+}
+
+/// A multi-packet broadcast shared across N consumers via `Arc`.
 ///
-/// Wraps a [`BroadcastEvent`] with lazy encoding: the first net task
-/// to consume it encodes the protocol packets via [`OnceLock`], and
-/// all subsequent consumers read the cached bytes.
+/// Holds an ordered list of [`EncodablePacket`]s and a lazy
+/// [`OnceLock`] cache of their encoded bytes. The first net task to
+/// drain it triggers encoding; every subsequent consumer reads the
+/// cached `(packet_id, payload_bytes)` pairs.
 pub struct SharedBroadcast {
-    /// The game event to encode.
-    pub(crate) event: BroadcastEvent,
+    /// The packets to send to each consumer, in order. Multi-packet
+    /// broadcasts (e.g. spawn entity + metadata) are stored as separate
+    /// entries; the encoder iterates through them.
+    pub(crate) packets: Vec<EncodablePacket>,
     /// Cached encoded packets: `(packet_id, payload_bytes)`.
     /// Populated by the first net task that processes this broadcast.
     encoded: std::sync::OnceLock<Vec<(i32, Vec<u8>)>>,
 }
 
 impl SharedBroadcast {
-    /// Creates a new shared broadcast from a game event.
-    pub(crate) fn new(event: BroadcastEvent) -> Self {
+    /// Creates a new shared broadcast from one or more packets.
+    pub(crate) fn new(packets: Vec<EncodablePacket>) -> Self {
         Self {
-            event,
+            packets,
             encoded: std::sync::OnceLock::new(),
         }
     }
 
+    /// Convenience constructor for single-packet broadcasts.
+    pub(crate) fn single<P: PacketPayload>(id: i32, packet: P) -> Self {
+        Self::new(vec![EncodablePacket::new(id, packet)])
+    }
+
     /// Returns the cached encoded packets, encoding on first call.
     ///
-    /// The `encode_fn` is called at most once (by the first consumer).
-    /// All subsequent calls return the cached result.
-    pub(crate) fn get_or_encode(
-        &self,
-        encode_fn: impl FnOnce(&BroadcastEvent) -> Vec<(i32, Vec<u8>)>,
-    ) -> &[(i32, Vec<u8>)] {
-        self.encoded.get_or_init(|| encode_fn(&self.event))
+    /// Encoding runs at most once (by the first consumer); all
+    /// subsequent calls read the cached bytes — one encode per
+    /// broadcast event regardless of the consumer count.
+    pub(crate) fn get_or_encode(&self) -> &[(i32, Vec<u8>)] {
+        self.encoded.get_or_init(|| {
+            self.packets
+                .iter()
+                .map(|ep| {
+                    let mut buf = Vec::with_capacity(ep.payload.encoded_size());
+                    ep.payload
+                        .encode(&mut buf)
+                        .expect("packet encoding cannot fail");
+                    (ep.id, buf)
+                })
+                .collect()
+        })
     }
 }
 
 impl std::fmt::Debug for SharedBroadcast {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SharedBroadcast")
-            .field("event", &self.event)
+            .field("packets", &self.packets.len())
             .field("encoded", &self.encoded.get().is_some())
             .finish()
     }
 }
 
-/// Game events that can be broadcast to multiple players.
+/// Supertrait combining [`Encode`], [`EncodedSize`], and `Any`-style
+/// downcasting for trait objects.
 ///
-/// Separate from [`ServerOutput`] to avoid recursive enum types.
-/// These represent the subset of game events that are sent to N players
-/// (movement, block changes, chat, player lifecycle).
-#[derive(Clone, Debug)]
-pub enum BroadcastEvent {
-    /// An entity moved.
-    EntityMoved {
-        /// Entity ID.
-        entity_id: i32,
-        /// World X coordinate.
-        x: f64,
-        /// World Y coordinate.
-        y: f64,
-        /// World Z coordinate.
-        z: f64,
-        /// Yaw rotation (degrees).
-        yaw: f32,
-        /// Pitch rotation (degrees).
-        pitch: f32,
-        /// Whether the entity is on the ground.
-        on_ground: bool,
-    },
-    /// A block changed in the world.
-    BlockChanged {
-        /// Block X coordinate.
-        x: i32,
-        /// Block Y coordinate.
-        y: i32,
-        /// Block Z coordinate.
-        z: i32,
-        /// New block state ID.
-        state: i32,
-    },
-    /// A system chat message.
-    SystemChat {
-        /// NBT-encoded text component content.
-        content: NbtCompound,
-        /// Whether to display as action bar text.
-        action_bar: bool,
-    },
-    /// Remove entities from the client.
-    RemoveEntities {
-        /// Entity IDs to remove.
-        entity_ids: Vec<i32>,
-    },
-    /// Remove players from the tab list.
-    RemovePlayers {
-        /// Player UUIDs to remove.
-        uuids: Vec<Uuid>,
-    },
-    /// A dropped item entity spawned in the world.
-    ///
-    /// Net task sends SpawnEntity (type 55) + SetEntityMetadata (index 8 = Slot).
-    SpawnItemEntity {
-        /// Entity ID.
-        entity_id: i32,
-        /// Spawn X coordinate.
-        x: f64,
-        /// Spawn Y coordinate.
-        y: f64,
-        /// Spawn Z coordinate.
-        z: f64,
-        /// Velocity X.
-        vx: f64,
-        /// Velocity Y.
-        vy: f64,
-        /// Velocity Z.
-        vz: f64,
-        /// Item ID.
-        item_id: i32,
-        /// Item count.
-        count: i32,
-    },
-    /// A player picked up an item. Net task sends CollectItem.
-    CollectItem {
-        /// Entity ID of the collected item.
-        collected_entity_id: i32,
-        /// Entity ID of the player who picked it up.
-        collector_entity_id: i32,
-        /// Number of items picked up.
-        count: i32,
-    },
-}
-
-/// Supertrait combining [`Encode`] and [`EncodedSize`] for trait objects.
-///
-/// Rust only allows one non-auto trait in `dyn`, so this combines both
+/// Rust only allows one non-auto trait in `dyn`, so this combines the
 /// serialization traits into a single trait object-compatible trait.
+/// `as_any` exposes the concrete payload type so tests can inspect
+/// packet fields through [`EncodablePacket::downcast`].
 pub(crate) trait PacketPayload: Encode + EncodedSize + Send + Sync + 'static {
     /// Returns a reference to the payload as `dyn Any` for downcasting.
     /// Used by [`EncodablePacket::downcast`] in tests.

@@ -64,7 +64,10 @@ pub(crate) async fn run_net_task(
     let broadcast_tx = config.broadcast_tx;
     let player_registry = config.player_registry;
     let world = config.world;
-    let chunk_cache = config.chunk_cache;
+    // chunk_cache is no longer used by the net task — chunk encoding
+    // happens at construction time in `helpers::send_chunk_with_entities`
+    // and the bytes flow through `ServerOutput::RawBorrowed`.
+    let _chunk_cache = config.chunk_cache;
     let command_args = config.command_args;
 
     let mut broadcast_rx = broadcast_tx.subscribe();
@@ -123,7 +126,7 @@ pub(crate) async fn run_net_task(
             output = output_rx.recv() => {
                 match output {
                     Some(msg) => {
-                        play_sender::write_server_output(&mut conn, &msg, &chunk_cache).await?;
+                        play_sender::write_server_output(&mut conn, &msg).await?;
                     }
                     None => {
                         log::debug!(target: "basalt::net_task", "[{addr}] {username} output channel closed");
@@ -136,7 +139,7 @@ pub(crate) async fn run_net_task(
             result = broadcast_rx.recv() => {
                 match result {
                     Ok(msg) => {
-                        play_sender::write_server_output(&mut conn, &msg, &chunk_cache).await?;
+                        play_sender::write_server_output(&mut conn, &msg).await?;
                     }
                     Err(broadcast::error::RecvError::Lagged(n)) => {
                         log::warn!(target: "basalt::net_task", "[{addr}] {username} missed {n} broadcast messages");
