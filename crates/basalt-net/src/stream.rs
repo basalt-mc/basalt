@@ -220,24 +220,28 @@ impl ProtocolStream {
             .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
         self.frame_buf.extend_from_slice(frame_content);
 
-        // Stage 4: encrypted write. Inlines the encryption branch so the
-        // compiler can split the borrow between `&self.frame_buf` and
-        // `&mut self.encrypt_buf` — calling `self.write_all(&self.frame_buf)`
-        // would require `&mut self` whole and conflict with the shared
-        // borrow on `frame_buf`.
+        // Stage 4: encrypted write — delegates to a private helper that
+        // owns `&mut self`, so the borrow on `self.frame_buf` doesn't
+        // conflict at the call site.
+        self.write_buffered().await.map_err(Error::Io)
+    }
+
+    /// Writes the contents of `self.frame_buf` to the wire, encrypting
+    /// through `self.encrypt_buf` if a cipher is active.
+    ///
+    /// Private helper extracted from `write_raw_packet` Stage 4 — kept
+    /// inside `&mut self` so the cipher / encrypt_buf / frame_buf /
+    /// stream borrows resolve as split borrows on disjoint fields.
+    /// Mirrors the dispatch in [`Self::write_all`] but operates on the
+    /// stream-owned buffer rather than an arbitrary `&[u8]`.
+    async fn write_buffered(&mut self) -> std::io::Result<()> {
         if let Some(cipher) = &mut self.cipher {
             self.encrypt_buf.clear();
             self.encrypt_buf.extend_from_slice(&self.frame_buf);
             cipher.encrypt(&mut self.encrypt_buf);
-            self.stream
-                .write_all(&self.encrypt_buf)
-                .await
-                .map_err(Error::Io)
+            self.stream.write_all(&self.encrypt_buf).await
         } else {
-            self.stream
-                .write_all(&self.frame_buf)
-                .await
-                .map_err(Error::Io)
+            self.stream.write_all(&self.frame_buf).await
         }
     }
 
