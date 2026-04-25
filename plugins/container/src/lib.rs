@@ -380,4 +380,107 @@ mod tests {
             "virtual slot change must not notify viewers"
         );
     }
+
+    #[test]
+    fn chest_open_broadcasts_lid_animation() {
+        let mut harness = PluginTestHarness::new();
+        harness.world().set_block(5, 64, 3, block::CHEST);
+        harness.register(ContainerPlugin);
+
+        let mut event = ContainerOpenedEvent {
+            window_id: 1,
+            inventory_type: InventoryType::Generic9x3,
+            backing: ContainerBacking::Block {
+                position: BlockPosition { x: 5, y: 64, z: 3 },
+            },
+            viewer_count: 1,
+        };
+
+        let result = harness.dispatch(&mut event);
+        assert!(
+            result.has_broadcast_block_action(),
+            "chest open must broadcast a BlockAction packet"
+        );
+    }
+
+    #[test]
+    fn virtual_open_broadcasts_no_animation() {
+        let mut harness = PluginTestHarness::new();
+        harness.register(ContainerPlugin);
+
+        let mut event = ContainerOpenedEvent {
+            window_id: 1,
+            inventory_type: InventoryType::Generic9x3,
+            backing: ContainerBacking::Virtual,
+            viewer_count: 0,
+        };
+
+        let result = harness.dispatch(&mut event);
+        assert!(
+            !result.has_broadcast_block_action(),
+            "virtual container must not broadcast lid animation"
+        );
+    }
+
+    #[test]
+    fn chest_close_broadcasts_lid_animation() {
+        let mut harness = PluginTestHarness::new();
+        harness.world().set_block(5, 64, 3, block::CHEST);
+        harness.register(ContainerPlugin);
+
+        let mut event = ContainerClosedEvent {
+            window_id: 1,
+            inventory_type: InventoryType::Generic9x3,
+            backing: ContainerBacking::Block {
+                position: BlockPosition { x: 5, y: 64, z: 3 },
+            },
+            reason: CloseReason::Manual,
+            viewer_count: 0,
+            crafting_grid_state: None,
+        };
+
+        let result = harness.dispatch(&mut event);
+        assert!(
+            result.has_broadcast_block_action(),
+            "chest close must broadcast a BlockAction packet (lid close)"
+        );
+    }
+
+    #[test]
+    fn block_broken_chest_queues_destroy() {
+        let mut harness = PluginTestHarness::new();
+        harness.register(ContainerPlugin);
+
+        let mut event = BlockBrokenEvent {
+            position: BlockPosition { x: 5, y: 64, z: 3 },
+            block_state: block::CHEST,
+            sequence: 1,
+            cancelled: false,
+        };
+
+        let result = harness.dispatch(&mut event);
+        assert!(
+            result.has_destroy_block_entity(),
+            "breaking a chest must queue a destroy for the block entity"
+        );
+    }
+
+    #[test]
+    fn block_broken_non_chest_does_not_queue_destroy() {
+        let mut harness = PluginTestHarness::new();
+        harness.register(ContainerPlugin);
+
+        let mut event = BlockBrokenEvent {
+            position: BlockPosition { x: 5, y: 64, z: 3 },
+            block_state: block::STONE,
+            sequence: 1,
+            cancelled: false,
+        };
+
+        let result = harness.dispatch(&mut event);
+        assert!(
+            !result.has_destroy_block_entity(),
+            "breaking stone must not touch block entities"
+        );
+    }
 }
