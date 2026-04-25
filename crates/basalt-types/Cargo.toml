@@ -6,6 +6,11 @@ description = "Primitive Minecraft protocol types with zero-copy serialization"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+documentation = "https://docs.rs/basalt-types"
+readme = "README.md"
+rust-version = "1.85"
+keywords = ["minecraft", "protocol", "encoding", "nbt", "serialization"]
+categories = ["encoding", "parser-implementations", "game-development"]
 
 [dependencies]
 thiserror = { workspace = true }
