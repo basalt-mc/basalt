@@ -95,9 +95,6 @@ pub trait ChatContext {
 
 /// World access: blocks, chunks, persistence.
 pub trait WorldContext {
-    /// Returns a reference to the world (chunks, blocks, persistence).
-    fn world(&self) -> &basalt_world::World;
-
     /// Returns the block state at the given position.
     ///
     /// Generates or loads the chunk if it is not cached. Returns 0

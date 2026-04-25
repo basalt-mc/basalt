@@ -15,8 +15,8 @@ const GRAVITY: f64 = 0.08;
 /// Physics plugin: gravity, collision, and movement resolution.
 ///
 /// Entities need [`Position`], [`Velocity`], and [`BoundingBox`]
-/// components to be affected by physics. The world is obtained
-/// via `ctx.world()` inside the system runner.
+/// components to be affected by physics. Collision queries use
+/// `ctx.resolve_movement()` inside the system runner.
 pub struct PhysicsPlugin;
 
 impl Plugin for PhysicsPlugin {

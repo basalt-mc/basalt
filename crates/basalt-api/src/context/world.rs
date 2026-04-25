@@ -7,9 +7,6 @@ use super::ServerContext;
 use super::response::Response;
 
 impl WorldContext for ServerContext {
-    fn world(&self) -> &basalt_world::World {
-        &self.world
-    }
     fn get_block(&self, x: i32, y: i32, z: i32) -> u16 {
         self.world.get_block(x, y, z)
     }
