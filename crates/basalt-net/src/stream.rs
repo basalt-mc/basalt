@@ -1,4 +1,4 @@
-use basalt_types::{Decode, Encode, EncodedSize, VarInt};
+use basalt_types::{Decode, Encode, VarInt};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
@@ -31,6 +31,19 @@ pub struct ProtocolStream {
     compression_threshold: Option<usize>,
     /// Reusable buffer for encrypting outgoing data, avoiding per-write allocation.
     encrypt_buf: Vec<u8>,
+    /// Reusable staging buffer for the uncompressed packet body
+    /// (`VarInt(packet_id)` + payload). Cleared and reused on every
+    /// `write_raw_packet` call, eliminating the per-packet `Vec`
+    /// allocation that dominated the broadcast hot path (#175).
+    packet_buf: Vec<u8>,
+    /// Reusable staging buffer for the zlib-compressed frame content.
+    /// Only populated when compression is active; otherwise stays empty
+    /// at zero capacity.
+    compressed_buf: Vec<u8>,
+    /// Reusable staging buffer for the framed wire bytes
+    /// (`VarInt(frame_length)` + frame content). Same lifecycle as
+    /// `packet_buf`.
+    frame_buf: Vec<u8>,
 }
 
 impl ProtocolStream {
@@ -41,6 +54,9 @@ impl ProtocolStream {
             cipher: None,
             compression_threshold: None,
             encrypt_buf: Vec::new(),
+            packet_buf: Vec::new(),
+            compressed_buf: Vec::new(),
+            frame_buf: Vec::new(),
         }
     }
 
@@ -171,33 +187,58 @@ impl ProtocolStream {
     /// if they exceed the threshold. The compressed (or uncompressed) data
     /// is then framed with a VarInt length prefix and written through the
     /// encryption layer.
+    ///
+    /// All staging is done in `self.packet_buf` / `self.compressed_buf` /
+    /// `self.frame_buf` (cleared then reused on every call) so the hot
+    /// broadcast path doesn't allocate.
     pub async fn write_raw_packet(&mut self, packet_id: i32, payload: &[u8]) -> Result<()> {
         let id_varint = VarInt(packet_id);
 
-        // Build the uncompressed packet data (id + payload)
-        let mut packet_data = Vec::with_capacity(id_varint.encoded_size() + payload.len());
+        // Stage 1: id + payload → packet_buf
+        self.packet_buf.clear();
         id_varint
-            .encode(&mut packet_data)
+            .encode(&mut self.packet_buf)
             .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
-        packet_data.extend_from_slice(payload);
+        self.packet_buf.extend_from_slice(payload);
 
-        // Compress if enabled, then frame with length prefix
-        let frame_content = if let Some(threshold) = self.compression_threshold {
-            compression::compress_packet(&packet_data, threshold)?
+        // Stage 2: optional compression → compressed_buf. Borrowing
+        // `self.packet_buf` as `&[u8]` resolves the input borrow before
+        // the `&mut self.compressed_buf` is taken, so the two field
+        // accesses don't conflict.
+        let frame_content: &[u8] = if let Some(threshold) = self.compression_threshold {
+            let input: &[u8] = &self.packet_buf;
+            compression::compress_packet_into(input, threshold, &mut self.compressed_buf)?;
+            &self.compressed_buf
         } else {
-            packet_data
+            &self.packet_buf
         };
 
-        // Write length prefix + frame content
-        let mut buf = Vec::with_capacity(
-            VarInt(frame_content.len() as i32).encoded_size() + frame_content.len(),
-        );
+        // Stage 3: length prefix + content → frame_buf
+        self.frame_buf.clear();
         VarInt(frame_content.len() as i32)
-            .encode(&mut buf)
+            .encode(&mut self.frame_buf)
             .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
-        buf.extend_from_slice(&frame_content);
+        self.frame_buf.extend_from_slice(frame_content);
 
-        self.write_all(&buf).await.map_err(Error::Io)
+        // Stage 4: encrypted write. Inlines the encryption branch so the
+        // compiler can split the borrow between `&self.frame_buf` and
+        // `&mut self.encrypt_buf` — calling `self.write_all(&self.frame_buf)`
+        // would require `&mut self` whole and conflict with the shared
+        // borrow on `frame_buf`.
+        if let Some(cipher) = &mut self.cipher {
+            self.encrypt_buf.clear();
+            self.encrypt_buf.extend_from_slice(&self.frame_buf);
+            cipher.encrypt(&mut self.encrypt_buf);
+            self.stream
+                .write_all(&self.encrypt_buf)
+                .await
+                .map_err(Error::Io)
+        } else {
+            self.stream
+                .write_all(&self.frame_buf)
+                .await
+                .map_err(Error::Io)
+        }
     }
 
     /// Writes all bytes, encrypting if encryption is active.

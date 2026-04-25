@@ -8,36 +8,50 @@ use basalt_types::{Decode, Encode, VarInt};
 
 use crate::error::{Error, Result};
 
-/// Compresses packet data using zlib if the uncompressed size meets the threshold.
+/// Compresses packet data into a caller-provided buffer using zlib if
+/// the uncompressed size meets the threshold.
 ///
 /// The Minecraft compressed packet format is:
 /// - `VarInt(data_length)` — uncompressed size, or 0 if below threshold
 /// - `data` — zlib-compressed bytes if data_length > 0, raw bytes otherwise
 ///
-/// This function returns the compressed frame (data_length + data), NOT
-/// including the outer packet length prefix — that is added by the framing layer.
-pub fn compress_packet(data: &[u8], threshold: usize) -> Result<Vec<u8>> {
-    let mut result = Vec::new();
+/// `out` is `clear()`ed and then populated with the compressed frame
+/// (data_length + data), NOT including the outer packet length prefix.
+/// Reusing the caller's buffer across calls eliminates the per-packet
+/// `Vec` allocation that dominated the broadcast hot path (issue #175).
+pub fn compress_packet_into(data: &[u8], threshold: usize, out: &mut Vec<u8>) -> Result<()> {
+    out.clear();
 
     if data.len() >= threshold {
         // Compress: write uncompressed length + zlib data
         VarInt(data.len() as i32)
-            .encode(&mut result)
+            .encode(out)
             .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
 
         // Level 3 favors speed over ratio — better for game server latency
-        let mut encoder = ZlibEncoder::new(&mut result, Compression::new(3));
+        let mut encoder = ZlibEncoder::new(&mut *out, Compression::new(3));
         encoder.write_all(data).map_err(Error::Io)?;
         encoder.finish().map_err(Error::Io)?;
     } else {
         // Below threshold: write 0 + raw data
         VarInt(0)
-            .encode(&mut result)
+            .encode(out)
             .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
-        result.extend_from_slice(data);
+        out.extend_from_slice(data);
     }
 
-    Ok(result)
+    Ok(())
+}
+
+/// Compresses packet data using zlib if the uncompressed size meets the threshold.
+///
+/// Convenience wrapper around [`compress_packet_into`] that allocates a
+/// fresh `Vec`. Prefer the pooled variant on hot paths; this exists for
+/// callers that don't keep a stream-owned buffer (tests, ad-hoc tools).
+pub fn compress_packet(data: &[u8], threshold: usize) -> Result<Vec<u8>> {
+    let mut out = Vec::new();
+    compress_packet_into(data, threshold, &mut out)?;
+    Ok(out)
 }
 
 /// Decompresses packet data from the Minecraft compressed format.
