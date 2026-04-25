@@ -114,16 +114,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "basalt-core"
-version = "0.1.0"
-dependencies = [
- "basalt-recipes",
- "basalt-types",
- "basalt-world",
- "log",
-]
-
-[[package]]
 name = "basalt-derive"
 version = "0.1.0"
 dependencies = [
