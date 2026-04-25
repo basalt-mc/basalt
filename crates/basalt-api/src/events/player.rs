@@ -38,7 +38,7 @@ crate::game_event!(PlayerLeftEvent);
 
 #[cfg(test)]
 mod tests {
-    use basalt_events::Event;
+    use crate::events::Event;
 
     use super::*;
 
@@ -63,7 +63,7 @@ mod tests {
 
     #[test]
     fn event_routing() {
-        use basalt_events::{BusKind, EventRouting};
+        use crate::events::{BusKind, EventRouting};
         assert_eq!(PlayerMovedEvent::BUS, BusKind::Game);
         assert_eq!(PlayerJoinedEvent::BUS, BusKind::Game);
         assert_eq!(PlayerLeftEvent::BUS, BusKind::Game);

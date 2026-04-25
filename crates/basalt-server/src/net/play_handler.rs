@@ -8,11 +8,11 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Instant;
 
+use basalt_api::EventBus;
 use basalt_api::context::{Response, ServerContext};
 use basalt_api::events::{ChatMessageEvent, CommandEvent, RawPacketEvent};
 use basalt_core::PlayerInfo;
 use basalt_core::components::Rotation;
-use basalt_events::EventBus;
 use basalt_net::connection::{Connection, Play};
 use basalt_protocol::packets::play::ServerboundPlayPacket;
 use basalt_protocol::packets::play::chat::{

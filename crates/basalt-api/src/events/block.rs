@@ -61,7 +61,7 @@ crate::game_cancellable_event!(PlayerInteractEvent);
 
 #[cfg(test)]
 mod tests {
-    use basalt_events::Event;
+    use crate::events::Event;
 
     use super::*;
 
@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn event_routing() {
-        use basalt_events::{BusKind, EventRouting};
+        use crate::events::{BusKind, EventRouting};
         assert_eq!(BlockBrokenEvent::BUS, BusKind::Game);
         assert_eq!(BlockPlacedEvent::BUS, BusKind::Game);
         assert_eq!(PlayerInteractEvent::BUS, BusKind::Game);

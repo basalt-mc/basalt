@@ -1,23 +1,36 @@
-//! Game events dispatched through the event bus.
+//! Game events and the event bus.
 //!
-//! Events are grouped by domain:
-//! - [`block`] — block breaking, placing, interaction
-//! - [`container`] — container open/close, clicks, drags, block entities
-//! - [`player`] — movement, join, leave
-//! - [`chat`] — chat messages and commands
+//! This module provides both:
+//! - The generic event-bus infrastructure ([`EventBus`], [`Event`],
+//!   [`Stage`], [`BusKind`], [`EventRouting`])
+//! - Domain event types organized by area: [`block`](self#block-events),
+//!   [`chat`](self#chat-events), [`container`](self#container-events),
+//!   [`player`](self#player-events), and crafting/recipe events.
+//!
+//! Events are dispatched through the bus in three stages:
+//!
+//! 1. **Validate** — read-only checks, can cancel (permissions, anti-cheat)
+//! 2. **Process** — state mutation (world changes, inventory updates)
+//! 3. **Post** — side effects (broadcasting, persistence, logging)
+//!
+//! If any Validate handler cancels an event, Process and Post are
+//! skipped entirely.
 //!
 //! Use the macros ([`game_cancellable_event!`], [`game_event!`],
 //! [`instant_cancellable_event!`], [`instant_event!`]) to implement
-//! the [`Event`](basalt_events::Event) trait for custom event types.
+//! the [`Event`] trait for custom event types.
 
 mod block;
+mod bus;
 mod chat;
 mod container;
 mod crafting;
 mod packet;
 mod player;
+mod traits;
 
 pub use block::{BlockBrokenEvent, BlockPlacedEvent, PlayerInteractEvent};
+pub use bus::EventBus;
 pub use chat::{ChatMessageEvent, CommandEvent};
 pub use container::*;
 pub use crafting::{
@@ -28,14 +41,14 @@ pub use crafting::{
 };
 pub use packet::RawPacketEvent;
 pub use player::{PlayerJoinedEvent, PlayerLeftEvent, PlayerMovedEvent};
+pub use traits::{BusKind, Event, EventRouting, Stage};
 
-/// Implements [`Event`](basalt_events::Event) and
-/// [`EventRouting`](basalt_events::EventRouting) for a non-cancellable
+/// Implements [`Event`] and [`EventRouting`] for a non-cancellable
 /// event dispatched on the **instant** loop's bus.
 #[macro_export]
 macro_rules! instant_event {
     ($name:ident) => {
-        impl basalt_events::Event for $name {
+        impl $crate::events::Event for $name {
             fn is_cancelled(&self) -> bool {
                 false
             }
@@ -46,25 +59,24 @@ macro_rules! instant_event {
             fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
                 self
             }
-            fn bus_kind(&self) -> basalt_events::BusKind {
-                basalt_events::BusKind::Instant
+            fn bus_kind(&self) -> $crate::events::BusKind {
+                $crate::events::BusKind::Instant
             }
         }
-        impl basalt_events::EventRouting for $name {
-            const BUS: basalt_events::BusKind = basalt_events::BusKind::Instant;
+        impl $crate::events::EventRouting for $name {
+            const BUS: $crate::events::BusKind = $crate::events::BusKind::Instant;
         }
     };
 }
 
-/// Implements [`Event`](basalt_events::Event) and
-/// [`EventRouting`](basalt_events::EventRouting) for a cancellable
+/// Implements [`Event`] and [`EventRouting`] for a cancellable
 /// event dispatched on the **instant** loop's bus.
 ///
 /// The struct must have a `cancelled: bool` field.
 #[macro_export]
 macro_rules! instant_cancellable_event {
     ($name:ident) => {
-        impl basalt_events::Event for $name {
+        impl $crate::events::Event for $name {
             fn is_cancelled(&self) -> bool {
                 self.cancelled
             }
@@ -77,23 +89,22 @@ macro_rules! instant_cancellable_event {
             fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
                 self
             }
-            fn bus_kind(&self) -> basalt_events::BusKind {
-                basalt_events::BusKind::Instant
+            fn bus_kind(&self) -> $crate::events::BusKind {
+                $crate::events::BusKind::Instant
             }
         }
-        impl basalt_events::EventRouting for $name {
-            const BUS: basalt_events::BusKind = basalt_events::BusKind::Instant;
+        impl $crate::events::EventRouting for $name {
+            const BUS: $crate::events::BusKind = $crate::events::BusKind::Instant;
         }
     };
 }
 
-/// Implements [`Event`](basalt_events::Event) and
-/// [`EventRouting`](basalt_events::EventRouting) for a non-cancellable
+/// Implements [`Event`] and [`EventRouting`] for a non-cancellable
 /// event dispatched on the **game** loop's bus.
 #[macro_export]
 macro_rules! game_event {
     ($name:ident) => {
-        impl basalt_events::Event for $name {
+        impl $crate::events::Event for $name {
             fn is_cancelled(&self) -> bool {
                 false
             }
@@ -104,25 +115,24 @@ macro_rules! game_event {
             fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
                 self
             }
-            fn bus_kind(&self) -> basalt_events::BusKind {
-                basalt_events::BusKind::Game
+            fn bus_kind(&self) -> $crate::events::BusKind {
+                $crate::events::BusKind::Game
             }
         }
-        impl basalt_events::EventRouting for $name {
-            const BUS: basalt_events::BusKind = basalt_events::BusKind::Game;
+        impl $crate::events::EventRouting for $name {
+            const BUS: $crate::events::BusKind = $crate::events::BusKind::Game;
         }
     };
 }
 
-/// Implements [`Event`](basalt_events::Event) and
-/// [`EventRouting`](basalt_events::EventRouting) for a cancellable
+/// Implements [`Event`] and [`EventRouting`] for a cancellable
 /// event dispatched on the **game** loop's bus.
 ///
 /// The struct must have a `cancelled: bool` field.
 #[macro_export]
 macro_rules! game_cancellable_event {
     ($name:ident) => {
-        impl basalt_events::Event for $name {
+        impl $crate::events::Event for $name {
             fn is_cancelled(&self) -> bool {
                 self.cancelled
             }
@@ -135,12 +145,12 @@ macro_rules! game_cancellable_event {
             fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
                 self
             }
-            fn bus_kind(&self) -> basalt_events::BusKind {
-                basalt_events::BusKind::Game
+            fn bus_kind(&self) -> $crate::events::BusKind {
+                $crate::events::BusKind::Game
             }
         }
-        impl basalt_events::EventRouting for $name {
-            const BUS: basalt_events::BusKind = basalt_events::BusKind::Game;
+        impl $crate::events::EventRouting for $name {
+            const BUS: $crate::events::BusKind = $crate::events::BusKind::Game;
         }
     };
 }

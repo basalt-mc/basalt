@@ -62,8 +62,8 @@ pub use basalt_world as world;
 pub use basalt_protocol::packets;
 
 // Top-level re-exports for non-prelude usage.
-pub use basalt_events::{Event, EventBus, Stage};
 pub use context::{Response, ServerContext};
+pub use events::{Event, EventBus, Stage};
 pub use plugin::{CommandEntry, Plugin, PluginMetadata, PluginRegistrar};
 
 /// Prelude module — import this in every plugin.
@@ -87,7 +87,7 @@ pub mod prelude {
     };
 
     // Event system
-    pub use basalt_events::{Event, Stage};
+    pub use crate::events::{Event, Stage};
 
     // Container types
     pub use crate::container::{Container, ContainerBacking, ContainerBuilder, InventoryType};

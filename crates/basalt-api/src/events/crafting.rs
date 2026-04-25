@@ -254,7 +254,7 @@ crate::game_event!(RecipeBookFilledEvent);
 
 #[cfg(test)]
 mod tests {
-    use basalt_events::{BusKind, Event, EventRouting};
+    use crate::events::{BusKind, Event, EventRouting};
 
     use super::*;
 

@@ -4,9 +4,9 @@
 //! [`Plugin`] trait. Plugins register event handlers and commands
 //! during [`on_enable`](Plugin::on_enable).
 
+use crate::events::{BusKind, Event, EventBus, EventRouting, Stage};
 use basalt_command::{Arg, CommandArg, CommandArgs, Validation};
 use basalt_core::Context;
-use basalt_events::{BusKind, Event, EventBus, EventRouting, Stage};
 
 use crate::context::ServerContext;
 

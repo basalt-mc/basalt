@@ -109,7 +109,7 @@ impl ServerState {
             let commands: Vec<basalt_api::CommandEntry> = commands.into_iter().collect();
             let commands = Arc::new(commands);
             instant_bus.on::<basalt_api::events::CommandEvent, basalt_api::context::ServerContext>(
-                basalt_events::Stage::Process,
+                basalt_api::Stage::Process,
                 -100,
                 move |event, ctx| {
                     use basalt_core::Context;

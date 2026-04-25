@@ -277,7 +277,7 @@ crate::game_event!(BlockEntityDestroyedEvent);
 
 #[cfg(test)]
 mod tests {
-    use basalt_events::{BusKind, Event, EventRouting};
+    use crate::events::{BusKind, Event, EventRouting};
 
     use super::*;
 

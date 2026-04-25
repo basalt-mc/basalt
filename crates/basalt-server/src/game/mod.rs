@@ -200,7 +200,7 @@ impl GameLoop {
     /// if `crash_on_plugin_panic` is false.
     pub(super) fn dispatch_event(
         &self,
-        event: &mut dyn basalt_events::Event,
+        event: &mut dyn basalt_api::Event,
         ctx: &basalt_api::context::ServerContext,
     ) {
         if self.crash_on_plugin_panic {
