@@ -70,14 +70,6 @@ impl GameLoop {
                     self.write_slot(eid, &ws, basalt_types::Slot::empty(), container_pos);
                     self.sync_slot(eid, wt, &ws, basalt_types::Slot::empty());
                     self.sync_inventory_to_client(eid);
-                    if let Some(pos) = container_pos {
-                        self.notify_container_viewers(
-                            pos,
-                            eid,
-                            *i as i16,
-                            &basalt_types::Slot::empty(),
-                        );
-                    }
                     self.dispatch_container_slot_changed(
                         uuid,
                         eid,

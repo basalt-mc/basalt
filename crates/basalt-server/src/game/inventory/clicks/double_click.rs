@@ -44,9 +44,6 @@ impl GameLoop {
                     grid_changed = true;
                 }
                 if let WindowSlot::Container(ci) = ws {
-                    if let Some(pos) = container_pos {
-                        self.notify_container_viewers(pos, eid, *ci as i16, new_slot);
-                    }
                     self.dispatch_container_slot_changed(
                         uuid,
                         eid,

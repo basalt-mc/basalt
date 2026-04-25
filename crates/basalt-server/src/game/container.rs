@@ -7,7 +7,7 @@ use basalt_api::events::{
 use basalt_types::Uuid;
 use basalt_world::block_entity::BlockEntity;
 
-use super::{GameLoop, OutputHandle};
+use super::GameLoop;
 use crate::messages::ServerOutput;
 
 /// Maps a world block entity to the public [`BlockEntityKind`] enum.
@@ -228,33 +228,34 @@ impl GameLoop {
             });
         });
 
-        // Broadcast chest open animation to all players
-        // Count how many players are viewing each part
-        for part in &view.parts {
-            let (px, py, pz) = part.position;
-            let viewer_count = self
-                .ecs
-                .iter::<basalt_core::OpenContainer>()
-                .filter(|(_, oc)| {
-                    matches!(
-                        &oc.backing,
-                        basalt_core::ContainerBacking::Block { position }
-                            if (position.x, position.y, position.z) == container_pos
-                    )
-                })
-                .count() as u8;
-            for (e, _) in self.ecs.iter::<OutputHandle>() {
-                self.send_to(e, |tx| {
-                    let _ = tx.try_send(ServerOutput::BlockAction {
-                        x: px,
-                        y: py,
-                        z: pz,
-                        action_id: 1,
-                        action_param: viewer_count.max(1),
-                        block_id: 185, // chest block registry ID
-                    });
-                });
-            }
+        // Dispatch ContainerOpenedEvent — `ContainerPlugin` listens at
+        // Post and broadcasts the chest-lid open animation. The
+        // viewer_count includes the just-opened viewer (the
+        // OpenContainer component was set above).
+        let inventory_type = if view.size == 27 {
+            basalt_core::InventoryType::Generic9x3
+        } else {
+            basalt_core::InventoryType::Generic9x6
+        };
+        let backing = basalt_core::ContainerBacking::Block {
+            position: basalt_core::BlockPosition {
+                x: container_pos.0,
+                y: container_pos.1,
+                z: container_pos.2,
+            },
+        };
+        let viewer_count = container_viewer_count(&self.ecs, &backing);
+
+        if let Some((entity_id, username, yaw, pitch)) = self.player_info(eid) {
+            let ctx = self.make_context(uuid, entity_id, &username, yaw, pitch);
+            let mut opened_event = ContainerOpenedEvent {
+                window_id,
+                inventory_type,
+                backing,
+                viewer_count,
+            };
+            self.dispatch_event(&mut opened_event, &ctx);
+            self.process_responses(uuid, &ctx.drain_responses());
         }
     }
 

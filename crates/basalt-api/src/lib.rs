@@ -84,7 +84,7 @@ pub mod prelude {
     pub use basalt_events::{Event, Stage};
 
     // Container types
-    pub use crate::container::{Container, ContainerBuilder, InventoryType};
+    pub use crate::container::{Container, ContainerBacking, ContainerBuilder, InventoryType};
 
     // All event types
     pub use crate::events::{
