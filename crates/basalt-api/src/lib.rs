@@ -22,6 +22,7 @@ pub mod player;
 pub mod plugin;
 pub mod recipes;
 pub mod system;
+#[cfg(any(feature = "testing", test))]
 pub mod testing;
 
 /// Command argument types, parsing, validation, and dispatch.

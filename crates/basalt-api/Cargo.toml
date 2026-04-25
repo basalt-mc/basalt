@@ -9,6 +9,7 @@ repository.workspace = true
 [features]
 default = []
 raw-packets = ["dep:basalt-protocol"]
+testing = []
 
 [dependencies]
 basalt-protocol = { workspace = true, optional = true }

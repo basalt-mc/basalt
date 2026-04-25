@@ -1,8 +1,4 @@
-//! Test utilities for crates that need a [`Context`] implementation.
-//!
-//! [`NoopContext`] implements all context traits with no-op methods.
-//! Use it in unit tests that need a `&dyn Context` but don't care
-//! about the actual behavior (e.g., command dispatch tests).
+//! No-op context implementation for unit tests.
 
 use crate::broadcast::BroadcastMessage;
 use crate::context::{
