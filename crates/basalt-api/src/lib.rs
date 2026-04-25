@@ -47,7 +47,7 @@ pub mod types {
 }
 
 /// World access: block states, collision, block entities, chunk storage.
-pub use basalt_world as world;
+pub mod world;
 
 /// Wire-level protocol packet definitions, exposed for plugins that
 /// need raw packet inspection (anti-cheat, telemetry, packet logging).
