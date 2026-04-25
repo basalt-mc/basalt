@@ -8,7 +8,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
-pub(crate) use basalt_api::EventBus;
+pub(crate) use basalt_api::events::EventBus;
 
 /// Shared server state, held behind `Arc` and passed to connection tasks.
 ///
@@ -56,13 +56,13 @@ impl ServerState {
     /// retains only world access, entity ID counter, and command metadata.
     pub fn build_for_loops(
         world: Arc<basalt_world::World>,
-        plugins: Vec<Box<dyn basalt_api::Plugin>>,
+        plugins: Vec<Box<dyn basalt_api::plugin::Plugin>>,
         max_inbound_packets_per_second: u32,
     ) -> (
         Arc<Self>,
         EventBus,
         EventBus,
-        Vec<basalt_core::SystemDescriptor>,
+        Vec<basalt_api::system::SystemDescriptor>,
         basalt_recipes::RecipeRegistry,
     ) {
         let mut instant_bus = EventBus::new();
@@ -75,10 +75,10 @@ impl ServerState {
         // `PlayerInfo::stub()` — handlers must ignore `ctx.player()`.
         let bootstrap_ctx = basalt_api::context::ServerContext::new(
             std::sync::Arc::clone(&world),
-            basalt_core::player::PlayerInfo::stub(),
+            basalt_api::player::PlayerInfo::stub(),
         );
         {
-            let mut registrar = basalt_api::PluginRegistrar::new(
+            let mut registrar = basalt_api::plugin::PluginRegistrar::new(
                 &mut instant_bus,
                 &mut game_bus,
                 &mut commands,
@@ -112,7 +112,7 @@ impl ServerState {
                 basalt_api::Stage::Process,
                 -100,
                 move |event, ctx| {
-                    use basalt_core::Context;
+                    use basalt_api::context::Context;
                     let parts: Vec<&str> = event.command.splitn(2, ' ').collect();
                     let cmd = parts[0];
                     let args = parts.get(1).copied().unwrap_or("");

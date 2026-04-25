@@ -27,7 +27,7 @@ impl GameLoop {
             return;
         };
         let (item_id, drop_count, held_idx) = {
-            let Some(inv) = self.ecs.get::<basalt_core::Inventory>(eid) else {
+            let Some(inv) = self.ecs.get::<basalt_api::components::Inventory>(eid) else {
                 return;
             };
             let held_idx = inv.held_slot as usize;
@@ -39,7 +39,7 @@ impl GameLoop {
             (item_id, count, held_idx)
         };
 
-        if let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid) {
+        if let Some(inv) = self.ecs.get_mut::<basalt_api::components::Inventory>(eid) {
             if drop_count >= inv.slots[held_idx].item_count {
                 inv.slots[held_idx] = basalt_types::Slot::empty();
             } else {
@@ -47,7 +47,7 @@ impl GameLoop {
             }
         }
 
-        if let Some(pos) = self.ecs.get::<basalt_core::Position>(eid) {
+        if let Some(pos) = self.ecs.get::<basalt_api::components::Position>(eid) {
             self.spawn_item_entity(
                 pos.x as i32,
                 pos.y as i32 + 1,
@@ -59,7 +59,7 @@ impl GameLoop {
 
         let slot_after = self
             .ecs
-            .get::<basalt_core::Inventory>(eid)
+            .get::<basalt_api::components::Inventory>(eid)
             .map(|inv| inv.slots[held_idx].clone())
             .unwrap_or_default();
         self.send_to(eid, |tx| {
@@ -209,13 +209,17 @@ impl GameLoop {
 
         let (window_id, backing) = match wt {
             WindowType::CraftingTable { window_id } => {
-                let oc = self.ecs.get::<basalt_core::OpenContainer>(eid);
-                let backing = oc.map_or(basalt_core::ContainerBacking::Virtual, |o| o.backing);
+                let oc = self.ecs.get::<basalt_api::components::OpenContainer>(eid);
+                let backing = oc.map_or(basalt_api::container::ContainerBacking::Virtual, |o| {
+                    o.backing
+                });
                 (*window_id, backing)
             }
             WindowType::Chest { window_id, .. } => {
-                let oc = self.ecs.get::<basalt_core::OpenContainer>(eid);
-                let backing = oc.map_or(basalt_core::ContainerBacking::Virtual, |o| o.backing);
+                let oc = self.ecs.get::<basalt_api::components::OpenContainer>(eid);
+                let backing = oc.map_or(basalt_api::container::ContainerBacking::Virtual, |o| {
+                    o.backing
+                });
                 (*window_id, backing)
             }
             WindowType::PlayerInventory => unreachable!(),
@@ -223,7 +227,7 @@ impl GameLoop {
 
         let cursor_before = self
             .ecs
-            .get::<basalt_core::Inventory>(eid)
+            .get::<basalt_api::components::Inventory>(eid)
             .map(|inv| inv.cursor.clone())
             .unwrap_or_default();
 
@@ -270,13 +274,17 @@ impl GameLoop {
 
         let (window_id, backing) = match wt {
             WindowType::CraftingTable { window_id } => {
-                let oc = self.ecs.get::<basalt_core::OpenContainer>(eid);
-                let backing = oc.map_or(basalt_core::ContainerBacking::Virtual, |o| o.backing);
+                let oc = self.ecs.get::<basalt_api::components::OpenContainer>(eid);
+                let backing = oc.map_or(basalt_api::container::ContainerBacking::Virtual, |o| {
+                    o.backing
+                });
                 (*window_id, backing)
             }
             WindowType::Chest { window_id, .. } => {
-                let oc = self.ecs.get::<basalt_core::OpenContainer>(eid);
-                let backing = oc.map_or(basalt_core::ContainerBacking::Virtual, |o| o.backing);
+                let oc = self.ecs.get::<basalt_api::components::OpenContainer>(eid);
+                let backing = oc.map_or(basalt_api::container::ContainerBacking::Virtual, |o| {
+                    o.backing
+                });
                 (*window_id, backing)
             }
             WindowType::PlayerInventory => return,
@@ -299,7 +307,7 @@ impl GameLoop {
         self.process_responses(uuid, &ctx.drain_responses());
 
         // Dispatch BlockEntityModifiedEvent for block-backed containers
-        if let basalt_core::ContainerBacking::Block { position } = backing {
+        if let basalt_api::container::ContainerBacking::Block { position } = backing {
             self.notify_block_entity_modified(uuid, eid, position.x, position.y, position.z);
         }
     }
@@ -323,7 +331,10 @@ mod tests {
         game_loop.tick(1);
 
         let eid = game_loop.find_by_uuid(uuid).unwrap();
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.held_slot, 3);
     }
 
@@ -341,7 +352,10 @@ mod tests {
         game_loop.tick(1);
 
         let eid = game_loop.find_by_uuid(uuid).unwrap();
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.hotbar()[0].item_id, Some(1));
         assert_eq!(inv.hotbar()[0].item_count, 64);
     }
@@ -360,7 +374,10 @@ mod tests {
         game_loop.tick(1);
 
         let eid = game_loop.find_by_uuid(uuid).unwrap();
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert!(inv.hotbar()[0].item_id.is_none());
     }
 
@@ -373,7 +390,7 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .slots[0] = Slot::new(1, 10);
         while rx.try_recv().is_ok() {}
@@ -388,7 +405,10 @@ mod tests {
         });
         game_loop.tick(1);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.slots[0].item_count, 9);
     }
 
@@ -401,7 +421,7 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .slots[0] = Slot::new(1, 32);
 
@@ -415,7 +435,10 @@ mod tests {
         });
         game_loop.tick(1);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert!(inv.slots[0].is_empty());
     }
 

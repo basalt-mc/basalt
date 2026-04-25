@@ -27,15 +27,15 @@ impl GameLoop {
         };
 
         let (entity_id, old_cx, old_cz, x, y, z, yaw, pitch, username) = {
-            let Some(p) = self.ecs.get::<basalt_core::Position>(eid) else {
+            let Some(p) = self.ecs.get::<basalt_api::components::Position>(eid) else {
                 return;
             };
             let old_cx = (p.x as i32) >> 4;
             let old_cz = (p.z as i32) >> 4;
-            let Some(r) = self.ecs.get::<basalt_core::Rotation>(eid) else {
+            let Some(r) = self.ecs.get::<basalt_api::components::Rotation>(eid) else {
                 return;
             };
-            let Some(pr) = self.ecs.get::<basalt_core::PlayerRef>(eid) else {
+            let Some(pr) = self.ecs.get::<basalt_api::components::PlayerRef>(eid) else {
                 return;
             };
             (
@@ -52,12 +52,12 @@ impl GameLoop {
         };
 
         // Update ECS
-        if let Some(p) = self.ecs.get_mut::<basalt_core::Position>(eid) {
+        if let Some(p) = self.ecs.get_mut::<basalt_api::components::Position>(eid) {
             p.x = x;
             p.y = y;
             p.z = z;
         }
-        if let Some(r) = self.ecs.get_mut::<basalt_core::Rotation>(eid) {
+        if let Some(r) = self.ecs.get_mut::<basalt_api::components::Rotation>(eid) {
             r.yaw = yaw;
             r.pitch = pitch;
         }
@@ -65,10 +65,10 @@ impl GameLoop {
         // Dispatch PlayerMovedEvent
         let ctx = self.make_context(uuid, entity_id, &username, yaw, pitch);
         let mut event = PlayerMovedEvent {
-            position: basalt_core::Position { x, y, z },
-            rotation: basalt_core::Rotation { yaw, pitch },
+            position: basalt_api::components::Position { x, y, z },
+            rotation: basalt_api::components::Rotation { yaw, pitch },
             on_ground,
-            old_chunk: basalt_core::ChunkPosition {
+            old_chunk: basalt_api::components::ChunkPosition {
                 x: old_cx,
                 z: old_cz,
             },
@@ -236,11 +236,17 @@ mod tests {
         game_loop.tick(1);
 
         let eid = game_loop.find_by_uuid(uuid).unwrap();
-        let pos = game_loop.ecs.get::<basalt_core::Position>(eid).unwrap();
+        let pos = game_loop
+            .ecs
+            .get::<basalt_api::components::Position>(eid)
+            .unwrap();
         assert_eq!(pos.x, 10.0);
         assert_eq!(pos.y, 65.0);
         assert_eq!(pos.z, -5.0);
-        let rot = game_loop.ecs.get::<basalt_core::Rotation>(eid).unwrap();
+        let rot = game_loop
+            .ecs
+            .get::<basalt_api::components::Rotation>(eid)
+            .unwrap();
         assert_eq!(rot.yaw, 90.0);
         assert_eq!(rot.pitch, 45.0);
     }
@@ -260,10 +266,16 @@ mod tests {
         game_loop.tick(1);
 
         let eid = game_loop.find_by_uuid(uuid).unwrap();
-        let rot = game_loop.ecs.get::<basalt_core::Rotation>(eid).unwrap();
+        let rot = game_loop
+            .ecs
+            .get::<basalt_api::components::Rotation>(eid)
+            .unwrap();
         assert_eq!(rot.yaw, 180.0);
         assert_eq!(rot.pitch, -30.0);
-        let pos = game_loop.ecs.get::<basalt_core::Position>(eid).unwrap();
+        let pos = game_loop
+            .ecs
+            .get::<basalt_api::components::Position>(eid)
+            .unwrap();
         assert_eq!(pos.x, 0.0);
     }
 

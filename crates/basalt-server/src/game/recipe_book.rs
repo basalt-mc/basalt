@@ -8,11 +8,11 @@
 use std::collections::HashMap;
 
 use basalt_api::Event;
+use basalt_api::components::{CraftingGrid, Inventory, KnownRecipes, Position};
+use basalt_api::context::UnlockReason;
 use basalt_api::events::{
     RecipeBookFillRequestEvent, RecipeBookFilledEvent, RecipeLockedEvent, RecipeUnlockedEvent,
 };
-use basalt_core::components::{CraftingGrid, Inventory, KnownRecipes, Position};
-use basalt_core::context::UnlockReason;
 use basalt_ecs::EntityId;
 use basalt_protocol::packets::play::misc::{
     ClientboundPlayRecipeBookAddEntries, ClientboundPlayRecipeBookAddEntriesRecipe,
@@ -341,11 +341,11 @@ impl GameLoop {
         let entity_id = eid as i32;
         let username = self
             .ecs
-            .get::<basalt_core::PlayerRef>(eid)
+            .get::<basalt_api::components::PlayerRef>(eid)
             .map_or_else(String::new, |p| p.username.clone());
         let (yaw, pitch) = self
             .ecs
-            .get::<basalt_core::Rotation>(eid)
+            .get::<basalt_api::components::Rotation>(eid)
             .map_or((0.0, 0.0), |r| (r.yaw, r.pitch));
         (entity_id, username, yaw, pitch)
     }
@@ -508,7 +508,7 @@ const STACK_CAP: i32 = 64;
 /// pre-check failure.
 pub(super) fn compute_max_craft_multiplier(
     plan: &[(usize, i32)],
-    inv: &basalt_core::Inventory,
+    inv: &basalt_api::components::Inventory,
 ) -> i32 {
     if plan.is_empty() {
         return 0;
@@ -692,7 +692,7 @@ mod tests {
 
     #[test]
     fn drain_finds_single_slot_with_enough_count() {
-        let mut inv = basalt_core::Inventory::empty();
+        let mut inv = basalt_api::components::Inventory::empty();
         inv.slots[0] = Slot::new(43, 8);
         let plan = find_inventory_drain(&inv, &[(43, 3)]).expect("sufficient");
         assert_eq!(plan, vec![(0, 3)]);
@@ -700,7 +700,7 @@ mod tests {
 
     #[test]
     fn drain_splits_across_slots_when_needed() {
-        let mut inv = basalt_core::Inventory::empty();
+        let mut inv = basalt_api::components::Inventory::empty();
         inv.slots[0] = Slot::new(43, 2);
         inv.slots[5] = Slot::new(43, 4);
         let plan = find_inventory_drain(&inv, &[(43, 5)]).expect("sufficient");
@@ -710,14 +710,14 @@ mod tests {
 
     #[test]
     fn drain_returns_none_when_inventory_short() {
-        let mut inv = basalt_core::Inventory::empty();
+        let mut inv = basalt_api::components::Inventory::empty();
         inv.slots[0] = Slot::new(43, 2);
         assert_eq!(find_inventory_drain(&inv, &[(43, 3)]), None);
     }
 
     #[test]
     fn drain_handles_mixed_ingredients() {
-        let mut inv = basalt_core::Inventory::empty();
+        let mut inv = basalt_api::components::Inventory::empty();
         inv.slots[0] = Slot::new(43, 4); // 4 oak planks
         inv.slots[10] = Slot::new(879, 2); // 2 sticks (in main inventory range)
         let plan = find_inventory_drain(&inv, &[(43, 2), (879, 1)]).expect("sufficient");
@@ -729,7 +729,7 @@ mod tests {
     /// multiplier = 64 / 2 = 32 (capped under STACK_CAP=64).
     #[test]
     fn make_all_multiplier_with_ample_supply() {
-        let mut inv = basalt_core::Inventory::empty();
+        let mut inv = basalt_api::components::Inventory::empty();
         inv.slots[0] = Slot::new(43, 64);
         let plan = vec![(0, 43), (3, 43)];
         assert_eq!(compute_max_craft_multiplier(&plan, &inv), 32);
@@ -738,7 +738,7 @@ mod tests {
     /// 200 oak planks, 1×2 recipe → 200 / 2 = 100, capped at STACK_CAP (64).
     #[test]
     fn make_all_multiplier_caps_at_stack_size() {
-        let mut inv = basalt_core::Inventory::empty();
+        let mut inv = basalt_api::components::Inventory::empty();
         inv.slots[0] = Slot::new(43, 64);
         inv.slots[1] = Slot::new(43, 64);
         inv.slots[2] = Slot::new(43, 64);
@@ -752,7 +752,7 @@ mod tests {
     /// min(64, 5/2) = 2.
     #[test]
     fn make_all_multiplier_honors_per_ingredient_bottleneck() {
-        let mut inv = basalt_core::Inventory::empty();
+        let mut inv = basalt_api::components::Inventory::empty();
         inv.slots[0] = Slot::new(43, 64);
         inv.slots[1] = Slot::new(879, 5);
         // Plan: 1 plank slot + 2 stick slots.
@@ -764,7 +764,7 @@ mod tests {
     /// back to the standard pre-check abort).
     #[test]
     fn make_all_multiplier_returns_zero_when_missing() {
-        let inv = basalt_core::Inventory::empty();
+        let inv = basalt_api::components::Inventory::empty();
         let plan = vec![(0, 43)];
         assert_eq!(compute_max_craft_multiplier(&plan, &inv), 0);
     }
@@ -772,7 +772,7 @@ mod tests {
     /// Empty plan returns 0 — no ingredients, no crafts.
     #[test]
     fn make_all_multiplier_empty_plan() {
-        let inv = basalt_core::Inventory::empty();
+        let inv = basalt_api::components::Inventory::empty();
         assert_eq!(compute_max_craft_multiplier(&[], &inv), 0);
     }
 

@@ -44,7 +44,7 @@ impl GameLoop {
         self.ecs.spawn_with_id(eid);
         self.ecs.set(
             eid,
-            basalt_core::Position {
+            basalt_api::components::Position {
                 x: px,
                 y: py,
                 z: pz,
@@ -52,7 +52,7 @@ impl GameLoop {
         );
         self.ecs.set(
             eid,
-            basalt_core::Velocity {
+            basalt_api::components::Velocity {
                 dx: 0.0,
                 dy: 0.2,
                 dz: 0.0,
@@ -60,27 +60,28 @@ impl GameLoop {
         );
         self.ecs.set(
             eid,
-            basalt_core::BoundingBox {
+            basalt_api::components::BoundingBox {
                 width: 0.25,
                 height: 0.25,
             },
         );
-        self.ecs.set(eid, basalt_core::EntityKind { type_id: 68 });
+        self.ecs
+            .set(eid, basalt_api::components::EntityKind { type_id: 68 });
         self.ecs.set(
             eid,
-            basalt_core::PickupDelay {
+            basalt_api::components::PickupDelay {
                 remaining_ticks: 10,
             },
         );
         self.ecs.set(
             eid,
-            basalt_core::Lifetime {
+            basalt_api::components::Lifetime {
                 remaining_ticks: 6000,
             },
         );
         self.ecs.set(
             eid,
-            basalt_core::DroppedItem {
+            basalt_api::components::DroppedItem {
                 slot: basalt_types::Slot::new(item_id, count),
             },
         );
@@ -131,14 +132,14 @@ impl GameLoop {
     pub(super) fn broadcast_item_movement(&mut self) {
         let moving: Vec<(basalt_ecs::EntityId, f64, f64, f64)> = self
             .ecs
-            .iter::<basalt_core::DroppedItem>()
+            .iter::<basalt_api::components::DroppedItem>()
             .filter_map(|(eid, _)| {
-                let vel = self.ecs.get::<basalt_core::Velocity>(eid)?;
+                let vel = self.ecs.get::<basalt_api::components::Velocity>(eid)?;
                 // Only broadcast if actually moving
                 if vel.dx.abs() < 0.001 && vel.dy.abs() < 0.001 && vel.dz.abs() < 0.001 {
                     return None;
                 }
-                let pos = self.ecs.get::<basalt_core::Position>(eid)?;
+                let pos = self.ecs.get::<basalt_api::components::Position>(eid)?;
                 Some((eid, pos.x, pos.y, pos.z))
             })
             .collect();
@@ -191,15 +192,15 @@ impl GameLoop {
         // Collect all item entities eligible for pickup
         let items: Vec<(basalt_ecs::EntityId, f64, f64, f64, i32, i32)> = self
             .ecs
-            .iter::<basalt_core::DroppedItem>()
+            .iter::<basalt_api::components::DroppedItem>()
             .filter_map(|(eid, item)| {
                 // Skip items still on pickup delay
-                if let Some(delay) = self.ecs.get::<basalt_core::PickupDelay>(eid)
+                if let Some(delay) = self.ecs.get::<basalt_api::components::PickupDelay>(eid)
                     && delay.remaining_ticks > 0
                 {
                     return None;
                 }
-                let pos = self.ecs.get::<basalt_core::Position>(eid)?;
+                let pos = self.ecs.get::<basalt_api::components::Position>(eid)?;
                 let item_id = item.slot.item_id?;
                 Some((eid, pos.x, pos.y, pos.z, item_id, item.slot.item_count))
             })
@@ -212,9 +213,9 @@ impl GameLoop {
         // Collect all players
         let players: Vec<(basalt_ecs::EntityId, f64, f64, f64)> = self
             .ecs
-            .iter::<basalt_core::PlayerRef>()
+            .iter::<basalt_api::components::PlayerRef>()
             .filter_map(|(eid, _)| {
-                let pos = self.ecs.get::<basalt_core::Position>(eid)?;
+                let pos = self.ecs.get::<basalt_api::components::Position>(eid)?;
                 Some((eid, pos.x, pos.y, pos.z))
             })
             .collect();
@@ -234,7 +235,10 @@ impl GameLoop {
 
                 // Try to insert into player inventory
                 let (inv_idx, slot_after) = {
-                    let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(*player_eid) else {
+                    let Some(inv) = self
+                        .ecs
+                        .get_mut::<basalt_api::components::Inventory>(*player_eid)
+                    else {
                         continue;
                     };
                     let Some(idx) = inv.try_insert(*item_id, *count) else {
@@ -291,7 +295,7 @@ impl GameLoop {
     /// that reached zero and handles the side effects (broadcast + despawn).
     pub(super) fn collect_expired_entities(&mut self) {
         let mut expired = Vec::new();
-        for (eid, lt) in self.ecs.iter::<basalt_core::Lifetime>() {
+        for (eid, lt) in self.ecs.iter::<basalt_api::components::Lifetime>() {
             if lt.remaining_ticks == 0 {
                 expired.push(eid);
             }
@@ -332,7 +336,7 @@ mod tests {
         game_loop.ecs.spawn_with_id(eid);
         game_loop.ecs.set(
             eid,
-            basalt_core::Position {
+            basalt_api::components::Position {
                 x: 0.0,
                 y: 0.0,
                 z: 0.0,
@@ -340,14 +344,14 @@ mod tests {
         );
         game_loop
             .ecs
-            .set(eid, basalt_core::Lifetime { remaining_ticks: 2 });
+            .set(eid, basalt_api::components::Lifetime { remaining_ticks: 2 });
 
         game_loop.tick(1); // system: 2 → 1, collect: not 0 → alive
-        assert!(game_loop.ecs.has::<basalt_core::Lifetime>(eid));
+        assert!(game_loop.ecs.has::<basalt_api::components::Lifetime>(eid));
 
         game_loop.tick(2); // system: 1 → 0, collect: 0 → despawned
         assert!(
-            !game_loop.ecs.has::<basalt_core::Lifetime>(eid),
+            !game_loop.ecs.has::<basalt_api::components::Lifetime>(eid),
             "entity should be despawned after lifetime reaches 0"
         );
     }

@@ -23,7 +23,7 @@ mod responses;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use basalt_api::EventBus;
+use basalt_api::events::EventBus;
 use tokio::sync::mpsc;
 
 use crate::messages::GameInput;
@@ -54,7 +54,7 @@ impl basalt_ecs::Component for Sneaking {}
 /// to other players on join.
 struct SkinData {
     /// Mojang profile properties (name, value, signature).
-    properties: Vec<basalt_core::broadcast::ProfileProperty>,
+    properties: Vec<basalt_api::broadcast::ProfileProperty>,
 }
 impl basalt_ecs::Component for SkinData {}
 
@@ -286,7 +286,7 @@ impl GameLoop {
     pub(super) fn rebuild_active_chunks(&mut self) {
         self.active_chunks.clear();
         let sd = self.simulation_distance;
-        for (_, pos) in self.ecs.iter::<basalt_core::Position>() {
+        for (_, pos) in self.ecs.iter::<basalt_api::components::Position>() {
             // Only count entities that are players
             let cx = (pos.x as i32) >> 4;
             let cz = (pos.z as i32) >> 4;
@@ -334,10 +334,10 @@ pub(super) mod tests {
         let mut recipes = basalt_recipes::RecipeRegistry::with_vanilla();
         let bootstrap_ctx = basalt_api::context::ServerContext::new(
             Arc::clone(&world),
-            basalt_core::player::PlayerInfo::stub(),
+            basalt_api::player::PlayerInfo::stub(),
         );
         {
-            let mut registrar = basalt_api::PluginRegistrar::new(
+            let mut registrar = basalt_api::plugin::PluginRegistrar::new(
                 &mut instant_bus,
                 &mut bus,
                 &mut commands,
@@ -359,12 +359,12 @@ pub(super) mod tests {
             basalt_ecs::SystemBuilder::new("lifetime")
                 .phase(basalt_ecs::Phase::Simulate)
                 .every(1)
-                .reads::<basalt_core::Lifetime>()
-                .writes::<basalt_core::Lifetime>()
-                .run(|ctx: &mut dyn basalt_core::SystemContext| {
-                    use basalt_core::SystemContextExt;
-                    for id in ctx.query::<basalt_core::Lifetime>() {
-                        if let Some(lt) = ctx.get_mut::<basalt_core::Lifetime>(id)
+                .reads::<basalt_api::components::Lifetime>()
+                .writes::<basalt_api::components::Lifetime>()
+                .run(|ctx: &mut dyn basalt_api::system::SystemContext| {
+                    use basalt_api::system::SystemContextExt;
+                    for id in ctx.query::<basalt_api::components::Lifetime>() {
+                        if let Some(lt) = ctx.get_mut::<basalt_api::components::Lifetime>(id)
                             && lt.remaining_ticks > 0
                         {
                             lt.remaining_ticks -= 1;
@@ -376,12 +376,12 @@ pub(super) mod tests {
             basalt_ecs::SystemBuilder::new("pickup_delay")
                 .phase(basalt_ecs::Phase::Simulate)
                 .every(1)
-                .reads::<basalt_core::PickupDelay>()
-                .writes::<basalt_core::PickupDelay>()
-                .run(|ctx: &mut dyn basalt_core::SystemContext| {
-                    use basalt_core::SystemContextExt;
-                    for id in ctx.query::<basalt_core::PickupDelay>() {
-                        if let Some(delay) = ctx.get_mut::<basalt_core::PickupDelay>(id)
+                .reads::<basalt_api::components::PickupDelay>()
+                .writes::<basalt_api::components::PickupDelay>()
+                .run(|ctx: &mut dyn basalt_api::system::SystemContext| {
+                    use basalt_api::system::SystemContextExt;
+                    for id in ctx.query::<basalt_api::components::PickupDelay>() {
+                        if let Some(delay) = ctx.get_mut::<basalt_api::components::PickupDelay>(id)
                             && delay.remaining_ticks > 0
                         {
                             delay.remaining_ticks -= 1;

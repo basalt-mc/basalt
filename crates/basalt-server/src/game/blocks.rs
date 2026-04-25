@@ -17,7 +17,7 @@ impl GameLoop {
             return;
         };
         let (entity_id, username) = {
-            let Some(pr) = self.ecs.get::<basalt_core::PlayerRef>(eid) else {
+            let Some(pr) = self.ecs.get::<basalt_api::components::PlayerRef>(eid) else {
                 return;
             };
             (eid as i32, pr.username.clone())
@@ -26,23 +26,23 @@ impl GameLoop {
         let original_state = self.world.get_block(x, y, z);
         let ctx = ServerContext::new(
             Arc::clone(&self.world),
-            basalt_core::PlayerInfo {
+            basalt_api::player::PlayerInfo {
                 uuid,
                 entity_id,
                 username: username.clone(),
-                rotation: basalt_core::Rotation {
+                rotation: basalt_api::components::Rotation {
                     yaw: 0.0,
                     pitch: 0.0,
                 },
                 position: self
                     .ecs
-                    .get::<basalt_core::Position>(eid)
-                    .map(|p| basalt_core::Position {
+                    .get::<basalt_api::components::Position>(eid)
+                    .map(|p| basalt_api::components::Position {
                         x: p.x,
                         y: p.y,
                         z: p.z,
                     })
-                    .unwrap_or(basalt_core::Position {
+                    .unwrap_or(basalt_api::components::Position {
                         x: 0.0,
                         y: 0.0,
                         z: 0.0,
@@ -50,7 +50,7 @@ impl GameLoop {
             },
         );
         let mut event = BlockBrokenEvent {
-            position: basalt_core::BlockPosition { x, y, z },
+            position: basalt_api::components::BlockPosition { x, y, z },
             block_state: original_state,
             sequence,
             cancelled: false,
@@ -95,15 +95,15 @@ impl GameLoop {
             let entity_id = eid as i32;
             let username = self
                 .ecs
-                .get::<basalt_core::PlayerRef>(eid)
+                .get::<basalt_api::components::PlayerRef>(eid)
                 .map_or_else(String::new, |pr| pr.username.clone());
             let (yaw, pitch) = self
                 .ecs
-                .get::<basalt_core::Rotation>(eid)
+                .get::<basalt_api::components::Rotation>(eid)
                 .map_or((0.0, 0.0), |r| (r.yaw, r.pitch));
             let ctx = self.make_context(uuid, entity_id, &username, yaw, pitch);
             let mut interact = PlayerInteractEvent {
-                position: basalt_core::BlockPosition { x, y, z },
+                position: basalt_api::components::BlockPosition { x, y, z },
                 block_state: clicked_state,
                 direction,
                 sequence,
@@ -120,7 +120,7 @@ impl GameLoop {
         let (px, py, pz) = (x + dx, y + dy, z + dz);
 
         let (entity_id, username, block_state) = {
-            let Some(inv) = self.ecs.get::<basalt_core::Inventory>(eid) else {
+            let Some(inv) = self.ecs.get::<basalt_api::components::Inventory>(eid) else {
                 return;
             };
             let Some(item_id) = inv.held_item().item_id else {
@@ -130,7 +130,7 @@ impl GameLoop {
             else {
                 return;
             };
-            let Some(pr) = self.ecs.get::<basalt_core::PlayerRef>(eid) else {
+            let Some(pr) = self.ecs.get::<basalt_api::components::PlayerRef>(eid) else {
                 return;
             };
             (eid as i32, pr.username.clone(), block_state)
@@ -138,24 +138,24 @@ impl GameLoop {
 
         let (yaw, pitch) = self
             .ecs
-            .get::<basalt_core::Rotation>(eid)
+            .get::<basalt_api::components::Rotation>(eid)
             .map_or((0.0, 0.0), |r| (r.yaw, r.pitch));
         let ctx = ServerContext::new(
             Arc::clone(&self.world),
-            basalt_core::PlayerInfo {
+            basalt_api::player::PlayerInfo {
                 uuid,
                 entity_id,
                 username: username.clone(),
-                rotation: basalt_core::Rotation { yaw, pitch },
+                rotation: basalt_api::components::Rotation { yaw, pitch },
                 position: self
                     .ecs
-                    .get::<basalt_core::Position>(eid)
-                    .map(|p| basalt_core::Position {
+                    .get::<basalt_api::components::Position>(eid)
+                    .map(|p| basalt_api::components::Position {
                         x: p.x,
                         y: p.y,
                         z: p.z,
                     })
-                    .unwrap_or(basalt_core::Position {
+                    .unwrap_or(basalt_api::components::Position {
                         x: 0.0,
                         y: 0.0,
                         z: 0.0,
@@ -163,7 +163,7 @@ impl GameLoop {
             },
         );
         let mut event = BlockPlacedEvent {
-            position: basalt_core::BlockPosition {
+            position: basalt_api::components::BlockPosition {
                 x: px,
                 y: py,
                 z: pz,
@@ -308,7 +308,10 @@ mod tests {
         let _rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
 
         let eid = game_loop.find_by_uuid(uuid).unwrap();
-        if let Some(inv) = game_loop.ecs.get_mut::<basalt_core::Inventory>(eid) {
+        if let Some(inv) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::Inventory>(eid)
+        {
             inv.hotbar_mut()[0] = basalt_types::Slot {
                 item_id: Some(1),
                 item_count: 1,
@@ -342,7 +345,7 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .slots[0] = basalt_types::Slot::new(313, 1); // chest item ID
 
@@ -374,13 +377,13 @@ mod tests {
         // Set player yaw to 180 (facing north → chest faces south)
         game_loop
             .ecs
-            .get_mut::<basalt_core::Rotation>(eid)
+            .get_mut::<basalt_api::components::Rotation>(eid)
             .unwrap()
             .yaw = 180.0;
         // Give chest in hotbar
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .slots[0] = basalt_types::Slot::new(313, 1);
 
@@ -412,14 +415,14 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Rotation>(eid)
+            .get_mut::<basalt_api::components::Rotation>(eid)
             .unwrap()
             .yaw = 0.0; // facing south → chest faces north
 
         // Place first chest
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .slots[0] = basalt_types::Slot::new(313, 2);
 

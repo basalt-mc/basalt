@@ -88,7 +88,8 @@ impl GameLoop {
                 } => {
                     use basalt_protocol::packets::play::player::ClientboundPlayPosition;
                     if let Some(eid) = self.find_by_uuid(source_uuid) {
-                        if let Some(pos) = self.ecs.get_mut::<basalt_core::Position>(eid) {
+                        if let Some(pos) = self.ecs.get_mut::<basalt_api::components::Position>(eid)
+                        {
                             pos.x = position.x;
                             pos.y = position.y;
                             pos.z = position.z;

@@ -20,7 +20,7 @@ impl GameLoop {
     ) -> bool {
         let cursor = self
             .ecs
-            .get::<basalt_core::Inventory>(eid)
+            .get::<basalt_api::components::Inventory>(eid)
             .map(|inv| inv.cursor.clone())
             .unwrap_or_default();
         if cursor.is_empty() {
@@ -55,7 +55,7 @@ impl GameLoop {
                 }
             }
         }
-        if let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid) {
+        if let Some(inv) = self.ecs.get_mut::<basalt_api::components::Inventory>(eid) {
             inv.cursor = new_cursor;
         }
 
@@ -102,7 +102,7 @@ mod tests {
         {
             let inv = game_loop
                 .ecs
-                .get_mut::<basalt_core::Inventory>(eid)
+                .get_mut::<basalt_api::components::Inventory>(eid)
                 .unwrap();
             inv.cursor = Slot::new(1, 5);
             inv.slots[9] = Slot::new(1, 10);
@@ -113,7 +113,10 @@ mod tests {
         // Double-click (mode 6)
         click(&game_tx, &mut game_loop, uuid, 9, 0, 6);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(
             inv.cursor.item_count, 23,
             "cursor should collect all matching"

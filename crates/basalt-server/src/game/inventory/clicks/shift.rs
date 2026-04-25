@@ -22,7 +22,7 @@ impl GameLoop {
             WindowSlot::CraftOutput => {
                 let has_output = self
                     .ecs
-                    .get::<basalt_core::CraftingGrid>(eid)
+                    .get::<basalt_api::components::CraftingGrid>(eid)
                     .is_some_and(|g| !g.output.is_empty());
                 if !has_output {
                     return false;
@@ -44,7 +44,7 @@ impl GameLoop {
                 let count = grid_item.item_count;
                 let inserted = self
                     .ecs
-                    .get_mut::<basalt_core::Inventory>(eid)
+                    .get_mut::<basalt_api::components::Inventory>(eid)
                     .and_then(|inv| inv.try_insert(item_id, count))
                     .is_some();
                 if inserted {
@@ -63,7 +63,7 @@ impl GameLoop {
                 let count = item.item_count;
                 let inserted = self
                     .ecs
-                    .get_mut::<basalt_core::Inventory>(eid)
+                    .get_mut::<basalt_api::components::Inventory>(eid)
                     .and_then(|inv| inv.try_insert(item_id, count))
                     .is_some();
                 if inserted {
@@ -195,7 +195,7 @@ impl GameLoop {
         count: i32,
         range: std::ops::Range<usize>,
     ) -> bool {
-        let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid) else {
+        let Some(inv) = self.ecs.get_mut::<basalt_api::components::Inventory>(eid) else {
             return false;
         };
         // Try stacking first
@@ -273,14 +273,17 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .slots[0] = Slot::new(1, 10);
 
         // Shift-click hotbar 0 (window 36)
         click(&game_tx, &mut game_loop, uuid, 36, 0, 1);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert!(inv.slots[0].is_empty(), "hotbar should be empty");
         let main_total: i32 = inv.slots[9..36]
             .iter()
@@ -299,14 +302,17 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .slots[9] = Slot::new(1, 10);
 
         // Shift-click main slot 9 (window 9)
         click(&game_tx, &mut game_loop, uuid, 9, 0, 1);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert!(inv.slots[9].is_empty(), "main slot should be empty");
         let hotbar_total: i32 = inv.slots[0..9]
             .iter()
@@ -331,7 +337,10 @@ mod tests {
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[0] = Slot::new(43, 2);
             grid.slots[1] = Slot::new(43, 2);
             grid.slots[3] = Slot::new(43, 2);
@@ -342,9 +351,15 @@ mod tests {
         // Shift-click output (slot 0, mode 1)
         click(&game_tx, &mut game_loop, uuid, 0, 0, 1);
 
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert!(grid.slots[0].is_empty(), "all planks should be consumed");
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         let total: i32 = inv
             .slots
             .iter()

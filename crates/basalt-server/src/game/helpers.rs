@@ -2,9 +2,9 @@
 
 use std::sync::Arc;
 
+use basalt_api::components::{Position, Rotation};
 use basalt_api::context::ServerContext;
-use basalt_core::PlayerInfo;
-use basalt_core::components::{Position, Rotation};
+use basalt_api::player::PlayerInfo;
 use basalt_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
 use basalt_protocol::packets::play::world::{
     ClientboundPlayMapChunk, ClientboundPlayTileEntityData,

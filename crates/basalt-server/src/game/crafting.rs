@@ -28,7 +28,10 @@ impl GameLoop {
         z: i32,
     ) {
         // Switch CraftingGrid to 3x3 mode and clear
-        if let Some(grid) = self.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = self
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.grid_size = 3;
             grid.clear();
         }
@@ -38,11 +41,11 @@ impl GameLoop {
         // Set OpenContainer so window close is handled
         self.ecs.set(
             eid,
-            basalt_core::OpenContainer {
+            basalt_api::components::OpenContainer {
                 window_id,
-                inventory_type: basalt_core::InventoryType::Crafting,
-                backing: basalt_core::ContainerBacking::Block {
-                    position: basalt_core::BlockPosition { x, y, z },
+                inventory_type: basalt_api::container::InventoryType::Crafting,
+                backing: basalt_api::container::ContainerBacking::Block {
+                    position: basalt_api::components::BlockPosition { x, y, z },
                 },
             },
         );
@@ -59,7 +62,7 @@ impl GameLoop {
         }
 
         // Player inventory (main + hotbar)
-        if let Some(inv) = self.ecs.get::<basalt_core::Inventory>(eid) {
+        if let Some(inv) = self.ecs.get::<basalt_api::components::Inventory>(eid) {
             window_slots.extend_from_slice(&inv.slots[9..]); // main (27)
             window_slots.extend_from_slice(&inv.slots[..9]); // hotbar (9)
         }
@@ -95,7 +98,7 @@ impl GameLoop {
     /// responds by computing and setting the output slot.
     pub(super) fn dispatch_crafting_grid_changed(&mut self, uuid: Uuid, eid: basalt_ecs::EntityId) {
         let (grid, grid_size) = {
-            let Some(grid_comp) = self.ecs.get::<basalt_core::CraftingGrid>(eid) else {
+            let Some(grid_comp) = self.ecs.get::<basalt_api::components::CraftingGrid>(eid) else {
                 return;
             };
             let gs = grid_comp.grid_size;
@@ -131,7 +134,7 @@ impl GameLoop {
         is_shift_click: bool,
     ) -> bool {
         let result: Slot = {
-            let Some(grid) = self.ecs.get::<basalt_core::CraftingGrid>(eid) else {
+            let Some(grid) = self.ecs.get::<basalt_api::components::CraftingGrid>(eid) else {
                 return true;
             };
             if grid.output.item_id.is_none() {
@@ -229,7 +232,7 @@ impl GameLoop {
     /// and [`run_crafting_match_cycle`](Self::run_crafting_match_cycle).
     pub(super) fn compute_crafting_match(&mut self, uuid: Uuid, eid: basalt_ecs::EntityId) -> Slot {
         let (grid_ids, grid_size, previous_output) = {
-            let Some(grid) = self.ecs.get::<basalt_core::CraftingGrid>(eid) else {
+            let Some(grid) = self.ecs.get::<basalt_api::components::CraftingGrid>(eid) else {
                 return Slot::empty();
             };
             let mut g = [None; 9];
@@ -281,7 +284,10 @@ impl GameLoop {
     /// output, so the server must re-send even when the same recipe
     /// still matches.
     pub(super) fn sync_crafting_output_slot(&mut self, eid: basalt_ecs::EntityId, output: Slot) {
-        if let Some(grid) = self.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = self
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.output = output.clone();
         }
 
@@ -290,7 +296,7 @@ impl GameLoop {
         // updates because crafting output is always server-pushed.
         let window_id = self
             .ecs
-            .get::<basalt_core::OpenContainer>(eid)
+            .get::<basalt_api::components::OpenContainer>(eid)
             .map(|oc| i32::from(oc.window_id))
             .unwrap_or(0);
 
@@ -325,7 +331,10 @@ impl GameLoop {
     /// that reach zero are replaced with `Slot::empty()`. The output
     /// slot is also cleared since the result was consumed.
     pub(super) fn consume_crafting_ingredients(&mut self, eid: basalt_ecs::EntityId) {
-        let Some(grid) = self.ecs.get_mut::<basalt_core::CraftingGrid>(eid) else {
+        let Some(grid) = self
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        else {
             return;
         };
         let slot_count = (grid.grid_size as usize) * (grid.grid_size as usize);
@@ -347,12 +356,12 @@ impl GameLoop {
     /// Grid slots are 1-based in the window (slot 0 is the output).
     pub(super) fn sync_crafting_grid_to_client(&mut self, eid: basalt_ecs::EntityId) {
         let (slots_data, slot_count, window_id) = {
-            let Some(grid) = self.ecs.get::<basalt_core::CraftingGrid>(eid) else {
+            let Some(grid) = self.ecs.get::<basalt_api::components::CraftingGrid>(eid) else {
                 return;
             };
             let wid = self
                 .ecs
-                .get::<basalt_core::OpenContainer>(eid)
+                .get::<basalt_api::components::OpenContainer>(eid)
                 .map(|oc| i32::from(oc.window_id))
                 .unwrap_or(0);
             let sc = (grid.grid_size as usize) * (grid.grid_size as usize);
@@ -388,15 +397,15 @@ impl GameLoop {
     /// (9-35 = main, 36-44 = hotbar) depending on whether an
     /// `OpenContainer` is present.
     pub(super) fn sync_inventory_to_client(&mut self, eid: basalt_ecs::EntityId) {
-        let Some(inv) = self.ecs.get::<basalt_core::Inventory>(eid) else {
+        let Some(inv) = self.ecs.get::<basalt_api::components::Inventory>(eid) else {
             return;
         };
         let slots = inv.slots.clone();
 
-        let has_open_container = self.ecs.has::<basalt_core::OpenContainer>(eid);
+        let has_open_container = self.ecs.has::<basalt_api::components::OpenContainer>(eid);
         let window_id = self
             .ecs
-            .get::<basalt_core::OpenContainer>(eid)
+            .get::<basalt_api::components::OpenContainer>(eid)
             .map(|oc| i32::from(oc.window_id))
             .unwrap_or(0);
 
@@ -443,7 +452,7 @@ impl GameLoop {
         // Capture the initial result so plugins know what's about to
         // be batched. Empty output means there's nothing to craft.
         let initial = {
-            let Some(grid) = self.ecs.get::<basalt_core::CraftingGrid>(eid) else {
+            let Some(grid) = self.ecs.get::<basalt_api::components::CraftingGrid>(eid) else {
                 return;
             };
             if grid.output.is_empty() {
@@ -466,7 +475,7 @@ impl GameLoop {
             // Read the current output (set by the prior iteration's
             // `compute_crafting_match` or by the initial click).
             let (result_id, result_count) = {
-                let Some(grid) = self.ecs.get::<basalt_core::CraftingGrid>(eid) else {
+                let Some(grid) = self.ecs.get::<basalt_api::components::CraftingGrid>(eid) else {
                     break;
                 };
                 let Some(id) = grid.output.item_id else {
@@ -477,7 +486,7 @@ impl GameLoop {
 
             // Try to insert into inventory
             let inserted = {
-                let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid) else {
+                let Some(inv) = self.ecs.get_mut::<basalt_api::components::Inventory>(eid) else {
                     break;
                 };
                 inv.try_insert(result_id, result_count).is_some()
@@ -489,7 +498,7 @@ impl GameLoop {
             // Snapshot the grid BEFORE consume so the CraftedEvent
             // carries the pre-consumption state.
             let consumed = {
-                let Some(grid) = self.ecs.get::<basalt_core::CraftingGrid>(eid) else {
+                let Some(grid) = self.ecs.get::<basalt_api::components::CraftingGrid>(eid) else {
                     break;
                 };
                 grid.slots.clone()
@@ -508,7 +517,10 @@ impl GameLoop {
             // suppresses `CraftingRecipeClearedEvent` here because the
             // previous output was already cleared by `consume`.
             let next = self.compute_crafting_match(uuid, eid);
-            if let Some(grid) = self.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+            if let Some(grid) = self
+                .ecs
+                .get_mut::<basalt_api::components::CraftingGrid>(eid)
+            {
                 grid.output = next.clone();
             }
             if next.is_empty() {
@@ -519,12 +531,12 @@ impl GameLoop {
 
     /// Extracts player info (entity_id, username, yaw, pitch) for event dispatch.
     pub(crate) fn player_info(&self, eid: basalt_ecs::EntityId) -> Option<(i32, String, f32, f32)> {
-        let pr = self.ecs.get::<basalt_core::PlayerRef>(eid)?;
+        let pr = self.ecs.get::<basalt_api::components::PlayerRef>(eid)?;
         let entity_id = eid as i32;
         let username = pr.username.clone();
         let (yaw, pitch) = self
             .ecs
-            .get::<basalt_core::Rotation>(eid)
+            .get::<basalt_api::components::Rotation>(eid)
             .map_or((0.0, 0.0), |r| (r.yaw, r.pitch));
         Some((entity_id, username, yaw, pitch))
     }
@@ -556,7 +568,7 @@ mod tests {
         // places cursor into empty grid slot
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(43, 1);
 
@@ -572,11 +584,17 @@ mod tests {
         game_loop.tick(1);
 
         // CraftingGrid slot 0 should have the item
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert_eq!(grid.slots[0].item_id, Some(43));
         assert_eq!(grid.slots[0].item_count, 1);
         // Cursor should be empty
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert!(
             inv.cursor.is_empty(),
             "cursor should be empty after placing"
@@ -603,7 +621,7 @@ mod tests {
         // hotbar slot (window slot 37 = hotbar 0 = internal 0)
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(1, 10);
 
@@ -617,7 +635,10 @@ mod tests {
         });
         game_loop.tick(1);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.slots[0].item_id, Some(1));
         assert_eq!(inv.slots[0].item_count, 10);
     }
@@ -634,7 +655,7 @@ mod tests {
         // cursor into empty grid slot
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(43, 1);
 
@@ -649,7 +670,10 @@ mod tests {
         });
         game_loop.tick(1);
 
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert_eq!(
             grid.slots[0].item_id,
             Some(43),
@@ -676,7 +700,10 @@ mod tests {
         // Place 4 oak planks (id 43) in the 2x2 top-left of the 3x3 grid.
         // Server-authoritative: set grid directly and trigger recipe match
         // via a single grid click that triggers dispatch_crafting_grid_changed.
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[0] = basalt_types::Slot::new(43, 1);
             grid.slots[1] = basalt_types::Slot::new(43, 1);
             grid.slots[3] = basalt_types::Slot::new(43, 1);
@@ -685,7 +712,7 @@ mod tests {
         // Place the last plank via a cursor click to trigger recipe matching
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(43, 1);
         let _ = game_tx.send(GameInput::WindowClick {
@@ -699,7 +726,10 @@ mod tests {
         game_loop.tick(1);
 
         // Output should be crafting table (id 314)
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert_eq!(
             grid.output.item_id,
             Some(314),
@@ -740,7 +770,10 @@ mod tests {
 
         // Place 4 oak planks in the grid and set output manually
         // (simulates the state after a grid change + recipe match)
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[0] = basalt_types::Slot::new(43, 1);
             grid.slots[1] = basalt_types::Slot::new(43, 1);
             grid.slots[3] = basalt_types::Slot::new(43, 1);
@@ -762,14 +795,20 @@ mod tests {
         game_loop.tick(1);
 
         // All 4 planks should be consumed by server-side logic
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert!(grid.slots[0].is_empty(), "grid slot 0 should be empty");
         assert!(grid.slots[1].is_empty(), "grid slot 1 should be empty");
         assert!(grid.slots[3].is_empty(), "grid slot 3 should be empty");
         assert!(grid.slots[4].is_empty(), "grid slot 4 should be empty");
 
         // Cursor should hold the crafting result
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.cursor.item_id, Some(314), "cursor should hold result");
         assert_eq!(inv.cursor.item_count, 1);
 
@@ -797,7 +836,10 @@ mod tests {
         while rx.try_recv().is_ok() {}
 
         // Place 2 oak planks in each of the 4 grid slots
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[0] = basalt_types::Slot::new(43, 2);
             grid.slots[1] = basalt_types::Slot::new(43, 2);
             grid.slots[3] = basalt_types::Slot::new(43, 2);
@@ -817,7 +859,10 @@ mod tests {
         game_loop.tick(1);
 
         // Should have crafted 2 times (2 planks per slot, 1 consumed per craft)
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert!(grid.slots[0].is_empty(), "all planks should be consumed");
         assert!(grid.slots[1].is_empty(), "all planks should be consumed");
         assert!(
@@ -826,7 +871,10 @@ mod tests {
         );
 
         // Player inventory should contain 2 crafting tables
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         let total: i32 = inv
             .slots
             .iter()
@@ -855,7 +903,7 @@ mod tests {
         // Set cursor to non-recipe item, then left-click grid slot 1
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(9999, 1);
 
@@ -870,7 +918,10 @@ mod tests {
         game_loop.tick(1);
 
         // Output should be empty (no matching recipe)
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert!(
             grid.output.is_empty(),
             "output should be empty for non-recipe items"
@@ -888,7 +939,10 @@ mod tests {
 
         // Set 3 planks directly, place the 4th via cursor click to
         // trigger recipe matching through the server-authoritative path
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[0] = basalt_types::Slot::new(43, 1);
             grid.slots[1] = basalt_types::Slot::new(43, 1);
             grid.slots[2] = basalt_types::Slot::new(43, 1);
@@ -896,7 +950,7 @@ mod tests {
 
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(43, 1);
 
@@ -911,7 +965,10 @@ mod tests {
         });
         game_loop.tick(1);
 
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert_eq!(
             grid.output.item_id,
             Some(314),
@@ -952,10 +1009,17 @@ mod tests {
         assert_eq!(inv_type, 11, "inventory_type should be 11 (crafting table)");
 
         // Player should have OpenContainer
-        assert!(game_loop.ecs.has::<basalt_core::OpenContainer>(eid));
+        assert!(
+            game_loop
+                .ecs
+                .has::<basalt_api::components::OpenContainer>(eid)
+        );
 
         // CraftingGrid should be 3x3 mode
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert_eq!(grid.grid_size, 3, "grid should be 3x3 after opening table");
     }
 
@@ -969,7 +1033,10 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
 
         // Fill all 36 inventory slots with distinct items (no stacking possible)
-        if let Some(inv) = game_loop.ecs.get_mut::<basalt_core::Inventory>(eid) {
+        if let Some(inv) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::Inventory>(eid)
+        {
             for i in 0..36 {
                 inv.slots[i] = basalt_types::Slot::new(i as i32 + 100, 64);
             }
@@ -983,7 +1050,10 @@ mod tests {
         while rx.try_recv().is_ok() {}
 
         // Place recipe ingredients in grid (4 oak planks for crafting table)
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[0] = basalt_types::Slot::new(43, 2);
             grid.slots[1] = basalt_types::Slot::new(43, 2);
             grid.slots[3] = basalt_types::Slot::new(43, 2);
@@ -1003,7 +1073,10 @@ mod tests {
         game_loop.tick(1);
 
         // Ingredients should NOT be consumed (inventory was full)
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert_eq!(
             grid.slots[0].item_count, 2,
             "ingredients should not be consumed when inventory is full"
@@ -1031,7 +1104,10 @@ mod tests {
         while rx.try_recv().is_ok() {}
 
         // Place 4 oak planks in the grid and set output
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[0] = basalt_types::Slot::new(43, 1);
             grid.slots[1] = basalt_types::Slot::new(43, 1);
             grid.slots[3] = basalt_types::Slot::new(43, 1);
@@ -1093,7 +1169,10 @@ mod tests {
         while rx.try_recv().is_ok() {}
 
         // Place 2 oak planks in each of the 4 grid slots
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[0] = basalt_types::Slot::new(43, 2);
             grid.slots[1] = basalt_types::Slot::new(43, 2);
             grid.slots[3] = basalt_types::Slot::new(43, 2);
@@ -1153,7 +1232,10 @@ mod tests {
         while rx.try_recv().is_ok() {}
 
         // Put item in grid slot, cursor empty
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[0] = basalt_types::Slot::new(43, 5);
         }
 
@@ -1168,10 +1250,16 @@ mod tests {
         });
         game_loop.tick(1);
 
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert!(grid.slots[0].is_empty(), "grid slot should be empty");
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.cursor.item_id, Some(43));
         assert_eq!(inv.cursor.item_count, 5);
     }
@@ -1192,12 +1280,15 @@ mod tests {
         while rx.try_recv().is_ok() {}
 
         // Grid has item A, cursor has item B
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[2] = basalt_types::Slot::new(10, 3);
         }
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(20, 7);
 
@@ -1213,11 +1304,17 @@ mod tests {
         game_loop.tick(1);
 
         // Should swap
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert_eq!(grid.slots[2].item_id, Some(20));
         assert_eq!(grid.slots[2].item_count, 7);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.cursor.item_id, Some(10));
         assert_eq!(inv.cursor.item_count, 3);
     }
@@ -1238,12 +1335,15 @@ mod tests {
         while rx.try_recv().is_ok() {}
 
         // Grid has 30 of item, cursor has 40 -> can fit 34 more (to 64)
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[0] = basalt_types::Slot::new(43, 30);
         }
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(43, 40);
 
@@ -1257,10 +1357,16 @@ mod tests {
         });
         game_loop.tick(1);
 
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert_eq!(grid.slots[0].item_count, 64, "grid should be full");
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.cursor.item_count, 6, "cursor should have remainder");
     }
 
@@ -1280,7 +1386,10 @@ mod tests {
         while rx.try_recv().is_ok() {}
 
         // Grid has 10 items, cursor empty
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[0] = basalt_types::Slot::new(43, 10);
         }
 
@@ -1296,10 +1405,16 @@ mod tests {
         game_loop.tick(1);
 
         // Pick up ceil(10/2) = 5, leave 5
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert_eq!(grid.slots[0].item_count, 5);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.cursor.item_id, Some(43));
         assert_eq!(inv.cursor.item_count, 5);
     }
@@ -1322,7 +1437,7 @@ mod tests {
         // Cursor has 5 items, grid slot empty
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(43, 5);
 
@@ -1338,11 +1453,17 @@ mod tests {
         game_loop.tick(1);
 
         // Grid should have 1, cursor should have 4
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert_eq!(grid.slots[0].item_id, Some(43));
         assert_eq!(grid.slots[0].item_count, 1);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.cursor.item_count, 4);
     }
 
@@ -1362,7 +1483,10 @@ mod tests {
         while rx.try_recv().is_ok() {}
 
         // Put item in grid slot
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[0] = basalt_types::Slot::new(43, 3);
         }
 
@@ -1378,10 +1502,16 @@ mod tests {
         game_loop.tick(1);
 
         // Grid should be empty, inventory should have the item
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert!(grid.slots[0].is_empty(), "grid should be empty");
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         let total: i32 = inv
             .slots
             .iter()
@@ -1407,7 +1537,10 @@ mod tests {
         while rx.try_recv().is_ok() {}
 
         // Set up recipe and put different item on cursor
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[0] = basalt_types::Slot::new(43, 1);
             grid.slots[1] = basalt_types::Slot::new(43, 1);
             grid.slots[3] = basalt_types::Slot::new(43, 1);
@@ -1416,7 +1549,7 @@ mod tests {
         }
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(1, 10); // different item
 
@@ -1432,14 +1565,20 @@ mod tests {
         game_loop.tick(1);
 
         // Ingredients should NOT be consumed
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert_eq!(
             grid.slots[0].item_count, 1,
             "ingredients should not be consumed"
         );
 
         // Cursor should still hold the different item
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.cursor.item_id, Some(1));
     }
 
@@ -1459,7 +1598,10 @@ mod tests {
         while rx.try_recv().is_ok() {}
 
         // Set up recipe output = 4 sticks (id 331)
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[0] = basalt_types::Slot::new(43, 1);
             grid.slots[3] = basalt_types::Slot::new(43, 1);
             grid.output = basalt_types::Slot::new(331, 4);
@@ -1468,7 +1610,7 @@ mod tests {
         // Cursor already has 2 of the same item
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(331, 2);
 
@@ -1483,7 +1625,10 @@ mod tests {
         });
         game_loop.tick(1);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.cursor.item_id, Some(331));
         assert_eq!(inv.cursor.item_count, 6, "cursor should have 2+4=6 sticks");
     }
@@ -1507,7 +1652,7 @@ mod tests {
         // Left drag distributes evenly: 4 / 2 = 2 each
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(43, 4);
 
@@ -1555,7 +1700,10 @@ mod tests {
         });
         game_loop.tick(4);
 
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert_eq!(grid.slots[0].item_id, Some(43));
         assert_eq!(grid.slots[0].item_count, 2);
         assert_eq!(grid.slots[1].item_id, Some(43));
@@ -1598,7 +1746,10 @@ mod tests {
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[0] = basalt_types::Slot::new(43, amount);
             grid.slots[1] = basalt_types::Slot::new(43, amount);
             grid.slots[3] = basalt_types::Slot::new(43, amount);
@@ -1632,9 +1783,15 @@ mod tests {
         });
         game_loop.tick(1);
 
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert_eq!(grid.slots[0].item_count, 1, "ingredients not consumed");
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert!(inv.cursor.is_empty(), "cursor still empty");
     }
 
@@ -1671,7 +1828,10 @@ mod tests {
         });
         game_loop.tick(2);
 
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert!(
             grid.output.is_empty(),
             "plugin denied recipe; output must be empty"
@@ -1715,7 +1875,10 @@ mod tests {
         game_loop.tick(1);
 
         assert_eq!(crafted.load(Ordering::SeqCst), 1, "cap honoured");
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert_eq!(
             grid.slots[0].item_count, 3,
             "only one plank consumed per slot"
@@ -1749,7 +1912,10 @@ mod tests {
         });
         game_loop.tick(1);
 
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert!(
             grid.output.is_empty(),
             "broken pattern clears the output slot"

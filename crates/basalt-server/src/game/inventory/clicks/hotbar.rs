@@ -83,7 +83,7 @@ mod tests {
         {
             let inv = game_loop
                 .ecs
-                .get_mut::<basalt_core::Inventory>(eid)
+                .get_mut::<basalt_api::components::Inventory>(eid)
                 .unwrap();
             inv.slots[9] = Slot::new(1, 10); // main slot
             inv.slots[2] = Slot::new(2, 5); // hotbar slot 2
@@ -92,7 +92,10 @@ mod tests {
         // Swap main slot 9 (window 9) with hotbar 2 (mode 2, button 2)
         click(&game_tx, &mut game_loop, uuid, 9, 2, 2);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(
             inv.slots[9].item_id,
             Some(2),
