@@ -60,6 +60,32 @@ impl WorldContext for NoopContext {
         static WORLD: OnceLock<basalt_world::World> = OnceLock::new();
         WORLD.get_or_init(|| basalt_world::World::new_memory(42))
     }
+    fn get_block(&self, x: i32, y: i32, z: i32) -> u16 {
+        self.world().get_block(x, y, z)
+    }
+    fn set_block(&self, x: i32, y: i32, z: i32, state: u16) {
+        self.world().set_block(x, y, z, state);
+    }
+    fn get_block_entity(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> Option<basalt_world::block_entity::BlockEntity> {
+        self.world().get_block_entity(x, y, z).map(|r| r.clone())
+    }
+    fn set_block_entity(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+        entity: basalt_world::block_entity::BlockEntity,
+    ) {
+        self.world().set_block_entity(x, y, z, entity);
+    }
+    fn mark_chunk_dirty(&self, cx: i32, cz: i32) {
+        self.world().mark_chunk_dirty(cx, cz);
+    }
     fn send_block_ack(&self, _sequence: i32) {}
     fn stream_chunks(&self, _cx: i32, _cz: i32) {}
     fn persist_chunk(&self, _cx: i32, _cz: i32) {}
