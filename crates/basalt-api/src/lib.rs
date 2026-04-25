@@ -18,25 +18,8 @@ pub mod logger;
 pub mod plugin;
 pub mod recipes;
 
-/// ECS component types for system plugins.
-///
-/// Contains spatial (Position, Velocity), identity (PlayerRef, EntityKind),
-/// item (DroppedItem, Lifetime), and inventory components.
-pub mod components {
-    pub use basalt_core::components::*;
-    pub use basalt_core::{Component, EntityId};
-}
-
-/// System registration for tick-based plugins.
-///
-/// System plugins register a runner that executes each tick with
-/// access to entities and the world via [`SystemContext`].
-pub mod system {
-    pub use basalt_core::{
-        Phase, SystemAccess, SystemBuilder, SystemContext, SystemContextExt, SystemDescriptor,
-        TickBudget,
-    };
-}
+pub mod components;
+pub mod system;
 
 /// Command argument types, parsing, validation, and dispatch.
 pub mod command;
