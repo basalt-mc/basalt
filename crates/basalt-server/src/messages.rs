@@ -160,6 +160,17 @@ pub enum GameInput {
         /// Action ID (0 = start sneak, 1 = stop sneak).
         action_id: i32,
     },
+    /// Player clicked a recipe in their book — the client expects
+    /// a `CraftRecipeResponse` (ghost recipe) reply showing the
+    /// ingredient layout in the open crafting window.
+    PlaceRecipe {
+        /// UUID of the requesting player.
+        uuid: Uuid,
+        /// Window id of the open crafting window.
+        window_id: i32,
+        /// Per-player numeric `display_id` of the chosen recipe.
+        display_id: i32,
+    },
 }
 
 /// Output from the game loop to a player's net task.
@@ -287,6 +298,37 @@ pub enum ServerOutput {
         z: i32,
         /// Block entity type (2 = chest).
         action: i32,
+    },
+
+    /// Push entries into the player's recipe book.
+    ///
+    /// `replace = true` clears the existing book first (used on join);
+    /// `replace = false` adds to the current set (used per-unlock).
+    /// Entries carry per-player `display_id`s allocated by `KnownRecipes`.
+    /// Net task encodes packet id `0x44`.
+    RecipeBookAdd {
+        /// Recipe-display entries to add.
+        entries: Vec<basalt_protocol::types::RecipeBookEntry>,
+        /// Replace the existing book contents.
+        replace: bool,
+    },
+
+    /// Remove the given `display_id`s from the player's recipe book.
+    ///
+    /// Net task encodes packet id `0x45`.
+    RecipeBookRemove {
+        /// Display IDs whose entries should be removed.
+        display_ids: Vec<i32>,
+    },
+
+    /// Reply to a `Place Recipe` C2S with the ghost-recipe display so
+    /// the client can show the ingredient layout in the open crafting
+    /// window. Net task encodes packet id `0x39`.
+    SendGhostRecipe {
+        /// Window id of the open crafting window the ghost is for.
+        window_id: i32,
+        /// Recipe display payload (variant + slots).
+        display: basalt_protocol::types::RecipeDisplay,
     },
 
     // ── Chunk path (cache-based, zero alloc) ──────────────────────────

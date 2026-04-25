@@ -222,6 +222,13 @@ impl GameLoop {
                         }
                     }
                 }
+                GameInput::PlaceRecipe {
+                    uuid,
+                    window_id,
+                    display_id,
+                } => {
+                    self.handle_place_recipe(uuid, window_id, display_id);
+                }
             }
         }
     }

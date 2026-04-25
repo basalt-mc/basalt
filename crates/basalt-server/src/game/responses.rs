@@ -185,6 +185,12 @@ impl GameLoop {
                         );
                     }
                 }
+                Response::UnlockRecipe { recipe_id, reason } => {
+                    self.unlock_recipe(source_uuid, recipe_id.clone(), *reason);
+                }
+                Response::LockRecipe { recipe_id } => {
+                    self.lock_recipe(source_uuid, recipe_id.clone());
+                }
             }
         }
     }

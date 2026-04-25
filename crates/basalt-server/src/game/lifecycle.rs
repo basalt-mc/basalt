@@ -54,6 +54,8 @@ impl GameLoop {
         );
         self.ecs.set(eid, basalt_core::Inventory::empty());
         self.ecs.set(eid, basalt_core::CraftingGrid::empty());
+        self.ecs
+            .set(eid, basalt_core::components::KnownRecipes::default());
         self.ecs.set(
             eid,
             SkinData {
@@ -66,6 +68,11 @@ impl GameLoop {
 
         // Send initial world data
         self.send_initial_world(eid, entity_id, position);
+
+        // Initialise the recipe book — even an empty one is required;
+        // the 1.21.4 client expects a `RecipeBookAdd { replace: true }`
+        // packet on join to set up its book UI.
+        self.send_initial_recipe_book(eid);
 
         // Send existing players to the new player + broadcast join
         let snapshot = basalt_api::broadcast::PlayerSnapshot {

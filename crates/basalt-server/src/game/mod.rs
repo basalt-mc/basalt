@@ -16,6 +16,7 @@ mod inventory;
 mod items;
 mod lifecycle;
 mod movement;
+mod recipe_book;
 mod responses;
 
 use std::collections::HashSet;
