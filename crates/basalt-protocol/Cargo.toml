@@ -1,7 +1,7 @@
 [package]
 name = "basalt-protocol"
 version.workspace = true
-publish = false
+publish = true
 description = "Minecraft packet definitions and version-aware packet registry"
 edition.workspace = true
 license.workspace = true
