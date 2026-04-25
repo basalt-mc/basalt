@@ -142,17 +142,31 @@ pub async fn connect_to_play_as(
         }
     }
 
-    // The welcome message is now followed by chunk batches that the
-    // drainer ships across multiple ticks (~5 ticks for a full view at
-    // the default 25 chunks/tick rate). Drain until silence so the test
-    // doesn't fight the chunk trickle when reading later packets.
-    while tokio::time::timeout(
-        std::time::Duration::from_millis(300),
-        framing::read_raw_packet(&mut client),
-    )
-    .await
-    .is_ok()
-    {}
+    // After the welcome message the drainer ships exactly 121 chunks
+    // (view radius 5 → `(2*5+1)^2`) across several ticks at the
+    // default 25 chunks/tick rate. Reading until we observe both
+    // (a) all 121 `MapChunk` packets and (b) the trailing
+    // `ChunkBatchFinished` of the batch that contained the last chunk
+    // is deterministic — no timeout race on slow CI runners — and
+    // leaves the wire idle so tests can start their real work.
+    use basalt_protocol::packets::play::world::{
+        ClientboundPlayChunkBatchFinished, ClientboundPlayMapChunk,
+    };
+    const INITIAL_CHUNK_COUNT: i32 = 121;
+    let mut chunks_drained = 0;
+    loop {
+        let raw = framing::read_raw_packet(&mut client)
+            .await
+            .unwrap()
+            .unwrap();
+        if raw.id == ClientboundPlayMapChunk::PACKET_ID {
+            chunks_drained += 1;
+        } else if raw.id == ClientboundPlayChunkBatchFinished::PACKET_ID
+            && chunks_drained >= INITIAL_CHUNK_COUNT
+        {
+            break;
+        }
+    }
 
     client
 }
