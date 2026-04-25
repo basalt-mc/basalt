@@ -97,6 +97,39 @@ pub trait ChatContext {
 pub trait WorldContext {
     /// Returns a reference to the world (chunks, blocks, persistence).
     fn world(&self) -> &basalt_world::World;
+
+    /// Returns the block state at the given position.
+    ///
+    /// Generates or loads the chunk if it is not cached. Returns 0
+    /// (air) for positions outside the valid Y range.
+    fn get_block(&self, x: i32, y: i32, z: i32) -> u16;
+
+    /// Sets a block state at the given position.
+    ///
+    /// Generates or loads the chunk if it is not cached. Marks the
+    /// containing chunk as dirty for persistence.
+    fn set_block(&self, x: i32, y: i32, z: i32, state: u16);
+
+    /// Returns a cloned block entity at the given position, if any.
+    fn get_block_entity(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> Option<basalt_world::block_entity::BlockEntity>;
+
+    /// Sets a block entity at the given position.
+    fn set_block_entity(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+        entity: basalt_world::block_entity::BlockEntity,
+    );
+
+    /// Marks a chunk as dirty so the persistence system flushes it.
+    fn mark_chunk_dirty(&self, cx: i32, cz: i32);
+
     /// Sends a block action acknowledgement to the current player.
     fn send_block_ack(&self, sequence: i32);
     /// Streams chunks around the given chunk coordinates.
