@@ -35,7 +35,7 @@ impl Plugin for WorldPlugin {
 #[cfg(test)]
 mod tests {
     use basalt_api::components::{ChunkPosition, Position, Rotation};
-    use basalt_testkit::PluginTestHarness;
+    use basalt_api::testing::PluginTestHarness;
 
     use super::*;
 
