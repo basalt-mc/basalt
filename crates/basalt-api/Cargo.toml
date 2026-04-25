@@ -2,9 +2,15 @@
 name = "basalt-api"
 version.workspace = true
 publish = false
+description = "Public plugin API for the Basalt Minecraft server: traits, components, events, and the plugin registration system"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+documentation = "https://docs.rs/basalt-api"
+readme = "README.md"
+rust-version = "1.85"
+keywords = ["minecraft", "server", "plugin", "game", "api"]
+categories = ["game-development", "api-bindings"]
 
 [features]
 default = []
