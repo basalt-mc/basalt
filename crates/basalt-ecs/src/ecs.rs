@@ -186,7 +186,8 @@ impl Ecs {
 
     /// Sets the world reference for system runners.
     ///
-    /// Must be called before `run_all` if any system uses `ctx.world()`.
+    /// Must be called before `run_all` if any system uses world methods
+    /// (e.g. `ctx.get_block()`, `ctx.resolve_movement()`).
     pub fn set_world(&mut self, world: std::sync::Arc<basalt_world::World>) {
         self.world = Some(world);
     }
@@ -618,11 +619,73 @@ impl Default for Ecs {
     }
 }
 
-impl basalt_api::system::SystemContext for Ecs {
-    fn world(&self) -> &basalt_world::World {
+impl Ecs {
+    /// Returns a reference to the internal world.
+    ///
+    /// Used by the `SystemContext` implementation to delegate typed
+    /// world methods. Panics if `set_world()` was not called.
+    fn world_ref(&self) -> &basalt_world::World {
         self.world
             .as_ref()
-            .expect("Ecs::set_world() must be called before running systems that use ctx.world()")
+            .expect("Ecs::set_world() must be called before running systems")
+    }
+}
+
+impl basalt_api::system::SystemContext for Ecs {
+    fn get_block(&self, x: i32, y: i32, z: i32) -> u16 {
+        self.world_ref().get_block(x, y, z)
+    }
+
+    fn set_block(&self, x: i32, y: i32, z: i32, state: u16) {
+        self.world_ref().set_block(x, y, z, state);
+    }
+
+    fn get_block_entity(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> Option<basalt_world::block_entity::BlockEntity> {
+        self.world_ref()
+            .get_block_entity(x, y, z)
+            .map(|r| r.clone())
+    }
+
+    fn set_block_entity(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+        entity: basalt_world::block_entity::BlockEntity,
+    ) {
+        self.world_ref().set_block_entity(x, y, z, entity);
+    }
+
+    fn mark_chunk_dirty(&self, cx: i32, cz: i32) {
+        self.world_ref().mark_chunk_dirty(cx, cz);
+    }
+
+    fn check_overlap(&self, aabb: &basalt_api::world::collision::Aabb) -> bool {
+        basalt_api::world::collision::check_overlap(self.world_ref(), aabb)
+    }
+
+    fn ray_cast(
+        &self,
+        origin: (f64, f64, f64),
+        direction: (f64, f64, f64),
+        max_distance: f64,
+    ) -> Option<basalt_api::world::collision::RayHit> {
+        basalt_api::world::collision::ray_cast(self.world_ref(), origin, direction, max_distance)
+    }
+
+    fn resolve_movement(
+        &self,
+        aabb: &basalt_api::world::collision::Aabb,
+        dx: f64,
+        dy: f64,
+        dz: f64,
+    ) -> (f64, f64, f64) {
+        basalt_api::world::collision::resolve_movement(self.world_ref(), aabb, dx, dy, dz)
     }
 
     fn spawn(&mut self) -> EntityId {

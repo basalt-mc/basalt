@@ -20,24 +20,17 @@ pub use crate::components::{EntityId, Phase};
 /// Methods use `TypeId` + `dyn Any` internally. Typed access is
 /// provided via free functions ([`get`], [`get_mut`], [`iter`]).
 pub trait SystemContext {
-    /// Returns a reference to the world for block/collision queries.
-    fn world(&self) -> &basalt_world::World;
-
     /// Returns the block state at the given position.
     ///
     /// Generates or loads the chunk if it is not cached. Returns 0
     /// (air) for positions outside the valid Y range.
-    fn get_block(&self, x: i32, y: i32, z: i32) -> u16 {
-        self.world().get_block(x, y, z)
-    }
+    fn get_block(&self, x: i32, y: i32, z: i32) -> u16;
 
     /// Sets a block state at the given position.
     ///
     /// Generates or loads the chunk if it is not cached. Marks the
     /// containing chunk as dirty for persistence.
-    fn set_block(&self, x: i32, y: i32, z: i32, state: u16) {
-        self.world().set_block(x, y, z, state);
-    }
+    fn set_block(&self, x: i32, y: i32, z: i32, state: u16);
 
     /// Returns a cloned block entity at the given position, if any.
     fn get_block_entity(
@@ -45,9 +38,7 @@ pub trait SystemContext {
         x: i32,
         y: i32,
         z: i32,
-    ) -> Option<basalt_world::block_entity::BlockEntity> {
-        self.world().get_block_entity(x, y, z).map(|r| r.clone())
-    }
+    ) -> Option<basalt_world::block_entity::BlockEntity>;
 
     /// Sets a block entity at the given position.
     fn set_block_entity(
@@ -56,22 +47,16 @@ pub trait SystemContext {
         y: i32,
         z: i32,
         entity: basalt_world::block_entity::BlockEntity,
-    ) {
-        self.world().set_block_entity(x, y, z, entity);
-    }
+    );
 
     /// Marks a chunk as dirty so the persistence system flushes it.
-    fn mark_chunk_dirty(&self, cx: i32, cz: i32) {
-        self.world().mark_chunk_dirty(cx, cz);
-    }
+    fn mark_chunk_dirty(&self, cx: i32, cz: i32);
 
     /// Checks if an AABB overlaps any solid block in the world.
     ///
-    /// Delegates to the collision module. Used for ground detection
-    /// and simple overlap tests in physics systems.
-    fn check_overlap(&self, aabb: &crate::world::collision::Aabb) -> bool {
-        crate::world::collision::check_overlap(self.world(), aabb)
-    }
+    /// Used for ground detection and simple overlap tests in
+    /// physics systems.
+    fn check_overlap(&self, aabb: &crate::world::collision::Aabb) -> bool;
 
     /// Casts a ray through the world and returns the first solid block hit.
     ///
@@ -81,9 +66,7 @@ pub trait SystemContext {
         origin: (f64, f64, f64),
         direction: (f64, f64, f64),
         max_distance: f64,
-    ) -> Option<crate::world::collision::RayHit> {
-        crate::world::collision::ray_cast(self.world(), origin, direction, max_distance)
-    }
+    ) -> Option<crate::world::collision::RayHit>;
 
     /// Resolves movement of an AABB against solid blocks.
     ///
@@ -95,9 +78,7 @@ pub trait SystemContext {
         dx: f64,
         dy: f64,
         dz: f64,
-    ) -> (f64, f64, f64) {
-        crate::world::collision::resolve_movement(self.world(), aabb, dx, dy, dz)
-    }
+    ) -> (f64, f64, f64);
 
     /// Spawns a new entity and returns its unique ID.
     fn spawn(&mut self) -> EntityId;

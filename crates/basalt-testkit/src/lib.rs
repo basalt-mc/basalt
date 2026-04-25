@@ -480,8 +480,58 @@ impl Default for SystemTestContext {
 }
 
 impl basalt_api::system::SystemContext for SystemTestContext {
-    fn world(&self) -> &World {
-        &self.world
+    fn get_block(&self, x: i32, y: i32, z: i32) -> u16 {
+        self.world.get_block(x, y, z)
+    }
+
+    fn set_block(&self, x: i32, y: i32, z: i32, state: u16) {
+        self.world.set_block(x, y, z, state);
+    }
+
+    fn get_block_entity(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> Option<basalt_world::block_entity::BlockEntity> {
+        self.world.get_block_entity(x, y, z).map(|r| r.clone())
+    }
+
+    fn set_block_entity(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+        entity: basalt_world::block_entity::BlockEntity,
+    ) {
+        self.world.set_block_entity(x, y, z, entity);
+    }
+
+    fn mark_chunk_dirty(&self, cx: i32, cz: i32) {
+        self.world.mark_chunk_dirty(cx, cz);
+    }
+
+    fn check_overlap(&self, aabb: &basalt_api::world::collision::Aabb) -> bool {
+        basalt_api::world::collision::check_overlap(&self.world, aabb)
+    }
+
+    fn ray_cast(
+        &self,
+        origin: (f64, f64, f64),
+        direction: (f64, f64, f64),
+        max_distance: f64,
+    ) -> Option<basalt_api::world::collision::RayHit> {
+        basalt_api::world::collision::ray_cast(&self.world, origin, direction, max_distance)
+    }
+
+    fn resolve_movement(
+        &self,
+        aabb: &basalt_api::world::collision::Aabb,
+        dx: f64,
+        dy: f64,
+        dz: f64,
+    ) -> (f64, f64, f64) {
+        basalt_api::world::collision::resolve_movement(&self.world, aabb, dx, dy, dz)
     }
 
     fn spawn(&mut self) -> basalt_api::components::EntityId {
