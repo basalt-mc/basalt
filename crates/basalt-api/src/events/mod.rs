@@ -19,7 +19,10 @@ mod player;
 pub use block::{BlockBrokenEvent, BlockPlacedEvent, PlayerInteractEvent};
 pub use chat::{ChatMessageEvent, CommandEvent};
 pub use container::*;
-pub use crafting::{CraftingGridChangedEvent, CraftingOutputClickedEvent};
+pub use crafting::{
+    CraftingCraftedEvent, CraftingGridChangedEvent, CraftingPreCraftEvent,
+    CraftingRecipeClearedEvent, CraftingRecipeMatchedEvent, CraftingShiftClickBatchEvent,
+};
 pub use player::{PlayerJoinedEvent, PlayerLeftEvent, PlayerMovedEvent};
 
 /// Implements [`Event`](basalt_events::Event) and

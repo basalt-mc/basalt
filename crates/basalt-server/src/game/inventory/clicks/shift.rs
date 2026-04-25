@@ -27,7 +27,7 @@ impl GameLoop {
                 if !has_output {
                     return false;
                 }
-                let cancelled = self.dispatch_crafting_output_clicked(uuid, eid, true);
+                let cancelled = self.dispatch_crafting_pre_craft(uuid, eid, true);
                 if !cancelled {
                     self.handle_shift_click_craft(eid);
                     self.sync_crafting_grid_to_client(eid);

@@ -69,7 +69,7 @@ impl GameLoop {
     /// Takes the crafting output and consumes ingredients.
     ///
     /// Validates that the cursor is empty or compatible with the output,
-    /// dispatches `CraftingOutputClickedEvent` (allowing cancellation),
+    /// dispatches `CraftingPreCraftEvent` (allowing cancellation),
     /// then moves the output to the cursor and decrements each grid
     /// ingredient by one.
     ///
@@ -102,7 +102,7 @@ impl GameLoop {
             return false;
         }
 
-        let cancelled = self.dispatch_crafting_output_clicked(uuid, eid, false);
+        let cancelled = self.dispatch_crafting_pre_craft(uuid, eid, false);
         if cancelled {
             return false;
         }

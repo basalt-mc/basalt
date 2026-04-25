@@ -92,7 +92,9 @@ pub mod prelude {
         BlockEntityModifiedEvent, BlockPlacedEvent, ChatMessageEvent, CloseReason, CommandEvent,
         ContainerClickEvent, ContainerClickType, ContainerClosedEvent, ContainerDragEvent,
         ContainerOpenRequestEvent, ContainerOpenedEvent, ContainerSlotChangedEvent,
-        CraftingGridChangedEvent, CraftingOutputClickedEvent, DragType, PlayerInteractEvent,
-        PlayerJoinedEvent, PlayerLeftEvent, PlayerMovedEvent, WindowSlotKind,
+        CraftingCraftedEvent, CraftingGridChangedEvent, CraftingPreCraftEvent,
+        CraftingRecipeClearedEvent, CraftingRecipeMatchedEvent, CraftingShiftClickBatchEvent,
+        DragType, PlayerInteractEvent, PlayerJoinedEvent, PlayerLeftEvent, PlayerMovedEvent,
+        WindowSlotKind,
     };
 }
