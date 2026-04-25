@@ -1,6 +1,7 @@
 //! Crafting events: grid changes, recipe matching, craft execution,
 //! and recipe-registry lifecycle.
 
+use basalt_core::context::UnlockReason;
 use basalt_recipes::{Recipe, RecipeId};
 use basalt_types::Slot;
 
@@ -181,6 +182,35 @@ pub struct RecipeUnregisteredEvent {
 }
 crate::game_event!(RecipeUnregisteredEvent);
 
+/// A recipe has been unlocked for the current player.
+///
+/// Fired at the **Post** stage on the **game** bus after the player's
+/// `KnownRecipes` component records the recipe and the
+/// `Recipe Book Add` packet has been queued. The crafting player is
+/// available via `ctx.player()`.
+#[derive(Debug, Clone)]
+pub struct RecipeUnlockedEvent {
+    /// Stable identifier of the unlocked recipe.
+    pub recipe_id: RecipeId,
+    /// Why the unlock happened — auto-discovery, manual grant, or
+    /// initial-join starter set.
+    pub reason: UnlockReason,
+}
+crate::game_event!(RecipeUnlockedEvent);
+
+/// A recipe has been locked for the current player.
+///
+/// Fired at the **Post** stage on the **game** bus after the player's
+/// `KnownRecipes` component drops the recipe and the
+/// `Recipe Book Remove` packet has been queued. The crafting player
+/// is available via `ctx.player()`.
+#[derive(Debug, Clone)]
+pub struct RecipeLockedEvent {
+    /// Stable identifier of the locked recipe.
+    pub recipe_id: RecipeId,
+}
+crate::game_event!(RecipeLockedEvent);
+
 #[cfg(test)]
 mod tests {
     use basalt_events::{BusKind, Event, EventRouting};
@@ -313,5 +343,29 @@ mod tests {
         assert!(!event.is_cancelled());
         assert_eq!(event.recipe_id.path, "obsolete");
         assert_eq!(RecipeUnregisteredEvent::BUS, BusKind::Game);
+    }
+
+    #[test]
+    fn recipe_unlocked_carries_id_and_reason() {
+        let mut event = RecipeUnlockedEvent {
+            recipe_id: RecipeId::vanilla("oak_planks"),
+            reason: UnlockReason::AutoDiscovered,
+        };
+        // not cancellable
+        event.cancel();
+        assert!(!event.is_cancelled());
+        assert_eq!(event.reason, UnlockReason::AutoDiscovered);
+        assert_eq!(RecipeUnlockedEvent::BUS, BusKind::Game);
+    }
+
+    #[test]
+    fn recipe_locked_carries_id() {
+        let mut event = RecipeLockedEvent {
+            recipe_id: RecipeId::new("plugin", "expired"),
+        };
+        event.cancel();
+        assert!(!event.is_cancelled());
+        assert_eq!(event.recipe_id.path, "expired");
+        assert_eq!(RecipeLockedEvent::BUS, BusKind::Game);
     }
 }

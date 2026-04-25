@@ -22,7 +22,8 @@ pub use container::*;
 pub use crafting::{
     CraftingCraftedEvent, CraftingGridChangedEvent, CraftingPreCraftEvent,
     CraftingRecipeClearedEvent, CraftingRecipeMatchedEvent, CraftingShiftClickBatchEvent,
-    RecipeRegisterEvent, RecipeRegisteredEvent, RecipeUnregisteredEvent,
+    RecipeLockedEvent, RecipeRegisterEvent, RecipeRegisteredEvent, RecipeUnlockedEvent,
+    RecipeUnregisteredEvent,
 };
 pub use player::{PlayerJoinedEvent, PlayerLeftEvent, PlayerMovedEvent};
 

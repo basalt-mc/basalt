@@ -105,3 +105,75 @@ fn context_trait_is_usable_as_dyn() {
     dyn_ctx.chat().send("via trait");
     assert_eq!(ctx.drain_responses().len(), 1);
 }
+
+#[test]
+fn recipes_unlock_queues_response() {
+    use basalt_core::context::UnlockReason;
+    use basalt_recipes::RecipeId;
+
+    let ctx = test_ctx();
+    let id = RecipeId::vanilla("oak_planks");
+    ctx.recipes().unlock(&id, UnlockReason::Manual);
+
+    let responses = ctx.drain_responses();
+    assert_eq!(responses.len(), 1);
+    match &responses[0] {
+        Response::UnlockRecipe { recipe_id, reason } => {
+            assert_eq!(recipe_id, &id);
+            assert_eq!(*reason, UnlockReason::Manual);
+        }
+        other => panic!("expected UnlockRecipe, got {other:?}"),
+    }
+}
+
+#[test]
+fn recipes_lock_queues_response() {
+    use basalt_recipes::RecipeId;
+
+    let ctx = test_ctx();
+    let id = RecipeId::new("plugin", "obsolete");
+    ctx.recipes().lock(&id);
+
+    let responses = ctx.drain_responses();
+    assert_eq!(responses.len(), 1);
+    match &responses[0] {
+        Response::LockRecipe { recipe_id } => {
+            assert_eq!(recipe_id, &id);
+        }
+        other => panic!("expected LockRecipe, got {other:?}"),
+    }
+}
+
+#[test]
+fn recipes_has_reads_snapshot() {
+    use basalt_core::components::KnownRecipes;
+    use basalt_recipes::RecipeId;
+
+    let id = RecipeId::vanilla("oak_planks");
+    let mut snapshot = KnownRecipes::default();
+    snapshot.unlock(id.clone());
+
+    let ctx = ServerContext::new(
+        test_world(),
+        PlayerInfo {
+            uuid: Uuid::default(),
+            entity_id: 1,
+            username: "Steve".into(),
+            rotation: Rotation {
+                yaw: 0.0,
+                pitch: 0.0,
+            },
+            position: basalt_core::Position {
+                x: 0.0,
+                y: 64.0,
+                z: 0.0,
+            },
+        },
+    )
+    .with_known_recipes(snapshot);
+
+    assert!(ctx.recipes().has(&id));
+    assert!(!ctx.recipes().has(&RecipeId::vanilla("missing")));
+    let snapshot_ids = ctx.recipes().unlocked();
+    assert_eq!(snapshot_ids, vec![id]);
+}

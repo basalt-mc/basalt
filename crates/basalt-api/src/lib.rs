@@ -73,7 +73,7 @@ pub mod prelude {
     // Context traits
     pub use basalt_core::{
         BroadcastMessage, ChatContext, ContainerContext, Context, EntityContext, Gamemode,
-        PlayerContext, WorldContext,
+        PlayerContext, RecipeContext, UnlockReason, WorldContext,
     };
 
     // Event system
@@ -91,7 +91,8 @@ pub mod prelude {
         CraftingCraftedEvent, CraftingGridChangedEvent, CraftingPreCraftEvent,
         CraftingRecipeClearedEvent, CraftingRecipeMatchedEvent, CraftingShiftClickBatchEvent,
         DragType, PlayerInteractEvent, PlayerJoinedEvent, PlayerLeftEvent, PlayerMovedEvent,
-        RecipeRegisterEvent, RecipeRegisteredEvent, RecipeUnregisteredEvent, WindowSlotKind,
+        RecipeLockedEvent, RecipeRegisterEvent, RecipeRegisteredEvent, RecipeUnlockedEvent,
+        RecipeUnregisteredEvent, WindowSlotKind,
     };
 
     // Recipe types referenced by registry-lifecycle events.
