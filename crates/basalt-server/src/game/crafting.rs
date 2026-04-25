@@ -4,7 +4,8 @@
 //! and crafting window management. All crafting-specific methods live here
 //! to keep `inventory.rs` and `container.rs` focused on their domains.
 
-use basalt_api::events::{CraftingGridChangedEvent, CraftingOutputClickedEvent};
+use basalt_api::events::{CraftingGridChangedEvent, CraftingPreCraftEvent};
+use basalt_types::Slot;
 use basalt_types::Uuid;
 
 use super::GameLoop;
@@ -100,25 +101,26 @@ impl GameLoop {
         self.process_responses(uuid, &ctx.drain_responses());
     }
 
-    /// Dispatches a `CraftingOutputClickedEvent` for the given player.
+    /// Dispatches a `CraftingPreCraftEvent` for the given player.
     ///
-    /// Fires when the player clicks the output slot of a crafting
-    /// grid that has a valid recipe result. Returns `true` if the
-    /// event was cancelled by a Validate handler.
-    pub(super) fn dispatch_crafting_output_clicked(
+    /// Fires at Validate when the player clicks the output slot of a
+    /// crafting grid that has a valid recipe result. Returns `true`
+    /// if the event was cancelled by a Validate handler — the caller
+    /// must abort the craft (no consume, no transfer).
+    pub(super) fn dispatch_crafting_pre_craft(
         &mut self,
         uuid: Uuid,
         eid: basalt_ecs::EntityId,
-        shift_click: bool,
+        is_shift_click: bool,
     ) -> bool {
-        let (result_id, result_count) = {
+        let result: Slot = {
             let Some(grid) = self.ecs.get::<basalt_core::CraftingGrid>(eid) else {
                 return true;
             };
-            let Some(id) = grid.output.item_id else {
+            if grid.output.item_id.is_none() {
                 return true;
-            };
-            (id, grid.output.item_count)
+            }
+            grid.output.clone()
         };
 
         let (entity_id, username, yaw, pitch) = match self.player_info(eid) {
@@ -127,10 +129,9 @@ impl GameLoop {
         };
 
         let ctx = self.make_context(uuid, entity_id, &username, yaw, pitch);
-        let mut event = CraftingOutputClickedEvent {
-            result_id,
-            result_count,
-            shift_click,
+        let mut event = CraftingPreCraftEvent {
+            result,
+            is_shift_click,
             cancelled: false,
         };
         self.dispatch_event(&mut event, &ctx);
