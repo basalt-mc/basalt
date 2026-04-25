@@ -15,11 +15,12 @@ use basalt_protocol::packets::login::{ClientboundLoginSuccess, ServerboundLoginP
 use basalt_protocol::packets::status::{
     ClientboundStatusPing, ClientboundStatusServerInfo, ServerboundStatusPacket,
 };
-use basalt_protocol::registry_data::build_default_registries;
+use basalt_protocol::registry_data::cached_registry_payloads;
 use basalt_types::Uuid;
 use dashmap::DashMap;
 use tokio::sync::{broadcast, mpsc};
 
+use crate::helpers::RawSlice;
 use crate::messages::{GameInput, ServerOutput};
 use crate::net::channels::player_output_channel;
 use crate::state::ServerState;
@@ -174,10 +175,14 @@ async fn handle_configuration(
     let skin_task =
         tokio::spawn(async move { crate::net::skin::fetch_skin_properties(&skin_username).await });
 
-    let registries = build_default_registries();
-    for reg in &registries {
-        conn.write_packet_typed(ClientboundConfigurationRegistryData::PACKET_ID, reg)
-            .await?;
+    // Registry payloads are identical across logins; encode once at
+    // first call, write the cached bytes per connection.
+    for payload in cached_registry_payloads() {
+        conn.write_packet_typed(
+            ClientboundConfigurationRegistryData::PACKET_ID,
+            &RawSlice(payload),
+        )
+        .await?;
     }
 
     let conn = conn.finish_configuration().await?;
