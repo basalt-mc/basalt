@@ -24,11 +24,12 @@
 use std::sync::Arc;
 
 use basalt_api::context::ServerContext;
+use basalt_api::events::{BusKind, EventRouting};
 use basalt_api::plugin::PluginRegistrar;
+use basalt_api::{Event, Stage};
 use basalt_api::{EventBus, Plugin, Response};
 use basalt_core::PlayerInfo;
 use basalt_core::components::Rotation;
-use basalt_events::{Event, EventRouting, Stage};
 use basalt_types::Uuid;
 use basalt_world::World;
 
@@ -123,11 +124,11 @@ impl PluginTestHarness {
             handler(event, ctx as &dyn basalt_core::Context);
         };
         match E::BUS {
-            basalt_events::BusKind::Instant => {
+            BusKind::Instant => {
                 self.instant_bus
                     .on::<E, ServerContext>(stage, priority, wrapper);
             }
-            basalt_events::BusKind::Game => {
+            BusKind::Game => {
                 self.game_bus
                     .on::<E, ServerContext>(stage, priority, wrapper);
             }
@@ -240,8 +241,8 @@ impl PluginTestHarness {
     /// Routes a type-erased event to the correct bus.
     fn dispatch_routed(&self, event: &mut dyn Event, ctx: &ServerContext) {
         match event.bus_kind() {
-            basalt_events::BusKind::Instant => self.instant_bus.dispatch_dyn(event, ctx),
-            basalt_events::BusKind::Game => self.game_bus.dispatch_dyn(event, ctx),
+            BusKind::Instant => self.instant_bus.dispatch_dyn(event, ctx),
+            BusKind::Game => self.game_bus.dispatch_dyn(event, ctx),
         }
     }
 }

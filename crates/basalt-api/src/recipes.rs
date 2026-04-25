@@ -18,7 +18,7 @@
 //! handler is registered, so retroactively dispatching 1557 events
 //! would only spam handlers without serving a use case.
 
-use basalt_events::{Event, EventBus};
+use crate::events::{Event, EventBus};
 
 // Re-export the underlying recipe types so plugins can refer to them
 // from `basalt_api::recipes` without depending on `basalt-recipes`
@@ -162,7 +162,7 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicU32, Ordering};
 
-    use basalt_events::Stage;
+    use crate::events::Stage;
 
     use super::*;
 

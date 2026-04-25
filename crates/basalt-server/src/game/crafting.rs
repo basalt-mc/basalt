@@ -1572,7 +1572,7 @@ mod tests {
         CraftingCraftedEvent, CraftingPreCraftEvent, CraftingRecipeClearedEvent,
         CraftingRecipeMatchedEvent, CraftingShiftClickBatchEvent,
     };
-    use basalt_events::{Event, Stage};
+    use basalt_api::{Event, Stage};
 
     /// Sets up a player with an open crafting table and pre-fills the
     /// 2x2 of oak planks (id 43) needed for a crafting-table recipe

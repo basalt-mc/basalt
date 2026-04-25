@@ -28,7 +28,7 @@ crate::instant_cancellable_event!(CommandEvent);
 
 #[cfg(test)]
 mod tests {
-    use basalt_events::{BusKind, EventRouting};
+    use crate::events::{BusKind, EventRouting};
 
     use super::*;
 

@@ -7,13 +7,13 @@
 
 use std::collections::HashMap;
 
+use basalt_api::Event;
 use basalt_api::events::{
     RecipeBookFillRequestEvent, RecipeBookFilledEvent, RecipeLockedEvent, RecipeUnlockedEvent,
 };
 use basalt_core::components::{CraftingGrid, Inventory, KnownRecipes, Position};
 use basalt_core::context::UnlockReason;
 use basalt_ecs::EntityId;
-use basalt_events::Event;
 use basalt_protocol::packets::play::misc::{
     ClientboundPlayRecipeBookAddEntries, ClientboundPlayRecipeBookAddEntriesRecipe,
 };
@@ -1153,7 +1153,7 @@ mod tests {
         game_loop
             .bus
             .on::<RecipeBookFillRequestEvent, basalt_api::context::ServerContext>(
-                basalt_events::Stage::Validate,
+                basalt_api::Stage::Validate,
                 0,
                 |event, _| event.cancel(),
             );

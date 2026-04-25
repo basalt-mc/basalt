@@ -40,7 +40,7 @@ crate::instant_cancellable_event!(RawPacketEvent);
 
 #[cfg(test)]
 mod tests {
-    use basalt_events::Event;
+    use crate::events::Event;
     use basalt_protocol::packets::play::ServerboundPlayPacket;
     use basalt_protocol::packets::play::misc::ServerboundPlayKeepAlive;
 
@@ -61,7 +61,7 @@ mod tests {
 
     #[test]
     fn raw_packet_event_routes_to_instant_bus() {
-        use basalt_events::{BusKind, EventRouting};
+        use crate::events::{BusKind, EventRouting};
         assert_eq!(RawPacketEvent::BUS, BusKind::Instant);
     }
 

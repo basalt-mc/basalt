@@ -14,5 +14,4 @@ basalt-core = { workspace = true }
 basalt-ecs = { workspace = true }
 basalt-world = { workspace = true }
 basalt-types = { workspace = true }
-basalt-events = { workspace = true }
 basalt-recipes = { workspace = true }
