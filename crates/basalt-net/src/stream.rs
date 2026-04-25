@@ -20,9 +20,12 @@ use crate::framing::{MAX_PACKET_SIZE, RawPacket};
 /// Once enabled, neither layer can be disabled. On the wire, compression
 /// is applied first (at the frame level), then encryption wraps everything
 /// including the length prefix.
-pub struct ProtocolStream {
-    /// The underlying TCP stream.
-    stream: TcpStream,
+pub struct ProtocolStream<W = TcpStream> {
+    /// The underlying byte stream. Defaults to `TcpStream` so existing
+    /// call sites (`Connection::accept`, etc.) compile unchanged; tests
+    /// and benches can substitute any `AsyncRead + AsyncWrite + Unpin`
+    /// type (e.g. `tokio::io::DuplexStream`).
+    stream: W,
     /// The cipher pair, if encryption has been enabled.
     cipher: Option<CipherPair>,
     /// The compression threshold in bytes, if compression has been enabled.
@@ -46,9 +49,10 @@ pub struct ProtocolStream {
     frame_buf: Vec<u8>,
 }
 
-impl ProtocolStream {
-    /// Creates a new unencrypted stream from a TCP connection.
-    pub fn new(stream: TcpStream) -> Self {
+impl<W> ProtocolStream<W> {
+    /// Creates a new unencrypted stream from any byte-stream backing
+    /// (`TcpStream` in production, `DuplexStream` in benches/tests).
+    pub fn new(stream: W) -> Self {
         Self {
             stream,
             cipher: None,
@@ -93,7 +97,13 @@ impl ProtocolStream {
     pub fn is_compressed(&self) -> bool {
         self.compression_threshold.is_some()
     }
+}
 
+/// Async I/O methods — require the underlying stream to support both
+/// reading and writing. The bidirectional bound matches how
+/// `ProtocolStream` is actually used (handshake exchanges in both
+/// directions on the same stream).
+impl<W: AsyncReadExt + AsyncWriteExt + Unpin> ProtocolStream<W> {
     /// Reads exactly `buf.len()` bytes, decrypting if encryption is active.
     ///
     /// Reads raw bytes from the TCP stream, then decrypts them in place

@@ -134,3 +134,61 @@ fn write_packet_prealloc_movement(b: &mut Bencher) {
         black_box(&buf);
     });
 }
+
+// -- Production-method bench (end-to-end path) ----------------------
+//
+// Calls `ProtocolStream::write_raw_packet` against an in-memory
+// `tokio::io::DuplexStream`, the closest we can get to the production
+// write path without real TCP. The reader half is drained by a
+// background task on the same runtime so writes never block on a
+// full duplex buffer.
+//
+// **What this measures**: encoding + framing + duplex write +
+// `tokio::block_on` polling overhead, all in one. To dilute the
+// constant per-iter `block_on` cost (~30-50 ns), each iteration
+// performs 100 sequential `write_raw_packet` calls. Divide the
+// reported `ns/iter` by 100 to estimate per-packet cost.
+//
+// **Expected per-packet cost**: a few tens of ns — close to the
+// allocator-free `write_packet_prealloc_movement` baseline
+// (~6 ns) plus the small `DuplexStream` write overhead. A
+// regression that pushes per-packet cost into the hundreds of ns
+// would mean the alloc savings from #175 Phase 2 were lost.
+
+const PROD_BENCH_PACKETS_PER_ITER: usize = 100;
+
+#[bench]
+fn protocol_stream_write_movement(b: &mut Bencher) {
+    use basalt_net::stream::ProtocolStream;
+    use tokio::io::AsyncReadExt;
+
+    let payload = vec![0xAAu8; 28];
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    // 64 KiB duplex buffer — large enough that even a sustained burst
+    // of movement packets won't backpressure the writer mid-iteration.
+    let (writer, mut reader) = tokio::io::duplex(64 * 1024);
+    rt.spawn(async move {
+        let mut sink = [0u8; 4096];
+        loop {
+            if reader.read(&mut sink).await.unwrap_or(0) == 0 {
+                break;
+            }
+        }
+    });
+    let mut stream = ProtocolStream::new(writer);
+
+    b.iter(|| {
+        rt.block_on(async {
+            for _ in 0..PROD_BENCH_PACKETS_PER_ITER {
+                stream
+                    .write_raw_packet(black_box(0x2E), black_box(&payload))
+                    .await
+                    .unwrap();
+            }
+        });
+    });
+}
