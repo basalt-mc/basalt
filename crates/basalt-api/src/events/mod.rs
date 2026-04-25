@@ -25,6 +25,7 @@ mod bus;
 mod chat;
 mod container;
 mod crafting;
+#[cfg(feature = "raw-packets")]
 mod packet;
 mod player;
 mod traits;
@@ -39,6 +40,7 @@ pub use crafting::{
     RecipeBookFillRequestEvent, RecipeBookFilledEvent, RecipeLockedEvent, RecipeRegisterEvent,
     RecipeRegisteredEvent, RecipeUnlockedEvent, RecipeUnregisteredEvent,
 };
+#[cfg(feature = "raw-packets")]
 pub use packet::RawPacketEvent;
 pub use player::{PlayerJoinedEvent, PlayerLeftEvent, PlayerMovedEvent};
 pub use traits::{BusKind, Event, EventRouting, Stage};
