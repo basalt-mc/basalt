@@ -1523,4 +1523,199 @@ mod tests {
         assert_eq!(grid.slots[1].item_id, Some(43));
         assert_eq!(grid.slots[1].item_count, 2);
     }
+
+    // ── Event-pipeline tests ──────────────────────────────────────
+
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    use basalt_api::context::ServerContext;
+    use basalt_api::events::{
+        CraftingCraftedEvent, CraftingPreCraftEvent, CraftingRecipeClearedEvent,
+        CraftingRecipeMatchedEvent, CraftingShiftClickBatchEvent,
+    };
+    use basalt_events::{Event, Stage};
+
+    /// Sets up a player with an open crafting table and pre-fills the
+    /// 2x2 of oak planks (id 43) needed for a crafting-table recipe
+    /// (item id 314). Drains all initial output messages.
+    fn setup_planks_grid(
+        amount: i32,
+    ) -> (
+        crate::game::GameLoop,
+        tokio::sync::mpsc::UnboundedSender<GameInput>,
+        Uuid,
+        basalt_ecs::EntityId,
+        tokio::sync::mpsc::Receiver<ServerOutput>,
+    ) {
+        let (mut game_loop, game_tx, _io_rx) = super::super::tests::test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let mut rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
+        while rx.try_recv().is_ok() {}
+
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
+        game_loop
+            .world
+            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+        game_loop.open_crafting_table(eid, 5, 64, 3);
+        while rx.try_recv().is_ok() {}
+
+        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+            grid.slots[0] = basalt_types::Slot::new(43, amount);
+            grid.slots[1] = basalt_types::Slot::new(43, amount);
+            grid.slots[3] = basalt_types::Slot::new(43, amount);
+            grid.slots[4] = basalt_types::Slot::new(43, amount);
+            grid.output = basalt_types::Slot::new(314, 1);
+        }
+
+        (game_loop, game_tx, uuid, eid, rx)
+    }
+
+    #[test]
+    fn pre_craft_cancellation_blocks_consume() {
+        let (mut game_loop, game_tx, uuid, eid, _rx) = setup_planks_grid(1);
+
+        // Validate handler that always cancels the craft.
+        game_loop.bus.on::<CraftingPreCraftEvent, ServerContext>(
+            Stage::Validate,
+            0,
+            |event, _ctx| {
+                event.cancel();
+            },
+        );
+
+        let _ = game_tx.send(GameInput::WindowClick {
+            uuid,
+            slot: 0,
+            button: 0,
+            mode: 0,
+            changed_slots: vec![],
+            cursor_item: basalt_types::Slot::empty(),
+        });
+        game_loop.tick(1);
+
+        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        assert_eq!(grid.slots[0].item_count, 1, "ingredients not consumed");
+        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        assert!(inv.cursor.is_empty(), "cursor still empty");
+    }
+
+    #[test]
+    fn matched_event_can_clear_result() {
+        let (mut game_loop, game_tx, uuid, eid, _rx) = setup_planks_grid(1);
+
+        // Process handler that denies the recipe by zeroing the result.
+        game_loop
+            .bus
+            .on::<CraftingRecipeMatchedEvent, ServerContext>(Stage::Process, 100, |event, _ctx| {
+                event.result = basalt_types::Slot::empty();
+            });
+
+        // Trigger a match cycle by clicking on (and re-placing) a grid slot.
+        // We pick up slot 0 then put it back; the resulting grid is identical
+        // but a recompute fires through the event pipeline.
+        let _ = game_tx.send(GameInput::WindowClick {
+            uuid,
+            slot: 1,
+            button: 0,
+            mode: 0,
+            changed_slots: vec![],
+            cursor_item: basalt_types::Slot::empty(),
+        });
+        game_loop.tick(1);
+        let _ = game_tx.send(GameInput::WindowClick {
+            uuid,
+            slot: 1,
+            button: 0,
+            mode: 0,
+            changed_slots: vec![],
+            cursor_item: basalt_types::Slot::empty(),
+        });
+        game_loop.tick(2);
+
+        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        assert!(
+            grid.output.is_empty(),
+            "plugin denied recipe; output must be empty"
+        );
+    }
+
+    #[test]
+    fn shift_click_batch_cap_limits_iterations() {
+        // 4 stacks of 4 planks → 4 craft iterations possible naturally,
+        // but the plugin caps at 1.
+        let (mut game_loop, game_tx, uuid, eid, _rx) = setup_planks_grid(4);
+
+        let crafted = Arc::new(AtomicU32::new(0));
+        let crafted_clone = Arc::clone(&crafted);
+        game_loop
+            .bus
+            .on::<CraftingShiftClickBatchEvent, ServerContext>(
+                Stage::Validate,
+                0,
+                |event, _ctx| {
+                    event.max_count = 1;
+                },
+            );
+        game_loop.bus.on::<CraftingCraftedEvent, ServerContext>(
+            Stage::Post,
+            0,
+            move |_event, _ctx| {
+                crafted_clone.fetch_add(1, Ordering::SeqCst);
+            },
+        );
+
+        // Shift-click on the output slot (mode = 1)
+        let _ = game_tx.send(GameInput::WindowClick {
+            uuid,
+            slot: 0,
+            button: 0,
+            mode: 1,
+            changed_slots: vec![],
+            cursor_item: basalt_types::Slot::empty(),
+        });
+        game_loop.tick(1);
+
+        assert_eq!(crafted.load(Ordering::SeqCst), 1, "cap honoured");
+        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        assert_eq!(
+            grid.slots[0].item_count, 3,
+            "only one plank consumed per slot"
+        );
+    }
+
+    #[test]
+    fn cleared_event_fires_on_match_to_no_match_transition() {
+        let (mut game_loop, game_tx, uuid, eid, _rx) = setup_planks_grid(1);
+
+        let cleared = Arc::new(AtomicU32::new(0));
+        let cleared_clone = Arc::clone(&cleared);
+        game_loop
+            .bus
+            .on::<CraftingRecipeClearedEvent, ServerContext>(
+                Stage::Post,
+                0,
+                move |_event, _ctx| {
+                    cleared_clone.fetch_add(1, Ordering::SeqCst);
+                },
+            );
+
+        // Pick up one plank — grid breaks the 2x2 pattern, output clears.
+        let _ = game_tx.send(GameInput::WindowClick {
+            uuid,
+            slot: 1,
+            button: 0,
+            mode: 0,
+            changed_slots: vec![],
+            cursor_item: basalt_types::Slot::empty(),
+        });
+        game_loop.tick(1);
+
+        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        assert!(
+            grid.output.is_empty(),
+            "broken pattern clears the output slot"
+        );
+        assert_eq!(cleared.load(Ordering::SeqCst), 1, "single transition fired");
+    }
 }
