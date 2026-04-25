@@ -39,7 +39,7 @@ pub fn build_chat_component(username: &str, message: &str) -> TextComponent {
 
 #[cfg(test)]
 mod tests {
-    use basalt_testkit::PluginTestHarness;
+    use basalt_api::testing::PluginTestHarness;
 
     use super::*;
 
