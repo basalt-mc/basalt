@@ -28,6 +28,10 @@ pub(crate) struct ServerState {
     pub declare_commands: Vec<u8>,
     /// Command arg metadata for TabComplete suggestions.
     pub command_args: Vec<CommandMeta>,
+    /// Maximum inbound packets per second per player. Threading
+    /// through to each net task on connection setup so the rate
+    /// limit can be tuned via `basalt.toml`.
+    pub max_inbound_packets_per_second: u32,
 }
 
 /// Command metadata for TabComplete suggestions.
@@ -53,6 +57,7 @@ impl ServerState {
     pub fn build_for_loops(
         world: Arc<basalt_world::World>,
         plugins: Vec<Box<dyn basalt_api::Plugin>>,
+        max_inbound_packets_per_second: u32,
     ) -> (
         Arc<Self>,
         EventBus,
@@ -146,6 +151,7 @@ impl ServerState {
             world,
             declare_commands: declare_commands.0,
             command_args,
+            max_inbound_packets_per_second,
         });
 
         (state, instant_bus, game_bus, systems, recipes)
@@ -413,7 +419,7 @@ mod tests {
         let world = Arc::new(config.create_world());
         let plugins = config.create_plugins();
         let (state, _instant_bus, _game_bus, _systems, _recipes) =
-            ServerState::build_for_loops(world, plugins);
+            ServerState::build_for_loops(world, plugins, 1000);
         state
     }
 

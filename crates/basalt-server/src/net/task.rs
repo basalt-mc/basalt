@@ -47,6 +47,9 @@ pub(crate) struct NetTaskConfig {
     pub chunk_cache: Arc<ChunkPacketCache>,
     /// Command metadata for tab-complete and /help.
     pub command_args: Vec<CommandMeta>,
+    /// Maximum inbound packets per second per player.
+    /// Exceeding kicks the connection (DoS mitigation).
+    pub max_inbound_packets_per_second: u32,
 }
 
 /// Runs the per-player net task until disconnect.
@@ -69,6 +72,7 @@ pub(crate) async fn run_net_task(
     // and the bytes flow through `ServerOutput::RawBorrowed`.
     let _chunk_cache = config.chunk_cache;
     let command_args = config.command_args;
+    let max_inbound_packets_per_second = config.max_inbound_packets_per_second;
 
     let mut broadcast_rx = broadcast_tx.subscribe();
     let mut keep_alive = tokio::time::interval(std::time::Duration::from_secs(15));
@@ -76,6 +80,12 @@ pub(crate) async fn run_net_task(
 
     let mut last_keep_alive_id: i64 = 0;
     let mut last_keep_alive_sent = Instant::now();
+
+    // Inbound rate limit — sliding 1-second window; if more than
+    // `max_inbound_packets_per_second` packets land in the window,
+    // the connection is dropped on the next received packet.
+    let mut packet_window_start = Instant::now();
+    let mut packet_count_in_window: u32 = 0;
 
     loop {
         tokio::select! {
@@ -99,6 +109,21 @@ pub(crate) async fn run_net_task(
             result = conn.read_packet() => {
                 match result {
                     Ok(packet) => {
+                        // Rate limit check: reset the window every second,
+                        // count each inbound packet, kick if over budget.
+                        if packet_window_start.elapsed() >= std::time::Duration::from_secs(1) {
+                            packet_window_start = Instant::now();
+                            packet_count_in_window = 0;
+                        }
+                        packet_count_in_window = packet_count_in_window.saturating_add(1);
+                        if packet_count_in_window > max_inbound_packets_per_second {
+                            log::warn!(
+                                target: "basalt::net_task",
+                                "[{addr}] {username} kicked: inbound rate limit exceeded ({packet_count_in_window} packets in <1s, max {max_inbound_packets_per_second})",
+                            );
+                            break;
+                        }
+
                         if let ServerboundPlayPacket::TabComplete(tc) = &packet {
                             play_handler::handle_tab_complete(&mut conn, &command_args, tc).await?;
                             continue;
