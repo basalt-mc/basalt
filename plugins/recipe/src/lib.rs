@@ -155,4 +155,75 @@ mod tests {
             "stone interact should produce no responses"
         );
     }
+
+    fn populated_grid() -> [basalt_api::types::Slot; 9] {
+        let mut slots: [basalt_api::types::Slot; 9] =
+            std::array::from_fn(|_| basalt_api::types::Slot::empty());
+        slots[0] = basalt_api::types::Slot::new(43, 1);
+        slots[2] = basalt_api::types::Slot::new(280, 4);
+        slots
+    }
+
+    #[test]
+    fn crafting_close_drops_grid_items() {
+        let mut harness = PluginTestHarness::new();
+        harness.register(RecipePlugin);
+
+        let mut event = ContainerClosedEvent {
+            window_id: 1,
+            inventory_type: InventoryType::Crafting,
+            backing: ContainerBacking::Block {
+                position: BlockPosition { x: 5, y: 64, z: 3 },
+            },
+            reason: CloseReason::Manual,
+            viewer_count: 0,
+            crafting_grid_state: Some(populated_grid()),
+        };
+
+        let result = harness.dispatch(&mut event);
+        assert!(result.has_spawn_dropped_item(43, 1));
+        assert!(result.has_spawn_dropped_item(280, 4));
+    }
+
+    #[test]
+    fn crafting_close_with_no_snapshot_drops_nothing() {
+        let mut harness = PluginTestHarness::new();
+        harness.register(RecipePlugin);
+
+        let mut event = ContainerClosedEvent {
+            window_id: 1,
+            inventory_type: InventoryType::Crafting,
+            backing: ContainerBacking::Block {
+                position: BlockPosition { x: 5, y: 64, z: 3 },
+            },
+            reason: CloseReason::Manual,
+            viewer_count: 0,
+            crafting_grid_state: None,
+        };
+
+        let result = harness.dispatch(&mut event);
+        assert!(!result.has_any_spawn_dropped_item());
+    }
+
+    #[test]
+    fn non_crafting_close_drops_nothing_even_with_snapshot() {
+        let mut harness = PluginTestHarness::new();
+        harness.register(RecipePlugin);
+
+        // Snapshot is populated but the inventory type is a chest —
+        // the plugin must ignore it.
+        let mut event = ContainerClosedEvent {
+            window_id: 1,
+            inventory_type: InventoryType::Generic9x3,
+            backing: ContainerBacking::Block {
+                position: BlockPosition { x: 5, y: 64, z: 3 },
+            },
+            reason: CloseReason::Manual,
+            viewer_count: 0,
+            crafting_grid_state: Some(populated_grid()),
+        };
+
+        let result = harness.dispatch(&mut event);
+        assert!(!result.has_any_spawn_dropped_item());
+    }
 }
