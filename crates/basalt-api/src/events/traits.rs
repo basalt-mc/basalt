@@ -48,7 +48,7 @@ pub enum BusKind {
 /// correct bus automatically. The associated constant `BUS` is
 /// resolved at compile time — no runtime dispatch overhead.
 ///
-/// Implemented via the `network_event!`, `network_cancellable_event!`,
+/// Implemented via the `instant_event!`, `instant_cancellable_event!`,
 /// `game_event!`, and `game_cancellable_event!` macros in `basalt-api`.
 pub trait EventRouting {
     /// The bus this event type is dispatched on.
@@ -85,7 +85,7 @@ pub trait Event: Any + Send {
     ///
     /// Enables runtime routing of type-erased events (`&mut dyn Event`)
     /// to the correct bus without hardcoded `TypeId` checks. Every
-    /// event type declares its bus via the macros (`network_event!`,
+    /// event type declares its bus via the macros (`instant_event!`,
     /// `game_event!`, etc.).
     fn bus_kind(&self) -> BusKind;
 }
