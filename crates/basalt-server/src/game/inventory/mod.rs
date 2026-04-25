@@ -177,7 +177,7 @@ impl GameLoop {
 
         if craft_grid_changed {
             self.dispatch_crafting_grid_changed(uuid, eid);
-            self.update_crafting_output(eid);
+            self.run_crafting_match_cycle(uuid, eid);
         }
     }
 
