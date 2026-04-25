@@ -313,7 +313,7 @@ pub enum ServerOutput {
     /// Net task encodes packet id `0x44`.
     RecipeBookAdd {
         /// Recipe-display entries to add.
-        entries: Vec<basalt_protocol::types::RecipeBookEntry>,
+        entries: Vec<basalt_protocol::packets::play::misc::ClientboundPlayRecipeBookAddEntries>,
         /// Replace the existing book contents.
         replace: bool,
     },
@@ -333,7 +333,7 @@ pub enum ServerOutput {
         /// Window id of the open crafting window the ghost is for.
         window_id: i32,
         /// Recipe display payload (variant + slots).
-        display: basalt_protocol::types::RecipeDisplay,
+        display: basalt_protocol::packets::play::types::RecipeDisplay,
     },
 
     // ── Chunk path (cache-based, zero alloc) ──────────────────────────
