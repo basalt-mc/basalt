@@ -9,19 +9,15 @@ use basalt_types::{NbtCompound, Position, Uuid, Vec2f};
 // -- Serverbound packets --
 
 /// Switch enum used by [`ServerboundPlayAdvancementTab`].
-#[derive(Debug, Clone, PartialEq, Encode, Decode, EncodedSize)]
+#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub enum ServerboundPlayAdvancementTabAction {
     #[variant(id = 0)]
     Variant0 { tab_id: String },
+    #[variant(id = 1)]
+    #[default]
+    Variant1,
 }
 
-impl Default for ServerboundPlayAdvancementTabAction {
-    fn default() -> Self {
-        Self::Variant0 {
-            tab_id: Default::default(),
-        }
-    }
-}
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x30)]
 pub struct ServerboundPlayAdvancementTab {
@@ -250,17 +246,9 @@ pub struct ClientboundPlayDeclareRecipesRecipes {
 
 /// Inline data structure used by [`ClientboundPlayDeclareRecipes`].
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
-pub struct ClientboundPlayDeclareRecipesStonecutterrecipesSlotdisplay {
-    #[field(varint)]
-    pub r#type: i32,
-    pub data: Vec<u8>,
-}
-
-/// Inline data structure used by [`ClientboundPlayDeclareRecipes`].
-#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayDeclareRecipesStonecutterrecipes {
     pub input: Vec<u8>,
-    pub slot_display: ClientboundPlayDeclareRecipesStonecutterrecipesSlotdisplay,
+    pub slot_display: crate::packets::play::types::SlotDisplay,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -298,18 +286,10 @@ pub struct ClientboundPlayPingResponse {
 
 /// Inline data structure used by [`ClientboundPlayRecipeBookAdd`].
 #[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
-pub struct ClientboundPlayRecipeBookAddEntriesRecipeRecipedisplay {
-    #[field(varint)]
-    pub r#type: i32,
-    pub data: Vec<u8>,
-}
-
-/// Inline data structure used by [`ClientboundPlayRecipeBookAdd`].
-#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
 pub struct ClientboundPlayRecipeBookAddEntriesRecipe {
     #[field(varint)]
     pub display_id: i32,
-    pub display: ClientboundPlayRecipeBookAddEntriesRecipeRecipedisplay,
+    pub display: crate::packets::play::types::RecipeDisplay,
     #[field(varint)]
     pub group: i32,
     #[field(varint)]
