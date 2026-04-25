@@ -23,13 +23,13 @@
 
 use std::sync::Arc;
 
+use basalt_api::components::Rotation;
 use basalt_api::context::ServerContext;
 use basalt_api::events::{BusKind, EventRouting};
+use basalt_api::player::PlayerInfo;
 use basalt_api::plugin::PluginRegistrar;
 use basalt_api::{Event, Stage};
 use basalt_api::{EventBus, Plugin, Response};
-use basalt_core::PlayerInfo;
-use basalt_core::components::Rotation;
 use basalt_types::Uuid;
 use basalt_world::World;
 
@@ -46,7 +46,7 @@ pub struct PluginTestHarness {
     /// Event bus for game events (blocks, movement, lifecycle).
     game_bus: EventBus,
     /// Collected command entries.
-    commands: Vec<basalt_api::CommandEntry>,
+    commands: Vec<basalt_api::plugin::CommandEntry>,
     /// Recipe registry for plugin customisation.
     recipes: basalt_recipes::RecipeRegistry,
 }
@@ -116,12 +116,12 @@ impl PluginTestHarness {
         &mut self,
         stage: Stage,
         priority: i32,
-        handler: impl Fn(&mut E, &dyn basalt_core::Context) + Send + Sync + 'static,
+        handler: impl Fn(&mut E, &dyn basalt_api::context::Context) + Send + Sync + 'static,
     ) where
         E: Event + EventRouting + 'static,
     {
         let wrapper = move |event: &mut E, ctx: &ServerContext| {
-            handler(event, ctx as &dyn basalt_core::Context);
+            handler(event, ctx as &dyn basalt_api::context::Context);
         };
         match E::BUS {
             BusKind::Instant => {
@@ -147,7 +147,7 @@ impl PluginTestHarness {
                     yaw: 0.0,
                     pitch: 0.0,
                 },
-                position: basalt_core::Position {
+                position: basalt_api::components::Position {
                     x: 0.0,
                     y: 64.0,
                     z: 0.0,
@@ -168,7 +168,7 @@ impl PluginTestHarness {
                     yaw: 0.0,
                     pitch: 0.0,
                 },
-                position: basalt_core::Position {
+                position: basalt_api::components::Position {
                     x: 0.0,
                     y: 64.0,
                     z: 0.0,
@@ -234,7 +234,7 @@ impl PluginTestHarness {
     }
 
     /// Returns a reference to the collected command entries.
-    pub fn commands(&self) -> &[basalt_api::CommandEntry] {
+    pub fn commands(&self) -> &[basalt_api::plugin::CommandEntry] {
         &self.commands
     }
 
@@ -313,7 +313,7 @@ impl DispatchResult {
         self.responses.iter().any(|r| {
             matches!(
                 r,
-                Response::Broadcast(basalt_core::BroadcastMessage::Chat { .. })
+                Response::Broadcast(basalt_api::broadcast::BroadcastMessage::Chat { .. })
             )
         })
     }
@@ -323,7 +323,7 @@ impl DispatchResult {
         self.responses.iter().any(|r| {
             matches!(
                 r,
-                Response::Broadcast(basalt_core::BroadcastMessage::BlockChanged { .. })
+                Response::Broadcast(basalt_api::broadcast::BroadcastMessage::BlockChanged { .. })
             )
         })
     }
@@ -333,7 +333,7 @@ impl DispatchResult {
         self.responses.iter().any(|r| {
             matches!(
                 r,
-                Response::Broadcast(basalt_core::BroadcastMessage::EntityMoved { .. })
+                Response::Broadcast(basalt_api::broadcast::BroadcastMessage::EntityMoved { .. })
             )
         })
     }
@@ -343,7 +343,7 @@ impl DispatchResult {
         self.responses.iter().any(|r| {
             matches!(
                 r,
-                Response::Broadcast(basalt_core::BroadcastMessage::PlayerJoined { .. })
+                Response::Broadcast(basalt_api::broadcast::BroadcastMessage::PlayerJoined { .. })
             )
         })
     }
@@ -353,7 +353,7 @@ impl DispatchResult {
         self.responses.iter().any(|r| {
             matches!(
                 r,
-                Response::Broadcast(basalt_core::BroadcastMessage::PlayerLeft { .. })
+                Response::Broadcast(basalt_api::broadcast::BroadcastMessage::PlayerLeft { .. })
             )
         })
     }
@@ -363,7 +363,7 @@ impl DispatchResult {
         self.responses.iter().any(|r| {
             matches!(
                 r,
-                Response::StreamChunks(basalt_core::ChunkPosition { x: cx, z: cz })
+                Response::StreamChunks(basalt_api::components::ChunkPosition { x: cx, z: cz })
                 if *cx == x && *cz == z
             )
         })
@@ -432,7 +432,7 @@ impl DispatchResult {
 /// Test context for system plugins.
 ///
 /// Pairs an [`Ecs`](basalt_ecs::Ecs) with a [`World`] and implements
-/// [`SystemContext`](basalt_core::SystemContext) so system runners can
+/// [`SystemContext`](basalt_api::system::SystemContext) so system runners can
 /// be tested without a full server.
 ///
 /// # Example
@@ -450,7 +450,7 @@ pub struct SystemTestContext {
     /// Shared world for block/collision queries.
     world: Arc<World>,
     /// Unlimited budget for test systems.
-    budget: basalt_core::TickBudget,
+    budget: basalt_api::budget::TickBudget,
 }
 
 impl SystemTestContext {
@@ -459,7 +459,7 @@ impl SystemTestContext {
         Self {
             ecs: basalt_ecs::Ecs::new(),
             world: Arc::new(World::flat()),
-            budget: basalt_core::TickBudget::unlimited(),
+            budget: basalt_api::budget::TickBudget::unlimited(),
         }
     }
 
@@ -468,7 +468,7 @@ impl SystemTestContext {
         Self {
             ecs: basalt_ecs::Ecs::new(),
             world,
-            budget: basalt_core::TickBudget::unlimited(),
+            budget: basalt_api::budget::TickBudget::unlimited(),
         }
     }
 }
@@ -479,35 +479,35 @@ impl Default for SystemTestContext {
     }
 }
 
-impl basalt_core::SystemContext for SystemTestContext {
+impl basalt_api::system::SystemContext for SystemTestContext {
     fn world(&self) -> &World {
         &self.world
     }
 
-    fn spawn(&mut self) -> basalt_core::EntityId {
+    fn spawn(&mut self) -> basalt_api::components::EntityId {
         self.ecs.spawn()
     }
 
-    fn despawn(&mut self, entity: basalt_core::EntityId) {
+    fn despawn(&mut self, entity: basalt_api::components::EntityId) {
         self.ecs.despawn(entity);
     }
 
     fn set_component(
         &mut self,
-        entity: basalt_core::EntityId,
+        entity: basalt_api::components::EntityId,
         type_id: std::any::TypeId,
         component: Box<dyn std::any::Any + Send + Sync>,
     ) {
         self.ecs.set_component(entity, type_id, component);
     }
 
-    fn entities_with(&self, type_id: std::any::TypeId) -> Vec<basalt_core::EntityId> {
+    fn entities_with(&self, type_id: std::any::TypeId) -> Vec<basalt_api::components::EntityId> {
         self.ecs.entities_with(type_id)
     }
 
     fn get_component(
         &self,
-        entity: basalt_core::EntityId,
+        entity: basalt_api::components::EntityId,
         type_id: std::any::TypeId,
     ) -> Option<&dyn std::any::Any> {
         self.ecs.get_component(entity, type_id)
@@ -515,13 +515,13 @@ impl basalt_core::SystemContext for SystemTestContext {
 
     fn get_component_mut(
         &mut self,
-        entity: basalt_core::EntityId,
+        entity: basalt_api::components::EntityId,
         type_id: std::any::TypeId,
     ) -> Option<&mut dyn std::any::Any> {
         self.ecs.get_component_mut(entity, type_id)
     }
 
-    fn budget(&self) -> &basalt_core::TickBudget {
+    fn budget(&self) -> &basalt_api::budget::TickBudget {
         &self.budget
     }
 }
