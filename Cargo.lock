@@ -106,22 +106,12 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 name = "basalt-api"
 version = "0.1.0"
 dependencies = [
- "basalt-command",
  "basalt-core",
  "basalt-protocol",
  "basalt-recipes",
  "basalt-types",
  "basalt-world",
  "log",
-]
-
-[[package]]
-name = "basalt-command"
-version = "0.1.0"
-dependencies = [
- "basalt-core",
- "basalt-types",
- "basalt-world",
 ]
 
 [[package]]
