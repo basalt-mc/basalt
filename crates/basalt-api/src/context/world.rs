@@ -1,7 +1,7 @@
 //! WorldContext implementation for ServerContext.
 
 use basalt_core::WorldContext;
-use basalt_core::components::ChunkPosition;
+use basalt_core::components::{BlockPosition, ChunkPosition};
 
 use super::ServerContext;
 use super::response::Response;
@@ -20,5 +20,10 @@ impl WorldContext for ServerContext {
     fn persist_chunk(&self, cx: i32, cz: i32) {
         self.responses
             .push(Response::PersistChunk(ChunkPosition { x: cx, z: cz }));
+    }
+    fn destroy_block_entity(&self, x: i32, y: i32, z: i32) {
+        self.responses.push(Response::DestroyBlockEntity {
+            position: BlockPosition { x, y, z },
+        });
     }
 }

@@ -338,7 +338,10 @@ async fn process_instant_responses(
             | Response::SpawnDroppedItem { .. }
             | Response::OpenChest(_)
             | Response::OpenCraftingTable { .. }
-            | Response::OpenContainer(_) => {}
+            | Response::OpenContainer(_)
+            | Response::BroadcastBlockAction { .. }
+            | Response::NotifyContainerViewers { .. }
+            | Response::DestroyBlockEntity { .. } => {}
         }
     }
     Ok(())

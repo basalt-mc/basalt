@@ -133,11 +133,27 @@ impl GameLoop {
                 }
                 GameInput::CloseWindow { uuid, .. } => {
                     if let Some(eid) = self.find_by_uuid(uuid) {
+                        // Snapshot the crafting grid (if applicable) before dispatch
+                        // so plugins receive the at-close state via the event.
+                        let crafting_grid_state = if matches!(
+                            self.ecs
+                                .get::<basalt_core::OpenContainer>(eid)
+                                .map(|oc| oc.inventory_type),
+                            Some(basalt_core::InventoryType::Crafting)
+                        ) {
+                            self.ecs
+                                .get::<basalt_core::CraftingGrid>(eid)
+                                .map(|g| g.slots.clone())
+                        } else {
+                            None
+                        };
+
                         // Dispatch ContainerClosedEvent before removing the component
                         self.dispatch_container_closed(
                             eid,
                             uuid,
                             basalt_api::events::CloseReason::Manual,
+                            crafting_grid_state,
                         );
 
                         // Return cursor item to inventory or drop it

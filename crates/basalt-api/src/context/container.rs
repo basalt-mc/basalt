@@ -22,4 +22,12 @@ impl ContainerContext for ServerContext {
         self.responses
             .push(Response::OpenContainer(container.clone()));
     }
+
+    fn notify_viewers(&self, x: i32, y: i32, z: i32, slot_index: i16, item: basalt_types::Slot) {
+        self.responses.push(Response::NotifyContainerViewers {
+            position: BlockPosition { x, y, z },
+            slot_index,
+            item,
+        });
+    }
 }
