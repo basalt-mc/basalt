@@ -6,6 +6,11 @@ description = "Minecraft packet definitions and version-aware packet registry"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+documentation = "https://docs.rs/basalt-protocol"
+readme = "README.md"
+rust-version = "1.85"
+keywords = ["minecraft", "protocol", "packets", "network", "wire"]
+categories = ["network-programming", "encoding", "game-development"]
 
 [dependencies]
 basalt-types = { workspace = true }
