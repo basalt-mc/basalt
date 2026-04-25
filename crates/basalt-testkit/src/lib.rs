@@ -224,7 +224,7 @@ impl PluginTestHarness {
 
         if let Some(entry) = self.commands.iter().find(|c| c.name == name)
             && let Ok(parsed) =
-                basalt_command::parse_command_args(args, &entry.args, &entry.variants)
+                basalt_api::command::parse_command_args(args, &entry.args, &entry.variants)
         {
             (entry.handler)(&parsed, &ctx);
         }
