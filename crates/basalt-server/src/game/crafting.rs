@@ -4,7 +4,10 @@
 //! and crafting window management. All crafting-specific methods live here
 //! to keep `inventory.rs` and `container.rs` focused on their domains.
 
-use basalt_api::events::{CraftingGridChangedEvent, CraftingPreCraftEvent};
+use basalt_api::events::{
+    CraftingGridChangedEvent, CraftingPreCraftEvent, CraftingRecipeClearedEvent,
+    CraftingRecipeMatchedEvent,
+};
 use basalt_types::Slot;
 use basalt_types::Uuid;
 
@@ -139,41 +142,83 @@ impl GameLoop {
         event.cancelled
     }
 
-    /// Matches crafting grid contents against the recipe registry and
-    /// updates the output slot.
+    /// Resolves the crafting result for the current grid contents.
     ///
-    /// Reads the `CraftingGrid` component, calls `match_grid()` on the
-    /// recipe registry, sets `CraftingGrid.output`, and sends a
-    /// `SetContainerSlot` to the client so the output slot is visible.
-    /// Always sends the packet because crafting output is server-authoritative:
-    /// after the player takes the output, the client clears slot 0 locally,
-    /// so the server must re-send even if the same recipe matches again.
-    pub(super) fn update_crafting_output(&mut self, eid: basalt_ecs::EntityId) {
-        let (grid_items, grid_size) = {
+    /// Calls `RecipeRegistry::match_grid` and dispatches the
+    /// appropriate event:
+    /// - `CraftingRecipeMatchedEvent` (Process+Post, mutable `result`)
+    ///   when a recipe matches. Plugins layer modifications by handler
+    ///   priority — setting `result` to `Slot::empty()` denies the
+    ///   craft.
+    /// - `CraftingRecipeClearedEvent` (Post) only on the transition
+    ///   `matched → unmatched` (i.e. when `grid.output` was non-empty
+    ///   before this call and no recipe now matches).
+    ///
+    /// Returns the final (post-mutation) result slot. Does **not**
+    /// write to `grid.output` and does **not** send any packet — see
+    /// [`sync_crafting_output_slot`](Self::sync_crafting_output_slot)
+    /// and [`run_crafting_match_cycle`](Self::run_crafting_match_cycle).
+    pub(super) fn compute_crafting_match(&mut self, uuid: Uuid, eid: basalt_ecs::EntityId) -> Slot {
+        let (grid_ids, grid_size, previous_output) = {
             let Some(grid) = self.ecs.get::<basalt_core::CraftingGrid>(eid) else {
-                return;
+                return Slot::empty();
             };
-            let items: Vec<Option<i32>> = grid.slots.iter().map(|s| s.item_id).collect();
-            (items, grid.grid_size)
+            let mut g = [None; 9];
+            for (i, slot) in grid.slots.iter().enumerate().take(9) {
+                g[i] = slot.item_id;
+            }
+            (g, grid.grid_size, grid.output.clone())
         };
 
-        let result = self.recipes.match_grid(&grid_items, grid_size);
-        let output_slot = match result {
-            Some((id, count)) => basalt_types::Slot::new(id, count),
-            None => basalt_types::Slot::empty(),
+        let raw_match = self
+            .recipes
+            .match_grid(&grid_ids, grid_size)
+            .map(|(id, count)| Slot::new(id, count));
+
+        let (entity_id, username, yaw, pitch) = match self.player_info(eid) {
+            Some(info) => info,
+            None => return raw_match.unwrap_or_else(Slot::empty),
         };
 
+        let ctx = self.make_context(uuid, entity_id, &username, yaw, pitch);
+
+        match raw_match {
+            Some(initial) => {
+                let mut event = CraftingRecipeMatchedEvent {
+                    grid: grid_ids,
+                    grid_size,
+                    result: initial,
+                };
+                self.dispatch_event(&mut event, &ctx);
+                self.process_responses(uuid, &ctx.drain_responses());
+                event.result
+            }
+            None => {
+                if !previous_output.is_empty() {
+                    let mut event = CraftingRecipeClearedEvent { grid_size };
+                    self.dispatch_event(&mut event, &ctx);
+                    self.process_responses(uuid, &ctx.drain_responses());
+                }
+                Slot::empty()
+            }
+        }
+    }
+
+    /// Writes the resolved result to `CraftingGrid.output` and pushes
+    /// a `SetContainerSlot` for slot 0 to the client.
+    ///
+    /// Always sends because crafting output is server-authoritative:
+    /// the client clears slot 0 locally when the player takes the
+    /// output, so the server must re-send even when the same recipe
+    /// still matches.
+    pub(super) fn sync_crafting_output_slot(&mut self, eid: basalt_ecs::EntityId, output: Slot) {
         if let Some(grid) = self.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
-            grid.output = output_slot.clone();
+            grid.output = output.clone();
         }
 
-        // Always send to client — crafting output is server-authoritative.
-        // The client clears slot 0 when taking the output, so even if the
-        // same recipe matches again, the server must re-send the result.
-        //
-        // Window ID 0 = player inventory window (used when no container is
-        // open for the 2x2 grid). The client accepts slot 0 updates for
-        // the crafting output because it is always server-pushed.
+        // Window ID 0 = player inventory window (used for the 2x2 grid
+        // when no container is open). The client accepts slot 0
+        // updates because crafting output is always server-pushed.
         let window_id = self
             .ecs
             .get::<basalt_core::OpenContainer>(eid)
@@ -184,9 +229,19 @@ impl GameLoop {
             let _ = tx.try_send(ServerOutput::SetContainerSlot {
                 window_id,
                 slot: 0,
-                item: output_slot,
+                item: output,
             });
         });
+    }
+
+    /// Runs the full crafting match cycle: resolve match (firing
+    /// matched/cleared events) and sync slot 0 to the client.
+    ///
+    /// This is the steady-state entry point invoked after every
+    /// crafting-grid mutation in the inventory click handler.
+    pub(super) fn run_crafting_match_cycle(&mut self, uuid: Uuid, eid: basalt_ecs::EntityId) {
+        let output = self.compute_crafting_match(uuid, eid);
+        self.sync_crafting_output_slot(eid, output);
     }
 
     /// Consumes one ingredient from each occupied grid slot after
@@ -293,9 +348,15 @@ impl GameLoop {
     /// Handles shift-click crafting: repeatedly consumes ingredients
     /// and inserts results into the player's inventory until either
     /// no recipe matches or the inventory is full.
-    pub(super) fn handle_shift_click_craft(&mut self, eid: basalt_ecs::EntityId) {
+    ///
+    /// Between iterations, calls
+    /// [`compute_crafting_match`](Self::compute_crafting_match) to
+    /// resolve the next result through the event pipeline so plugins
+    /// can mutate the per-iteration result.
+    pub(super) fn handle_shift_click_craft(&mut self, uuid: Uuid, eid: basalt_ecs::EntityId) {
         loop {
-            // Check the current output
+            // Read the current output (set by the prior iteration's
+            // `compute_crafting_match` or by the initial click).
             let (result_id, result_count) = {
                 let Some(grid) = self.ecs.get::<basalt_core::CraftingGrid>(eid) else {
                     break;
@@ -317,30 +378,19 @@ impl GameLoop {
                 break;
             }
 
-            // Consume ingredients
+            // Consume ingredients (clears grid.output as a side effect)
             self.consume_crafting_ingredients(eid);
 
-            // Re-match the grid to check if we can craft again
-            let next_result = {
-                let Some(grid) = self.ecs.get::<basalt_core::CraftingGrid>(eid) else {
-                    break;
-                };
-                let items: Vec<Option<i32>> = grid.slots.iter().map(|s| s.item_id).collect();
-                self.recipes.match_grid(&items, grid.grid_size)
-            };
-
-            match next_result {
-                Some((id, count)) => {
-                    if let Some(grid) = self.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
-                        grid.output = basalt_types::Slot::new(id, count);
-                    }
-                }
-                None => {
-                    if let Some(grid) = self.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
-                        grid.output = basalt_types::Slot::empty();
-                    }
-                    break;
-                }
+            // Resolve next iteration through the event pipeline so
+            // plugins observe each match. `compute_crafting_match`
+            // suppresses `CraftingRecipeClearedEvent` here because the
+            // previous output was already cleared by `consume`.
+            let next = self.compute_crafting_match(uuid, eid);
+            if let Some(grid) = self.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+                grid.output = next.clone();
+            }
+            if next.is_empty() {
+                break;
             }
         }
     }

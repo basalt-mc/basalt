@@ -29,7 +29,7 @@ impl GameLoop {
                 }
                 let cancelled = self.dispatch_crafting_pre_craft(uuid, eid, true);
                 if !cancelled {
-                    self.handle_shift_click_craft(eid);
+                    self.handle_shift_click_craft(uuid, eid);
                     self.sync_crafting_grid_to_client(eid);
                     self.sync_inventory_to_client(eid);
                 }
