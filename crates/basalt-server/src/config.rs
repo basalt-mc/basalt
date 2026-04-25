@@ -75,6 +75,13 @@ pub struct ServerSection {
     /// to defend against malformed values and unbounded server-side burst.
     /// Default: 100.0.
     pub chunk_batch_max_rate: f32,
+    /// Maximum inbound packets per second per player. Exceeding the
+    /// budget kicks the connection (DoS mitigation). Vanilla caps
+    /// game-relevant traffic at ~400/sec (20 packets/tick × 20 TPS);
+    /// 1000 leaves comfortable headroom for chunk-batch ACKs and
+    /// other low-frequency control packets without being trivially
+    /// abusable. Default: 1000.
+    pub max_inbound_packets_per_second: u32,
     /// Performance tuning.
     pub performance: PerformanceSection,
     /// Per-system CPU budget overrides (milliseconds per tick).
@@ -259,6 +266,7 @@ impl Default for ServerSection {
             persistence_interval_seconds: 30,
             chunk_batch_initial_rate: 25.0,
             chunk_batch_max_rate: 100.0,
+            max_inbound_packets_per_second: 1000,
             performance: PerformanceSection::default(),
             budgets: BudgetsSection::default(),
         }
@@ -470,6 +478,22 @@ chunk_batch_max_rate = 50.0
         let config: ServerConfig = toml::from_str(toml).unwrap();
         assert_eq!(config.server.chunk_batch_initial_rate, 12.5);
         assert_eq!(config.server.chunk_batch_max_rate, 50.0);
+    }
+
+    #[test]
+    fn default_inbound_rate_limit() {
+        let config = ServerConfig::default();
+        assert_eq!(config.server.max_inbound_packets_per_second, 1000);
+    }
+
+    #[test]
+    fn parse_inbound_rate_limit() {
+        let toml = r#"
+[server]
+max_inbound_packets_per_second = 250
+"#;
+        let config: ServerConfig = toml::from_str(toml).unwrap();
+        assert_eq!(config.server.max_inbound_packets_per_second, 250);
     }
 
     #[test]

@@ -82,7 +82,11 @@ impl Server {
         let world = Arc::new(self.config.create_world());
         let plugins = self.config.create_plugins();
         let (server_state, instant_bus, game_bus, plugin_systems, recipes) =
-            ServerState::build_for_loops(Arc::clone(&world), plugins);
+            ServerState::build_for_loops(
+                Arc::clone(&world),
+                plugins,
+                self.config.server.max_inbound_packets_per_second,
+            );
 
         // Initialize rayon thread pool for parallel ECS system dispatch
         let system_threads = self.config.server.performance.system_threads.unwrap_or(0);

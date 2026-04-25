@@ -233,6 +233,7 @@ async fn handle_configuration(
             world,
             chunk_cache,
             command_args: state.command_args.clone(),
+            max_inbound_packets_per_second: state.max_inbound_packets_per_second,
         },
         output_rx,
     )
