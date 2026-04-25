@@ -6,10 +6,11 @@
 //! and helpers (collision math, block constants) progressively move
 //! into `basalt-api` itself as they're decoupled from the runtime.
 
+pub mod collision;
+
 pub use basalt_world::block;
 pub use basalt_world::block_entity;
 pub use basalt_world::chunk;
-pub use basalt_world::collision;
 pub use basalt_world::format;
 pub use basalt_world::palette;
 pub use basalt_world::{ChunkColumn, FlatWorldGenerator, NoiseTerrainGenerator, World};
