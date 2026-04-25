@@ -7,7 +7,7 @@
 use basalt_api::components::{BoundingBox, Position, Velocity};
 use basalt_api::prelude::*;
 use basalt_api::system::{Phase, SystemContext, SystemContextExt};
-use basalt_api::world::collision::{Aabb, resolve_movement};
+use basalt_api::world::collision::Aabb;
 
 /// Minecraft gravity constant: -0.08 blocks per tick² (downward).
 const GRAVITY: f64 = 0.08;
@@ -68,7 +68,7 @@ fn physics_tick(ctx: &mut dyn SystemContext) {
         // Resolve movement against solid blocks
         let (resolved_dx, resolved_dy, resolved_dz) = if let Some(bb) = ctx.get::<BoundingBox>(id) {
             let aabb = Aabb::from_entity(px, py, pz, bb.width, bb.height);
-            resolve_movement(ctx.world(), &aabb, dx, dy, dz)
+            ctx.resolve_movement(&aabb, dx, dy, dz)
         } else {
             (dx, dy, dz)
         };
