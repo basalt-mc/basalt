@@ -46,7 +46,7 @@ impl Plugin for ItemPlugin {
 #[cfg(test)]
 mod tests {
     use basalt_api::components::BlockPosition;
-    use basalt_testkit::PluginTestHarness;
+    use basalt_api::testing::PluginTestHarness;
 
     use super::*;
 

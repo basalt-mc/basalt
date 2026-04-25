@@ -10,5 +10,5 @@ repository.workspace = true
 basalt-api = { workspace = true }
 
 [dev-dependencies]
-basalt-testkit = { workspace = true }
+basalt-api = { workspace = true, features = ["testing"] }
 basalt-plugin-block = { path = "../block" }
