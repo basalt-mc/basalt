@@ -431,7 +431,7 @@ pub(super) async fn handle_tab_complete(
     command_args: &[CommandMeta],
     tc: &ServerboundPlayTabComplete,
 ) -> crate::error::Result<()> {
-    use basalt_command::Arg;
+    use basalt_api::command::Arg;
 
     let text = tc.text.trim_start_matches('/');
     let parts: Vec<&str> = text.split_whitespace().collect();
@@ -451,7 +451,7 @@ pub(super) async fn handle_tab_complete(
     let mut suggestions = Vec::new();
 
     if let Some(meta) = command_args.iter().find(|c| c.name == cmd_name) {
-        let arg_lists: Vec<&Vec<basalt_command::CommandArg>> = if !meta.variants.is_empty() {
+        let arg_lists: Vec<&Vec<basalt_api::command::CommandArg>> = if !meta.variants.is_empty() {
             meta.variants.iter().collect()
         } else {
             vec![&meta.args]
