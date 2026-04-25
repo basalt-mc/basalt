@@ -62,6 +62,19 @@ pub struct ServerSection {
     /// of on every block change. Maximum data loss on crash equals
     /// this interval. Default: 30 seconds.
     pub persistence_interval_seconds: u32,
+    /// Initial chunk-batch rate assumed for a freshly connected player,
+    /// in chunks per tick.
+    ///
+    /// Used until the client reports its actual decode rate via
+    /// `ServerboundPlayChunkBatchReceived`. Matches the vanilla 1.21.4
+    /// initial assumption. Default: 25.0.
+    pub chunk_batch_initial_rate: f32,
+    /// Upper bound on the per-player chunk-batch rate, in chunks per tick.
+    ///
+    /// The reported client rate is clamped to `[0.01, chunk_batch_max_rate]`
+    /// to defend against malformed values and unbounded server-side burst.
+    /// Default: 100.0.
+    pub chunk_batch_max_rate: f32,
     /// Performance tuning.
     pub performance: PerformanceSection,
     /// Per-system CPU budget overrides (milliseconds per tick).
@@ -244,6 +257,8 @@ impl Default for ServerSection {
             crash_on_plugin_panic: true,
             simulation_distance: 8,
             persistence_interval_seconds: 30,
+            chunk_batch_initial_rate: 25.0,
+            chunk_batch_max_rate: 100.0,
             performance: PerformanceSection::default(),
             budgets: BudgetsSection::default(),
         }
@@ -433,6 +448,8 @@ mod tests {
         assert_eq!(config.server.bind, "0.0.0.0:25565");
         assert_eq!(config.server.tick_rate, 20);
         assert!(config.server.crash_on_plugin_panic);
+        assert_eq!(config.server.chunk_batch_initial_rate, 25.0);
+        assert_eq!(config.server.chunk_batch_max_rate, 100.0);
         assert_eq!(config.world.seed, 42);
         assert_eq!(config.world.storage, StorageMode::ReadWrite);
         assert!(config.plugins.chat);
@@ -441,6 +458,18 @@ mod tests {
         assert!(config.plugins.lifecycle);
         assert!(config.plugins.movement);
         assert!(config.plugins.crafting);
+    }
+
+    #[test]
+    fn parse_chunk_batch_rates() {
+        let toml = r#"
+[server]
+chunk_batch_initial_rate = 12.5
+chunk_batch_max_rate = 50.0
+"#;
+        let config: ServerConfig = toml::from_str(toml).unwrap();
+        assert_eq!(config.server.chunk_batch_initial_rate, 12.5);
+        assert_eq!(config.server.chunk_batch_max_rate, 50.0);
     }
 
     #[test]

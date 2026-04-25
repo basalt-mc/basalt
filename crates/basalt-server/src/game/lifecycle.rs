@@ -10,7 +10,7 @@ use basalt_types::{Position, Uuid};
 use tokio::sync::mpsc;
 
 use super::helpers::{send_player_info_add, send_spawn_entity};
-use super::{ChunkView, GameLoop, OutputHandle, SkinData, VIEW_RADIUS};
+use super::{ChunkStreamRate, ChunkView, GameLoop, OutputHandle, SkinData, VIEW_RADIUS};
 use crate::messages::{BroadcastEvent, EncodablePacket, ServerOutput, SharedBroadcast};
 
 impl GameLoop {
@@ -63,6 +63,8 @@ impl GameLoop {
             },
         );
         self.ecs.set(eid, ChunkView::empty());
+        self.ecs
+            .set(eid, ChunkStreamRate::new(self.chunk_batch_initial_rate));
         self.ecs.set(eid, OutputHandle { tx: output_tx });
         self.index_uuid(uuid, eid);
 
@@ -230,31 +232,19 @@ impl GameLoop {
             });
         });
 
-        // UpdateViewPosition + chunks
+        // UpdateViewPosition + enqueue initial chunks for tick-paced sending.
+        // The drainer wraps each batch in ChunkBatchStart/Finished and
+        // marks chunks as loaded in `ChunkView` once they actually leave.
         let cx = (position.0 as i32) >> 4;
         let cz = (position.2 as i32) >> 4;
         self.send_to(eid, |tx| {
             let _ = tx.try_send(ServerOutput::UpdateViewPosition { cx, cz });
-            let _ = tx.try_send(ServerOutput::ChunkBatchStart);
         });
 
-        let mut count = 0i32;
-        for dx in -VIEW_RADIUS..=VIEW_RADIUS {
-            for dz in -VIEW_RADIUS..=VIEW_RADIUS {
-                self.send_chunk_with_entities(eid, cx + dx, cz + dz);
-                count += 1;
-            }
-        }
-
-        self.send_to(eid, |tx| {
-            let _ = tx.try_send(ServerOutput::ChunkBatchFinished { batch_size: count });
-        });
-
-        // Track loaded chunks
-        if let Some(view) = self.ecs.get_mut::<ChunkView>(eid) {
+        if let Some(rate) = self.ecs.get_mut::<ChunkStreamRate>(eid) {
             for dx in -VIEW_RADIUS..=VIEW_RADIUS {
                 for dz in -VIEW_RADIUS..=VIEW_RADIUS {
-                    view.loaded_chunks.insert((cx + dx, cz + dz));
+                    rate.pending.push_back((cx + dx, cz + dz));
                 }
             }
         }

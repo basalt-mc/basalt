@@ -6,6 +6,7 @@
 
 mod blocks;
 mod chat;
+mod chunks;
 mod login;
 mod multiplayer;
 mod status;
@@ -129,8 +130,8 @@ pub async fn connect_to_play_as(
     .await;
 
     // Drain all initial Play packets until we receive the welcome
-    // SystemChat message — it's always the last packet sent during
-    // the join sequence. This avoids fragile timeout-based draining.
+    // SystemChat message — it's the last "control" packet sent during
+    // the join sequence.
     loop {
         let raw = framing::read_raw_packet(&mut client)
             .await
@@ -140,6 +141,18 @@ pub async fn connect_to_play_as(
             break;
         }
     }
+
+    // The welcome message is now followed by chunk batches that the
+    // drainer ships across multiple ticks (~5 ticks for a full view at
+    // the default 25 chunks/tick rate). Drain until silence so the test
+    // doesn't fight the chunk trickle when reading later packets.
+    while tokio::time::timeout(
+        std::time::Duration::from_millis(300),
+        framing::read_raw_packet(&mut client),
+    )
+    .await
+    .is_ok()
+    {}
 
     client
 }

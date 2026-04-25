@@ -1,6 +1,6 @@
 //! Input dispatch — drains the [`GameInput`] channel and routes messages.
 
-use super::{GameLoop, Sneaking};
+use super::{ChunkStreamRate, GameLoop, Sneaking};
 use crate::messages::GameInput;
 
 impl GameLoop {
@@ -230,6 +230,23 @@ impl GameLoop {
                 } => {
                     self.handle_place_recipe(uuid, window_id, display_id, make_all);
                 }
+                GameInput::ChunkBatchAck {
+                    uuid,
+                    chunks_per_tick,
+                } => {
+                    // Reject non-finite values (NaN / ±∞) — keep the previous
+                    // rate. Clamp finite values to a defensive range so a
+                    // hostile or buggy client cannot push the server into
+                    // sending zero chunks (stalls the player) or arbitrarily
+                    // huge bursts.
+                    let max_rate = self.chunk_batch_max_rate;
+                    if chunks_per_tick.is_finite()
+                        && let Some(eid) = self.find_by_uuid(uuid)
+                        && let Some(rate) = self.ecs.get_mut::<ChunkStreamRate>(eid)
+                    {
+                        rate.desired_chunks_per_tick = chunks_per_tick.clamp(0.01, max_rate);
+                    }
+                }
             }
         }
     }
@@ -371,6 +388,83 @@ mod tests {
         assert!(
             game_loop.drag_states.is_empty(),
             "drag state should be removed on disconnect"
+        );
+    }
+
+    #[test]
+    fn chunk_batch_ack_updates_per_player_rate() {
+        let (mut game_loop, game_tx, _io_rx) = super::super::tests::test_game_loop();
+        let uuid = Uuid::from_bytes([1; 16]);
+        let _rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
+        let eid = game_loop.find_by_uuid(uuid).unwrap();
+
+        // Initial rate seeded from the game-loop config (25.0 in tests).
+        let initial = game_loop
+            .ecs
+            .get::<super::super::ChunkStreamRate>(eid)
+            .unwrap()
+            .desired_chunks_per_tick;
+        assert_eq!(initial, 25.0);
+
+        // Healthy update — value is stored as-is (no clamp triggered).
+        let _ = game_tx.send(GameInput::ChunkBatchAck {
+            uuid,
+            chunks_per_tick: 42.0,
+        });
+        game_loop.tick(1);
+        assert_eq!(
+            game_loop
+                .ecs
+                .get::<super::super::ChunkStreamRate>(eid)
+                .unwrap()
+                .desired_chunks_per_tick,
+            42.0
+        );
+
+        // Negative / zero rates would stall the drainer — clamp to the floor.
+        let _ = game_tx.send(GameInput::ChunkBatchAck {
+            uuid,
+            chunks_per_tick: -3.0,
+        });
+        game_loop.tick(2);
+        assert_eq!(
+            game_loop
+                .ecs
+                .get::<super::super::ChunkStreamRate>(eid)
+                .unwrap()
+                .desired_chunks_per_tick,
+            0.01
+        );
+
+        // Out-of-range rates are capped at chunk_batch_max_rate (100.0 in tests).
+        let _ = game_tx.send(GameInput::ChunkBatchAck {
+            uuid,
+            chunks_per_tick: 9_999.0,
+        });
+        game_loop.tick(3);
+        assert_eq!(
+            game_loop
+                .ecs
+                .get::<super::super::ChunkStreamRate>(eid)
+                .unwrap()
+                .desired_chunks_per_tick,
+            100.0
+        );
+
+        // NaN must not corrupt the stored rate.
+        let _ = game_tx.send(GameInput::ChunkBatchAck {
+            uuid,
+            chunks_per_tick: f32::NAN,
+        });
+        game_loop.tick(4);
+        assert_eq!(
+            game_loop
+                .ecs
+                .get::<super::super::ChunkStreamRate>(eid)
+                .unwrap()
+                .desired_chunks_per_tick,
+            100.0,
+            "NaN ACK must leave the previous rate untouched"
         );
     }
 

@@ -275,11 +275,18 @@ pub(super) async fn handle_packet(
         | ServerboundPlayPacket::Flying(_)
         | ServerboundPlayPacket::PlayerLoaded(_) => {}
 
+        // -- Forwarded: chunk batch rate ACK --
+        ServerboundPlayPacket::ChunkBatchReceived(ack) => {
+            let _ = game_tx.send(GameInput::ChunkBatchAck {
+                uuid,
+                chunks_per_tick: ack.chunks_per_tick,
+            });
+        }
+
         // -- Ignored --
         ServerboundPlayPacket::CustomPayload(_)
         | ServerboundPlayPacket::PlayerInput(_)
         | ServerboundPlayPacket::TickEnd(_)
-        | ServerboundPlayPacket::ChunkBatchReceived(_)
         | ServerboundPlayPacket::Pong(_)
         | ServerboundPlayPacket::MessageAcknowledgement(_)
         | ServerboundPlayPacket::ConfigurationAcknowledged(_)
