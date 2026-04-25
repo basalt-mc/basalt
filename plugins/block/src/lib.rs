@@ -21,7 +21,7 @@ impl Plugin for BlockPlugin {
     fn on_enable(&self, registrar: &mut PluginRegistrar) {
         // Process: mutate world state
         registrar.on::<BlockBrokenEvent>(Stage::Process, 0, |event, ctx| {
-            ctx.world_ctx().world().set_block(
+            ctx.world_ctx().set_block(
                 event.position.x,
                 event.position.y,
                 event.position.z,
@@ -30,7 +30,7 @@ impl Plugin for BlockPlugin {
         });
 
         registrar.on::<BlockPlacedEvent>(Stage::Process, 0, |event, ctx| {
-            ctx.world_ctx().world().set_block(
+            ctx.world_ctx().set_block(
                 event.position.x,
                 event.position.y,
                 event.position.z,
