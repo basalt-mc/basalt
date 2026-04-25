@@ -310,6 +310,30 @@ const testkit = [
   'testkit',
 ];
 
+const chat = [
+  // Chat plugin: chat message broadcast to all players.
+  // Example: "feat(chat): add chat formatting"
+  'chat',
+];
+
+const block = [
+  // Block plugin: block breaking/placing, world mutation, ack, broadcast.
+  // Example: "feat(block): add block place validation"
+  'block',
+];
+
+const lifecycle = [
+  // Lifecycle plugin: player join/leave broadcast.
+  // Example: "feat(lifecycle): add custom join message"
+  'lifecycle',
+];
+
+const movement = [
+  // Movement plugin: player position/look broadcast.
+  // Example: "feat(movement): add movement validation"
+  'movement',
+];
+
 const physics = [
   // Physics plugin: gravity, AABB collision, movement resolution.
   // Example: "feat(physics): add AABB-vs-block collision"
@@ -400,7 +424,7 @@ const keywords = [
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...ecs, ...testkit, ...physics, ...item, ...container, ...recipes, ...recipe, ...keywords]],
+    'scope-enum': [2, 'always', [...types, ...derive, ...protocol, ...net, ...server, ...world, ...events, ...api, ...core, ...command, ...storage, ...ecs, ...testkit, ...chat, ...block, ...lifecycle, ...movement, ...physics, ...item, ...container, ...recipes, ...recipe, ...keywords]],
     'scope-empty': [2, 'never'],
   },
 };
