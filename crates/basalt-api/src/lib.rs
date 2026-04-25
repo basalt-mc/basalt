@@ -51,6 +51,16 @@ pub mod types {
 /// World access: block states, collision, block entities, chunk storage.
 pub use basalt_world as world;
 
+/// Wire-level protocol packet definitions, exposed for plugins that
+/// need raw packet inspection (anti-cheat, telemetry, packet logging).
+///
+/// Most plugins should listen to domain events
+/// ([`events::BlockBrokenEvent`], [`events::PlayerMovedEvent`], …)
+/// rather than reaching into packet structs directly. The packets
+/// module is here for the cases where the wire-level shape matters —
+/// e.g. inspecting [`events::RawPacketEvent::packet`].
+pub use basalt_protocol::packets;
+
 // Top-level re-exports for non-prelude usage.
 pub use basalt_events::{Event, EventBus, Stage};
 pub use context::{Response, ServerContext};

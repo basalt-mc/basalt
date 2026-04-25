@@ -109,6 +109,7 @@ dependencies = [
  "basalt-command",
  "basalt-core",
  "basalt-events",
+ "basalt-protocol",
  "basalt-recipes",
  "basalt-types",
  "basalt-world",
