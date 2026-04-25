@@ -253,6 +253,24 @@ fn emit_shaped_struct(out: &mut String) {
     writeln!(out, "pub struct ShapedRecipe {{").unwrap();
     writeln!(
         out,
+        "    /// Stable resource-location identifier (`namespace:path`)."
+    )
+    .unwrap();
+    writeln!(out, "    ///").unwrap();
+    writeln!(
+        out,
+        "    /// Vanilla ids are synthetic `minecraft:shaped_<n>` placeholders"
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "    /// derived from codegen sort order — minecraft-data does not"
+    )
+    .unwrap();
+    writeln!(out, "    /// carry real recipe names.").unwrap();
+    writeln!(out, "    pub id: &'static str,").unwrap();
+    writeln!(
+        out,
         "    /// Grid width (1-3 for standard crafting table recipes)."
     )
     .unwrap();
@@ -308,6 +326,24 @@ fn emit_shapeless_struct(out: &mut String) {
     .unwrap();
     writeln!(out, "#[derive(Debug, Clone, Copy, PartialEq, Eq)]").unwrap();
     writeln!(out, "pub struct ShapelessRecipe {{").unwrap();
+    writeln!(
+        out,
+        "    /// Stable resource-location identifier (`namespace:path`)."
+    )
+    .unwrap();
+    writeln!(out, "    ///").unwrap();
+    writeln!(
+        out,
+        "    /// Vanilla ids are synthetic `minecraft:shapeless_<n>` placeholders"
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "    /// derived from codegen sort order — minecraft-data does not"
+    )
+    .unwrap();
+    writeln!(out, "    /// carry real recipe names.").unwrap();
+    writeln!(out, "    pub id: &'static str,").unwrap();
     writeln!(
         out,
         "    /// Unordered set of required ingredient item state IDs."
@@ -368,8 +404,8 @@ fn emit_shaped_slice(out: &mut String, shaped: &[Shaped]) {
     for (i, recipe) in shaped.iter().enumerate() {
         writeln!(
             out,
-            "    ShapedRecipe {{ width: {}, height: {}, ingredients: &SHAPED_{}_INGR, result_id: {}, result_count: {} }},",
-            recipe.width, recipe.height, i, recipe.result_id, recipe.result_count
+            "    ShapedRecipe {{ id: \"minecraft:shaped_{}\", width: {}, height: {}, ingredients: &SHAPED_{}_INGR, result_id: {}, result_count: {} }},",
+            i, recipe.width, recipe.height, i, recipe.result_id, recipe.result_count
         )
         .unwrap();
     }
@@ -388,8 +424,8 @@ fn emit_shapeless_slice(out: &mut String, shapeless: &[Shapeless]) {
     for (i, recipe) in shapeless.iter().enumerate() {
         writeln!(
             out,
-            "    ShapelessRecipe {{ ingredients: &SHAPELESS_{}_INGR, result_id: {}, result_count: {} }},",
-            i, recipe.result_id, recipe.result_count
+            "    ShapelessRecipe {{ id: \"minecraft:shapeless_{}\", ingredients: &SHAPELESS_{}_INGR, result_id: {}, result_count: {} }},",
+            i, i, recipe.result_id, recipe.result_count
         )
         .unwrap();
     }

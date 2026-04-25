@@ -5,6 +5,7 @@
 //! efficient matching against crafting grid contents.
 
 use crate::generated::{SHAPED_RECIPES, SHAPELESS_RECIPES};
+use crate::id::RecipeId;
 
 /// An owned shaped crafting recipe for plugin-registered custom recipes.
 ///
@@ -13,6 +14,8 @@ use crate::generated::{SHAPED_RECIPES, SHAPELESS_RECIPES};
 /// The `result_count` is `i32` (not `u8`) for flexibility in plugin recipes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OwnedShapedRecipe {
+    /// Stable identifier — must be unique across the registry.
+    pub id: RecipeId,
     /// Grid width (1-3 for standard crafting table recipes).
     pub width: u8,
     /// Grid height (1-3 for standard crafting table recipes).
@@ -35,6 +38,8 @@ pub struct OwnedShapedRecipe {
 /// The `result_count` is `i32` (not `u8`) for flexibility in plugin recipes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OwnedShapelessRecipe {
+    /// Stable identifier — must be unique across the registry.
+    pub id: RecipeId,
     /// Unordered set of required ingredient item state IDs, sorted ascending.
     ///
     /// Must be kept sorted for correct matching. Duplicates are allowed.
@@ -43,6 +48,46 @@ pub struct OwnedShapelessRecipe {
     pub result_id: i32,
     /// How many items are produced per craft.
     pub result_count: i32,
+}
+
+/// A crafting recipe of either shape.
+///
+/// Used by event types ([`crate::id::RecipeId`]) and the registry's
+/// removal API to surface a recipe regardless of its underlying shape
+/// kind. Plugin handlers match on the variant when they need shape-
+/// specific access.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Recipe {
+    /// A grid-pattern shaped recipe.
+    Shaped(OwnedShapedRecipe),
+    /// An unordered shapeless recipe.
+    Shapeless(OwnedShapelessRecipe),
+}
+
+impl Recipe {
+    /// Returns the recipe's stable identifier.
+    pub fn id(&self) -> &RecipeId {
+        match self {
+            Self::Shaped(r) => &r.id,
+            Self::Shapeless(r) => &r.id,
+        }
+    }
+
+    /// Returns the item state ID of the crafted result.
+    pub fn result_id(&self) -> i32 {
+        match self {
+            Self::Shaped(r) => r.result_id,
+            Self::Shapeless(r) => r.result_id,
+        }
+    }
+
+    /// Returns how many items are produced per craft.
+    pub fn result_count(&self) -> i32 {
+        match self {
+            Self::Shaped(r) => r.result_count,
+            Self::Shapeless(r) => r.result_count,
+        }
+    }
 }
 
 /// Indexes vanilla and custom recipes for efficient crafting grid matching.
@@ -67,10 +112,13 @@ impl RecipeRegistry {
     ///
     /// Converts the 1285 static shaped recipes and 272 static shapeless
     /// recipes from [`super::generated`] into owned heap copies.
+    /// Vanilla ids are parsed from the static `id: &'static str` field
+    /// (`"minecraft:shaped_<n>"` / `"minecraft:shapeless_<n>"`).
     pub fn with_vanilla() -> Self {
         let shaped = SHAPED_RECIPES
             .iter()
             .map(|r| OwnedShapedRecipe {
+                id: RecipeId::parse(r.id).expect("vanilla id must be well-formed"),
                 width: r.width,
                 height: r.height,
                 pattern: r.ingredients.to_vec(),
@@ -82,6 +130,7 @@ impl RecipeRegistry {
         let shapeless = SHAPELESS_RECIPES
             .iter()
             .map(|r| OwnedShapelessRecipe {
+                id: RecipeId::parse(r.id).expect("vanilla id must be well-formed"),
                 ingredients: r.ingredients.to_vec(),
                 result_id: r.result_id,
                 result_count: i32::from(r.result_count),
@@ -101,12 +150,16 @@ impl RecipeRegistry {
         }
     }
 
-    /// Registers a custom shaped recipe.
+    /// Registers a shaped recipe.
+    ///
+    /// The caller is responsible for id uniqueness — callers go through
+    /// `basalt-api`'s `RecipeRegistrar` which dispatches the lifecycle
+    /// events; this raw method is also used by `with_vanilla`.
     pub fn add_shaped(&mut self, recipe: OwnedShapedRecipe) {
         self.shaped.push(recipe);
     }
 
-    /// Registers a custom shapeless recipe.
+    /// Registers a shapeless recipe.
     ///
     /// The recipe's `ingredients` must be sorted ascending for correct
     /// matching. This method does not enforce sorting — the caller is
@@ -115,16 +168,55 @@ impl RecipeRegistry {
         self.shapeless.push(recipe);
     }
 
-    /// Removes all recipes (shaped and shapeless) that produce the given result.
-    pub fn remove_by_result(&mut self, result_id: i32) {
-        self.shaped.retain(|r| r.result_id != result_id);
-        self.shapeless.retain(|r| r.result_id != result_id);
+    /// Removes the recipe with the given id, if present.
+    ///
+    /// Searches both shaped and shapeless registries. Returns the
+    /// removed recipe (wrapped in [`Recipe`]) so callers can surface
+    /// it via lifecycle events.
+    pub fn remove_by_id(&mut self, id: &RecipeId) -> Option<Recipe> {
+        if let Some(idx) = self.shaped.iter().position(|r| &r.id == id) {
+            return Some(Recipe::Shaped(self.shaped.remove(idx)));
+        }
+        if let Some(idx) = self.shapeless.iter().position(|r| &r.id == id) {
+            return Some(Recipe::Shapeless(self.shapeless.remove(idx)));
+        }
+        None
     }
 
-    /// Removes all recipes from the registry.
-    pub fn clear(&mut self) {
-        self.shaped.clear();
-        self.shapeless.clear();
+    /// Removes every recipe (shaped and shapeless) that produces the given result.
+    ///
+    /// Returns the ids of the removed recipes in registry order — first
+    /// shaped, then shapeless. The caller can use these ids to dispatch
+    /// per-recipe lifecycle events.
+    pub fn remove_by_result(&mut self, result_id: i32) -> Vec<RecipeId> {
+        let mut removed = Vec::new();
+        self.shaped.retain(|r| {
+            if r.result_id == result_id {
+                removed.push(r.id.clone());
+                false
+            } else {
+                true
+            }
+        });
+        self.shapeless.retain(|r| {
+            if r.result_id == result_id {
+                removed.push(r.id.clone());
+                false
+            } else {
+                true
+            }
+        });
+        removed
+    }
+
+    /// Removes every recipe and returns their ids.
+    ///
+    /// Returned in registry order — first shaped, then shapeless.
+    pub fn clear(&mut self) -> Vec<RecipeId> {
+        let mut removed = Vec::with_capacity(self.shaped.len() + self.shapeless.len());
+        removed.extend(self.shaped.drain(..).map(|r| r.id));
+        removed.extend(self.shapeless.drain(..).map(|r| r.id));
+        removed
     }
 
     /// Returns the number of registered shaped recipes.
@@ -135,6 +227,11 @@ impl RecipeRegistry {
     /// Returns the number of registered shapeless recipes.
     pub fn shapeless_count(&self) -> usize {
         self.shapeless.len()
+    }
+
+    /// Returns `true` if a recipe with the given id is registered.
+    pub fn contains(&self, id: &RecipeId) -> bool {
+        self.shaped.iter().any(|r| &r.id == id) || self.shapeless.iter().any(|r| &r.id == id)
     }
 
     /// Matches a crafting grid against all registered recipes.
@@ -284,11 +381,46 @@ fn mirror_pattern(pattern: &[Option<i32>], width: u8, height: u8) -> Vec<Option<
 mod tests {
     use super::*;
 
+    fn shaped(
+        id: &str,
+        width: u8,
+        height: u8,
+        pattern: Vec<Option<i32>>,
+        result: (i32, i32),
+    ) -> OwnedShapedRecipe {
+        OwnedShapedRecipe {
+            id: RecipeId::parse(id).unwrap(),
+            width,
+            height,
+            pattern,
+            result_id: result.0,
+            result_count: result.1,
+        }
+    }
+
+    fn shapeless(id: &str, ingredients: Vec<i32>, result: (i32, i32)) -> OwnedShapelessRecipe {
+        OwnedShapelessRecipe {
+            id: RecipeId::parse(id).unwrap(),
+            ingredients,
+            result_id: result.0,
+            result_count: result.1,
+        }
+    }
+
     #[test]
     fn with_vanilla_counts() {
         let reg = RecipeRegistry::with_vanilla();
         assert_eq!(reg.shaped_count(), 1285);
         assert_eq!(reg.shapeless_count(), 272);
+    }
+
+    #[test]
+    fn vanilla_recipes_have_minecraft_namespace_ids() {
+        let reg = RecipeRegistry::with_vanilla();
+        // Spot-check a couple of vanilla ids.
+        assert!(reg.contains(&RecipeId::vanilla("shaped_0")));
+        assert!(reg.contains(&RecipeId::vanilla("shapeless_0")));
+        assert!(!reg.contains(&RecipeId::new("plugin", "shaped_0")));
     }
 
     #[test]
@@ -372,13 +504,13 @@ mod tests {
         // Asymmetric 2x2 pattern:
         //   [A, B]
         //   [A, _]
-        reg.add_shaped(OwnedShapedRecipe {
-            width: 2,
-            height: 2,
-            pattern: vec![Some(100), Some(200), Some(100), None],
-            result_id: 9999,
-            result_count: 1,
-        });
+        reg.add_shaped(shaped(
+            "plugin:asymmetric",
+            2,
+            2,
+            vec![Some(100), Some(200), Some(100), None],
+            (9999, 1),
+        ));
 
         // Place the mirrored pattern on the grid:
         //   [B, A]
@@ -439,52 +571,89 @@ mod tests {
         assert_eq!(reg.match_grid(&grid, 3), None);
     }
 
-    /// Adding then removing a recipe by result ID.
+    /// Adding then removing a recipe by result ID returns the removed ids.
     #[test]
-    fn remove_by_result() {
+    fn remove_by_result_returns_ids() {
         let mut reg = RecipeRegistry::empty();
-        reg.add_shaped(OwnedShapedRecipe {
-            width: 1,
-            height: 1,
-            pattern: vec![Some(42)],
-            result_id: 7777,
-            result_count: 2,
-        });
+        reg.add_shaped(shaped("plugin:single", 1, 1, vec![Some(42)], (7777, 2)));
 
         let grid = [Some(42), None, None, None];
         assert!(reg.match_grid(&grid, 2).is_some());
 
-        reg.remove_by_result(7777);
+        let removed = reg.remove_by_result(7777);
+        assert_eq!(removed, vec![RecipeId::new("plugin", "single")]);
         assert_eq!(reg.match_grid(&grid, 2), None);
         assert_eq!(reg.shaped_count(), 0);
     }
 
-    /// Clear all recipes, then add a custom one.
+    /// `remove_by_result` removes from both shaped and shapeless registries.
     #[test]
-    fn clear_then_custom() {
-        let mut reg = RecipeRegistry::with_vanilla();
-        assert!(reg.shaped_count() > 0);
-        assert!(reg.shapeless_count() > 0);
+    fn remove_by_result_both_types() {
+        let mut reg = RecipeRegistry::empty();
+        reg.add_shaped(shaped("plugin:s", 1, 1, vec![Some(1)], (42, 1)));
+        reg.add_shapeless(shapeless("plugin:sl", vec![2, 3], (42, 1)));
+        assert_eq!(reg.shaped_count(), 1);
+        assert_eq!(reg.shapeless_count(), 1);
 
-        reg.clear();
+        let removed = reg.remove_by_result(42);
+        assert_eq!(removed.len(), 2);
         assert_eq!(reg.shaped_count(), 0);
         assert_eq!(reg.shapeless_count(), 0);
+    }
 
-        // Add a custom shapeless recipe.
-        reg.add_shapeless(OwnedShapelessRecipe {
-            ingredients: vec![1, 2],
-            result_id: 5555,
-            result_count: 3,
-        });
+    /// `remove_by_id` finds a shapeless recipe and returns it.
+    #[test]
+    fn remove_by_id_shapeless() {
+        let mut reg = RecipeRegistry::empty();
+        reg.add_shapeless(shapeless("plugin:bread", vec![10, 11, 12], (100, 1)));
+        let id = RecipeId::new("plugin", "bread");
 
-        let grid = [Some(2), None, None, Some(1)];
-        let result = reg.match_grid(&grid, 2);
-        assert!(result.is_some(), "custom shapeless should match");
-        assert_eq!(result.unwrap(), (5555, 3));
+        let removed = reg.remove_by_id(&id);
+        match removed {
+            Some(Recipe::Shapeless(r)) => {
+                assert_eq!(r.id, id);
+                assert_eq!(r.ingredients, vec![10, 11, 12]);
+            }
+            _ => panic!("expected shapeless recipe"),
+        }
+        assert!(!reg.contains(&id));
+    }
 
-        // Vanilla recipe should no longer match.
-        let vanilla_grid = [Some(43), Some(43), Some(43), Some(43)];
-        assert_eq!(reg.match_grid(&vanilla_grid, 2), None);
+    /// `remove_by_id` returns None when the id is unknown.
+    #[test]
+    fn remove_by_id_missing() {
+        let mut reg = RecipeRegistry::empty();
+        assert!(
+            reg.remove_by_id(&RecipeId::new("plugin", "missing"))
+                .is_none()
+        );
+    }
+
+    /// Clear removes every recipe and returns all ids.
+    #[test]
+    fn clear_returns_all_ids() {
+        let mut reg = RecipeRegistry::empty();
+        reg.add_shaped(shaped("plugin:a", 1, 1, vec![Some(1)], (1, 1)));
+        reg.add_shapeless(shapeless("plugin:b", vec![2], (2, 1)));
+
+        let removed = reg.clear();
+        assert_eq!(removed.len(), 2);
+        assert_eq!(reg.shaped_count(), 0);
+        assert_eq!(reg.shapeless_count(), 0);
+    }
+
+    /// `Recipe` accessors return id + result data regardless of variant.
+    #[test]
+    fn recipe_accessors() {
+        let s = Recipe::Shaped(shaped("plugin:s", 1, 1, vec![Some(1)], (10, 4)));
+        assert_eq!(s.id(), &RecipeId::new("plugin", "s"));
+        assert_eq!(s.result_id(), 10);
+        assert_eq!(s.result_count(), 4);
+
+        let sl = Recipe::Shapeless(shapeless("plugin:sl", vec![1, 2], (20, 8)));
+        assert_eq!(sl.id(), &RecipeId::new("plugin", "sl"));
+        assert_eq!(sl.result_id(), 20);
+        assert_eq!(sl.result_count(), 8);
     }
 
     /// Bounding box helper with various grid configurations.
@@ -564,13 +733,13 @@ mod tests {
     #[test]
     fn match_asymmetric_normal_orientation() {
         let mut reg = RecipeRegistry::empty();
-        reg.add_shaped(OwnedShapedRecipe {
-            width: 2,
-            height: 2,
-            pattern: vec![Some(100), Some(200), Some(100), None],
-            result_id: 8888,
-            result_count: 1,
-        });
+        reg.add_shaped(shaped(
+            "plugin:n",
+            2,
+            2,
+            vec![Some(100), Some(200), Some(100), None],
+            (8888, 1),
+        ));
 
         // Place the recipe exactly (not mirrored).
         let grid = [
@@ -587,29 +756,5 @@ mod tests {
         let result = reg.match_grid(&grid, 3);
         assert!(result.is_some(), "normal orientation should match");
         assert_eq!(result.unwrap(), (8888, 1));
-    }
-
-    /// `remove_by_result` removes from both shaped and shapeless vecs.
-    #[test]
-    fn remove_by_result_both_types() {
-        let mut reg = RecipeRegistry::empty();
-        reg.add_shaped(OwnedShapedRecipe {
-            width: 1,
-            height: 1,
-            pattern: vec![Some(1)],
-            result_id: 42,
-            result_count: 1,
-        });
-        reg.add_shapeless(OwnedShapelessRecipe {
-            ingredients: vec![2, 3],
-            result_id: 42,
-            result_count: 1,
-        });
-        assert_eq!(reg.shaped_count(), 1);
-        assert_eq!(reg.shapeless_count(), 1);
-
-        reg.remove_by_result(42);
-        assert_eq!(reg.shaped_count(), 0);
-        assert_eq!(reg.shapeless_count(), 0);
     }
 }
