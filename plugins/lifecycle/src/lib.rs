@@ -34,7 +34,7 @@ impl Plugin for LifecyclePlugin {
 
 #[cfg(test)]
 mod tests {
-    use basalt_testkit::PluginTestHarness;
+    use basalt_api::testing::PluginTestHarness;
 
     use super::*;
 
