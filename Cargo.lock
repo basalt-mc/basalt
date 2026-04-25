@@ -321,7 +321,6 @@ name = "basalt-testkit"
 version = "0.1.0"
 dependencies = [
  "basalt-api",
- "basalt-command",
  "basalt-core",
  "basalt-ecs",
  "basalt-recipes",
