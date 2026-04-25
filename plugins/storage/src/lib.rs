@@ -53,8 +53,8 @@ impl Plugin for StoragePlugin {
 #[cfg(test)]
 mod tests {
     use basalt_api::components::BlockPosition;
+    use basalt_api::testing::PluginTestHarness;
     use basalt_api::world::block_entity::BlockEntity;
-    use basalt_testkit::PluginTestHarness;
 
     use super::*;
 
