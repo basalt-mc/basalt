@@ -183,7 +183,7 @@ impl Default for CommandPlugin {
 
 #[cfg(test)]
 mod tests {
-    use basalt_testkit::{DispatchResult, PluginTestHarness};
+    use basalt_api::testing::{DispatchResult, PluginTestHarness};
 
     use super::*;
 
