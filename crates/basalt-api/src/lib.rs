@@ -38,10 +38,8 @@ pub mod system {
     };
 }
 
-/// Command argument types for command plugins.
-pub mod command {
-    pub use basalt_command::{Arg, CommandArg, CommandArgs, Validation};
-}
+/// Command argument types, parsing, validation, and dispatch.
+pub mod command;
 
 /// Primitive Minecraft types.
 pub mod types {
