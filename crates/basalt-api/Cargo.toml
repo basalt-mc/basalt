@@ -6,8 +6,12 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+default = []
+raw-packets = ["dep:basalt-protocol"]
+
 [dependencies]
-basalt-protocol = { workspace = true }
+basalt-protocol = { workspace = true, optional = true }
 basalt-types = { workspace = true }
 basalt-world = { workspace = true }
 basalt-recipes = { workspace = true }

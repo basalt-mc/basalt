@@ -43,6 +43,9 @@ pub mod world;
 /// rather than reaching into packet structs directly. The packets
 /// module is here for the cases where the wire-level shape matters —
 /// e.g. inspecting [`events::RawPacketEvent::packet`].
+///
+/// Available only when the `raw-packets` feature is enabled.
+#[cfg(feature = "raw-packets")]
 pub use basalt_protocol::packets;
 
 // Top-level re-exports for non-prelude usage.
