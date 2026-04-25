@@ -182,6 +182,55 @@ pub(super) async fn write_server_output(
             conn.write_packet_typed(ClientboundPlayTileEntityData::PACKET_ID, &packet)
                 .await?;
         }
+        ServerOutput::RecipeBookAdd { entries, replace } => {
+            // Manual encoding: codegen falls back to opaque Vec<u8> for
+            // RecipeDisplay/SlotDisplay (recursive switch types). The
+            // typed RecipeBookEntry implements Encode + EncodedSize.
+            use basalt_types::{Encode, EncodedSize, VarInt};
+            let mut payload = Vec::with_capacity(
+                VarInt(entries.len() as i32).encoded_size()
+                    + entries.iter().map(|e| e.encoded_size()).sum::<usize>()
+                    + 1,
+            );
+            VarInt(entries.len() as i32).encode(&mut payload).unwrap();
+            for entry in entries {
+                entry.encode(&mut payload).unwrap();
+            }
+            replace.encode(&mut payload).unwrap();
+            // Packet ID 0x44 = ClientboundPlayRecipeBookAdd in 1.21.4.
+            conn.write_packet_typed(0x44, &RawPayload(payload)).await?;
+        }
+        ServerOutput::RecipeBookRemove { display_ids } => {
+            use basalt_types::{Encode, EncodedSize, VarInt};
+            let mut payload = Vec::with_capacity(
+                VarInt(display_ids.len() as i32).encoded_size()
+                    + display_ids
+                        .iter()
+                        .map(|d| VarInt(*d).encoded_size())
+                        .sum::<usize>(),
+            );
+            VarInt(display_ids.len() as i32)
+                .encode(&mut payload)
+                .unwrap();
+            for d in display_ids {
+                VarInt(*d).encode(&mut payload).unwrap();
+            }
+            // Packet ID 0x45 = ClientboundPlayRecipeBookRemove in 1.21.4.
+            conn.write_packet_typed(0x45, &RawPayload(payload)).await?;
+        }
+        ServerOutput::SendGhostRecipe { window_id, display } => {
+            // Packet 0x39 = ClientboundPlayCraftRecipeResponse — same
+            // RecipeDisplay encoding as RecipeBookAdd, so we use the
+            // typed `RecipeDisplay` directly. Codegen can't model the
+            // recursive switch, so we hand-encode the payload.
+            use basalt_types::{Encode, EncodedSize, VarInt};
+            let window_size = VarInt(*window_id).encoded_size();
+            let display_size = display.encoded_size();
+            let mut payload = Vec::with_capacity(window_size + display_size);
+            VarInt(*window_id).encode(&mut payload).unwrap();
+            display.encode(&mut payload).unwrap();
+            conn.write_packet_typed(0x39, &RawPayload(payload)).await?;
+        }
         // ── Chunk path: cache-based ──────────────────────────────────
         ServerOutput::SendChunk { cx, cz } => {
             let bytes = chunk_cache.get_or_encode(*cx, *cz);

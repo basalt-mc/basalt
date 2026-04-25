@@ -260,6 +260,15 @@ pub(super) async fn handle_packet(
             });
         }
 
+        // -- Game loop: place recipe (ghost preview) --
+        ServerboundPlayPacket::CraftRecipeRequest(req) => {
+            let _ = game_tx.send(GameInput::PlaceRecipe {
+                uuid,
+                window_id: req.window_id,
+                display_id: req.recipe_id,
+            });
+        }
+
         // -- Inline (no routing) --
         ServerboundPlayPacket::TeleportConfirm(_)
         | ServerboundPlayPacket::Flying(_)
@@ -274,7 +283,12 @@ pub(super) async fn handle_packet(
         | ServerboundPlayPacket::MessageAcknowledgement(_)
         | ServerboundPlayPacket::ConfigurationAcknowledged(_)
         | ServerboundPlayPacket::UseItem(_)
-        | ServerboundPlayPacket::ArmAnimation(_) => {}
+        | ServerboundPlayPacket::ArmAnimation(_)
+        // Recipe book settings (which tabs are open / filtering) and
+        // displayed-recipe notifications are accepted but ignored —
+        // tracking the player's UI tab state isn't useful server-side.
+        | ServerboundPlayPacket::RecipeBook(_)
+        | ServerboundPlayPacket::DisplayedRecipe(_) => {}
 
         other => {
             log::trace!(target: "basalt::net_task", "[{addr}] {username} unhandled: {:?}", std::mem::discriminant(&other));
@@ -355,7 +369,9 @@ async fn process_instant_responses(
             | Response::OpenContainer(_)
             | Response::BroadcastBlockAction { .. }
             | Response::NotifyContainerViewers { .. }
-            | Response::DestroyBlockEntity { .. } => {}
+            | Response::DestroyBlockEntity { .. }
+            | Response::UnlockRecipe { .. }
+            | Response::LockRecipe { .. } => {}
         }
     }
     Ok(())
