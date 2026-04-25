@@ -2,8 +2,31 @@
 
 use std::sync::Arc;
 
+use basalt_protocol::packets::play::entity::{
+    ClientboundPlayCollect, ClientboundPlayEntityDestroy, ClientboundPlayEntityHeadRotation,
+    ClientboundPlayEntityMetadata, ClientboundPlaySpawnEntity, ClientboundPlaySyncEntityPosition,
+};
+use basalt_types::{Encode, Uuid, VarInt, Vec3i16};
+
 use super::{GameLoop, OutputHandle};
-use crate::messages::{BroadcastEvent, ServerOutput, SharedBroadcast};
+use crate::helpers::angle_to_byte;
+use crate::messages::{EncodablePacket, ServerOutput, SharedBroadcast};
+
+/// Encodes entity metadata entries for a dropped item entity.
+///
+/// Produces the raw metadata bytes (without entity ID — that's in
+/// the [`ClientboundPlayEntityMetadata`] struct):
+/// - Index 8, type 7 (Slot), value = item slot
+/// - 0xFF terminator
+fn encode_item_metadata(item_id: i32, count: i32) -> Vec<u8> {
+    let mut buf = Vec::new();
+    8u8.encode(&mut buf).unwrap();
+    VarInt(7).encode(&mut buf).unwrap();
+    let slot = basalt_types::Slot::new(item_id, count);
+    slot.encode(&mut buf).unwrap();
+    0xFFu8.encode(&mut buf).unwrap();
+    buf
+}
 
 impl GameLoop {
     /// Spawns a dropped item entity and broadcasts it to all players.
@@ -62,21 +85,40 @@ impl GameLoop {
             },
         );
 
-        // Broadcast spawn to all players
-        let bc = Arc::new(SharedBroadcast::new(BroadcastEvent::SpawnItemEntity {
-            entity_id,
-            x: px,
-            y: py,
-            z: pz,
-            vx: 0.0,
-            vy: 0.2,
-            vz: 0.0,
-            item_id,
-            count,
-        }));
+        // Broadcast spawn to all players: SpawnEntity (item type 68) +
+        // EntityMetadata carrying the item slot.
+        let bc = Arc::new(SharedBroadcast::new(vec![
+            EncodablePacket::new(
+                ClientboundPlaySpawnEntity::PACKET_ID,
+                ClientboundPlaySpawnEntity {
+                    entity_id,
+                    object_uuid: Uuid::from_bytes((entity_id as u128).to_le_bytes()),
+                    r#type: 68, // item entity in 1.21.4
+                    x: px,
+                    y: py,
+                    z: pz,
+                    pitch: 0,
+                    yaw: 0,
+                    head_pitch: 0,
+                    object_data: 0,
+                    velocity: Vec3i16 {
+                        x: 0,
+                        y: (0.2 * 8000.0) as i16,
+                        z: 0,
+                    },
+                },
+            ),
+            EncodablePacket::new(
+                ClientboundPlayEntityMetadata::PACKET_ID,
+                ClientboundPlayEntityMetadata {
+                    entity_id,
+                    metadata: encode_item_metadata(item_id, count),
+                },
+            ),
+        ]));
         for (other_eid, _) in self.ecs.iter::<OutputHandle>() {
             self.send_to(other_eid, |tx| {
-                let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&bc)));
+                let _ = tx.try_send(ServerOutput::Cached(Arc::clone(&bc)));
             });
         }
     }
@@ -106,18 +148,34 @@ impl GameLoop {
         }
 
         for (eid, x, y, z) in moving {
-            let bc = Arc::new(SharedBroadcast::new(BroadcastEvent::EntityMoved {
-                entity_id: eid as i32,
-                x,
-                y,
-                z,
-                yaw: 0.0,
-                pitch: 0.0,
-                on_ground: false,
-            }));
+            let entity_id = eid as i32;
+            let bc = Arc::new(SharedBroadcast::new(vec![
+                EncodablePacket::new(
+                    ClientboundPlaySyncEntityPosition::PACKET_ID,
+                    ClientboundPlaySyncEntityPosition {
+                        entity_id,
+                        x,
+                        y,
+                        z,
+                        dx: 0.0,
+                        dy: 0.0,
+                        dz: 0.0,
+                        yaw: 0.0,
+                        pitch: 0.0,
+                        on_ground: false,
+                    },
+                ),
+                EncodablePacket::new(
+                    ClientboundPlayEntityHeadRotation::PACKET_ID,
+                    ClientboundPlayEntityHeadRotation {
+                        entity_id,
+                        head_yaw: angle_to_byte(0.0),
+                    },
+                ),
+            ]));
             for (player_eid, _) in self.ecs.iter::<OutputHandle>() {
                 self.send_to(player_eid, |tx| {
-                    let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&bc)));
+                    let _ = tx.try_send(ServerOutput::Cached(Arc::clone(&bc)));
                 });
             }
         }
@@ -187,25 +245,35 @@ impl GameLoop {
 
                 // Send SetSlot to sync (raw internal index = SetPlayerInventory slot)
                 self.send_to(*player_eid, |tx| {
-                    let _ = tx.try_send(ServerOutput::SetSlot {
-                        slot: inv_idx as i16,
-                        item: slot_after,
-                    });
+                    use basalt_protocol::packets::play::inventory::ClientboundPlaySetPlayerInventory;
+                    let _ = tx.try_send(ServerOutput::plain(
+                        ClientboundPlaySetPlayerInventory::PACKET_ID,
+                        ClientboundPlaySetPlayerInventory {
+                            slot_id: i32::from(inv_idx as i16),
+                            contents: slot_after,
+                        },
+                    ));
                 });
 
                 // Broadcast collect animation + entity destroy
-                let collect = Arc::new(SharedBroadcast::new(BroadcastEvent::CollectItem {
-                    collected_entity_id: *item_eid as i32,
-                    collector_entity_id: *player_eid as i32,
-                    count: *count,
-                }));
-                let destroy = Arc::new(SharedBroadcast::new(BroadcastEvent::RemoveEntities {
-                    entity_ids: vec![*item_eid as i32],
-                }));
+                let collect = Arc::new(SharedBroadcast::single(
+                    ClientboundPlayCollect::PACKET_ID,
+                    ClientboundPlayCollect {
+                        collected_entity_id: *item_eid as i32,
+                        collector_entity_id: *player_eid as i32,
+                        pickup_item_count: *count,
+                    },
+                ));
+                let destroy = Arc::new(SharedBroadcast::single(
+                    ClientboundPlayEntityDestroy::PACKET_ID,
+                    ClientboundPlayEntityDestroy {
+                        entity_ids: vec![*item_eid as i32],
+                    },
+                ));
                 for (e, _) in self.ecs.iter::<OutputHandle>() {
                     self.send_to(e, |tx| {
-                        let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&collect)));
-                        let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&destroy)));
+                        let _ = tx.try_send(ServerOutput::Cached(Arc::clone(&collect)));
+                        let _ = tx.try_send(ServerOutput::Cached(Arc::clone(&destroy)));
                     });
                 }
 
@@ -234,12 +302,13 @@ impl GameLoop {
         }
 
         let entity_ids: Vec<i32> = expired.iter().map(|&eid| eid as i32).collect();
-        let bc = Arc::new(SharedBroadcast::new(BroadcastEvent::RemoveEntities {
-            entity_ids,
-        }));
+        let bc = Arc::new(SharedBroadcast::single(
+            ClientboundPlayEntityDestroy::PACKET_ID,
+            ClientboundPlayEntityDestroy { entity_ids },
+        ));
         for (player_eid, _) in self.ecs.iter::<OutputHandle>() {
             self.send_to(player_eid, |tx| {
-                let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&bc)));
+                let _ = tx.try_send(ServerOutput::Cached(Arc::clone(&bc)));
             });
         }
         for eid in expired {

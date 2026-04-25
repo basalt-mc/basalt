@@ -4,10 +4,14 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use basalt_api::events::PlayerMovedEvent;
+use basalt_protocol::packets::play::entity::{
+    ClientboundPlayEntityHeadRotation, ClientboundPlaySyncEntityPosition,
+};
 use basalt_types::Uuid;
 
 use super::{ChunkStreamRate, ChunkView, GameLoop, OutputHandle, VIEW_RADIUS};
-use crate::messages::{BroadcastEvent, ServerOutput, SharedBroadcast};
+use crate::helpers::angle_to_byte;
+use crate::messages::{EncodablePacket, ServerOutput, SharedBroadcast};
 
 impl GameLoop {
     /// Handles movement input: updates ECS, broadcasts, checks chunk boundaries.
@@ -74,19 +78,34 @@ impl GameLoop {
         self.process_responses(uuid, &responses);
 
         // Broadcast movement to other players
-        let moved = Arc::new(SharedBroadcast::new(BroadcastEvent::EntityMoved {
-            entity_id,
-            x,
-            y,
-            z,
-            yaw,
-            pitch,
-            on_ground,
-        }));
+        let moved = Arc::new(SharedBroadcast::new(vec![
+            EncodablePacket::new(
+                ClientboundPlaySyncEntityPosition::PACKET_ID,
+                ClientboundPlaySyncEntityPosition {
+                    entity_id,
+                    x,
+                    y,
+                    z,
+                    dx: 0.0,
+                    dy: 0.0,
+                    dz: 0.0,
+                    yaw,
+                    pitch,
+                    on_ground,
+                },
+            ),
+            EncodablePacket::new(
+                ClientboundPlayEntityHeadRotation::PACKET_ID,
+                ClientboundPlayEntityHeadRotation {
+                    entity_id,
+                    head_yaw: angle_to_byte(yaw),
+                },
+            ),
+        ]));
         for (other_eid, _) in self.ecs.iter::<OutputHandle>() {
             if other_eid != eid {
                 self.send_to(other_eid, |tx| {
-                    let _ = tx.try_send(ServerOutput::Broadcast(Arc::clone(&moved)));
+                    let _ = tx.try_send(ServerOutput::Cached(Arc::clone(&moved)));
                 });
             }
         }
@@ -108,11 +127,15 @@ impl GameLoop {
     /// queue. The actual sending happens in `drain_chunk_batches` at the
     /// player's negotiated per-tick rate.
     pub(super) fn stream_chunks(&mut self, eid: basalt_ecs::EntityId, new_cx: i32, new_cz: i32) {
+        use basalt_protocol::packets::play::world::ClientboundPlayUpdateViewPosition;
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(ServerOutput::UpdateViewPosition {
-                cx: new_cx,
-                cz: new_cz,
-            });
+            let _ = tx.try_send(ServerOutput::plain(
+                ClientboundPlayUpdateViewPosition::PACKET_ID,
+                ClientboundPlayUpdateViewPosition {
+                    chunk_x: new_cx,
+                    chunk_z: new_cz,
+                },
+            ));
         });
 
         let r = VIEW_RADIUS;
@@ -135,8 +158,15 @@ impl GameLoop {
             .collect();
 
         for &(cx, cz) in &to_unload {
+            use basalt_protocol::packets::play::world::ClientboundPlayUnloadChunk;
             self.send_to(eid, |tx| {
-                let _ = tx.try_send(ServerOutput::UnloadChunk { cx, cz });
+                let _ = tx.try_send(ServerOutput::plain(
+                    ClientboundPlayUnloadChunk::PACKET_ID,
+                    ClientboundPlayUnloadChunk {
+                        chunk_x: cx,
+                        chunk_z: cz,
+                    },
+                ));
             });
         }
 
@@ -258,7 +288,7 @@ mod tests {
 
         let mut got_moved = false;
         while let Ok(msg) = rx2.try_recv() {
-            if matches!(msg, ServerOutput::Broadcast(_)) {
+            if matches!(msg, ServerOutput::Cached(_)) {
                 got_moved = true;
             }
         }

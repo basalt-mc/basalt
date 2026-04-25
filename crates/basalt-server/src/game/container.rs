@@ -220,12 +220,26 @@ impl GameLoop {
         );
 
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(ServerOutput::OpenWindow {
-                window_id,
-                inventory_type: view.inventory_type,
-                title: basalt_types::TextComponent::text(&view.title).to_nbt(),
-                slots: window_slots,
-            });
+            use basalt_protocol::packets::play::inventory::{
+                ClientboundPlayOpenWindow, ClientboundPlayWindowItems,
+            };
+            let _ = tx.try_send(ServerOutput::plain(
+                ClientboundPlayOpenWindow::PACKET_ID,
+                ClientboundPlayOpenWindow {
+                    window_id: i32::from(window_id),
+                    inventory_type: view.inventory_type,
+                    window_title: basalt_types::TextComponent::text(&view.title).to_nbt(),
+                },
+            ));
+            let _ = tx.try_send(ServerOutput::plain(
+                ClientboundPlayWindowItems::PACKET_ID,
+                ClientboundPlayWindowItems {
+                    window_id: i32::from(window_id),
+                    state_id: 0,
+                    items: window_slots.clone(),
+                    carried_item: basalt_types::Slot::empty(),
+                },
+            ));
         });
 
         // Dispatch ContainerOpenedEvent — `ContainerPlugin` listens at
@@ -362,12 +376,19 @@ impl GameLoop {
                 basalt_core::ContainerBacking::Virtual => continue,
             };
             if other_eid != exclude_eid && pos == container_pos {
+                use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+                let oc_window_id = oc.window_id;
+                let item_clone = item.clone();
                 self.send_to(other_eid, |tx| {
-                    let _ = tx.try_send(ServerOutput::SetContainerSlot {
-                        window_id: i32::from(oc.window_id),
-                        slot: window_slot,
-                        item: item.clone(),
-                    });
+                    let _ = tx.try_send(ServerOutput::plain(
+                        ClientboundPlaySetSlot::PACKET_ID,
+                        ClientboundPlaySetSlot {
+                            window_id: i32::from(oc_window_id),
+                            state_id: 0,
+                            slot: window_slot,
+                            item: item_clone,
+                        },
+                    ));
                 });
             }
         }
@@ -479,12 +500,26 @@ impl GameLoop {
         }
 
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(ServerOutput::OpenWindow {
-                window_id,
-                inventory_type: inventory_type.protocol_id(),
-                title: basalt_types::TextComponent::text(&title).to_nbt(),
-                slots: window_slots,
-            });
+            use basalt_protocol::packets::play::inventory::{
+                ClientboundPlayOpenWindow, ClientboundPlayWindowItems,
+            };
+            let _ = tx.try_send(ServerOutput::plain(
+                ClientboundPlayOpenWindow::PACKET_ID,
+                ClientboundPlayOpenWindow {
+                    window_id: i32::from(window_id),
+                    inventory_type: inventory_type.protocol_id(),
+                    window_title: basalt_types::TextComponent::text(&title).to_nbt(),
+                },
+            ));
+            let _ = tx.try_send(ServerOutput::plain(
+                ClientboundPlayWindowItems::PACKET_ID,
+                ClientboundPlayWindowItems {
+                    window_id: i32::from(window_id),
+                    state_id: 0,
+                    items: window_slots,
+                    carried_item: basalt_types::Slot::empty(),
+                },
+            ));
         });
 
         // Compute the viewer count BEFORE dispatch — for block-backed
@@ -682,9 +717,11 @@ mod tests {
         });
         game_loop.tick(1);
 
+        use basalt_protocol::packets::play::inventory::ClientboundPlayOpenWindow;
         let mut got_open = false;
         while let Ok(msg) = rx.try_recv() {
-            if matches!(&msg, ServerOutput::OpenWindow { .. }) {
+            if matches!(&msg, ServerOutput::Plain(ep) if ep.id() == ClientboundPlayOpenWindow::PACKET_ID)
+            {
                 got_open = true;
             }
         }
@@ -831,7 +868,7 @@ mod tests {
         // Should have broadcast a spawn entity
         let mut got_spawn = false;
         while let Ok(msg) = rx.try_recv() {
-            if matches!(&msg, ServerOutput::Broadcast(_)) {
+            if matches!(&msg, ServerOutput::Cached(_)) {
                 got_spawn = true;
             }
         }

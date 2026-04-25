@@ -367,13 +367,13 @@ mod tests {
 
         click(&game_tx, &mut game_loop, uuid, 36, 0, 0);
 
+        use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
         let mut got_cursor = false;
         while let Ok(msg) = rx.try_recv() {
-            if let ServerOutput::SetContainerSlot {
-                window_id: -1,
-                slot: -1,
-                ..
-            } = &msg
+            if let ServerOutput::Plain(ep) = &msg
+                && let Some(p) = ep.downcast::<ClientboundPlaySetSlot>()
+                && p.window_id == -1
+                && p.slot == -1
             {
                 got_cursor = true;
             }

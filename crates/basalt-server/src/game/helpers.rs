@@ -6,6 +6,9 @@ use basalt_api::context::ServerContext;
 use basalt_core::PlayerInfo;
 use basalt_core::components::{Position, Rotation};
 use basalt_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
+use basalt_protocol::packets::play::world::{
+    ClientboundPlayMapChunk, ClientboundPlayTileEntityData,
+};
 use basalt_types::{Encode, Uuid, VarInt, Vec3i16};
 use tokio::sync::mpsc;
 
@@ -65,16 +68,31 @@ impl GameLoop {
         // Force chunk + block entities to be loaded from disk before querying
         self.world.with_chunk(cx, cz, |_| {});
 
+        // Pull (or encode-and-cache) the framed chunk packet bytes from
+        // the shared cache, then ship them as a ref-counted slice — N
+        // players consume the same `Arc<Vec<u8>>` without re-encoding.
+        let chunk_bytes = self.chunk_cache.get_or_encode(cx, cz);
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(ServerOutput::SendChunk { cx, cz });
+            let _ = tx.try_send(ServerOutput::RawBorrowed {
+                id: ClientboundPlayMapChunk::PACKET_ID,
+                bytes: chunk_bytes,
+            });
         });
+
         // Send block entity data for chests in this chunk
         for (x, y, z, be) in self.world.block_entities_in_chunk(cx, cz) {
             let action = match &be {
                 basalt_world::block_entity::BlockEntity::Chest { .. } => 2,
             };
             self.send_to(eid, |tx| {
-                let _ = tx.try_send(ServerOutput::BlockEntityData { x, y, z, action });
+                let _ = tx.try_send(ServerOutput::plain(
+                    ClientboundPlayTileEntityData::PACKET_ID,
+                    ClientboundPlayTileEntityData {
+                        location: basalt_types::Position::new(x, y, z),
+                        action,
+                        nbt_data: basalt_types::nbt::NbtCompound::new(),
+                    },
+                ));
             });
         }
     }
@@ -108,10 +126,10 @@ pub(crate) fn send_player_info_add(
     }
     VarInt(1).encode(&mut buf).unwrap(); // gamemode: creative
     true.encode(&mut buf).unwrap(); // listed
-    let _ = output_tx.try_send(ServerOutput::Raw {
-        id: ClientboundPlayPlayerInfo::PACKET_ID,
-        data: buf,
-    });
+    let _ = output_tx.try_send(ServerOutput::raw_owned(
+        ClientboundPlayPlayerInfo::PACKET_ID,
+        buf,
+    ));
 }
 
 /// Sends a SpawnEntity packet for a player entity.
@@ -132,7 +150,7 @@ pub(crate) fn send_spawn_entity(
         object_data: 0,
         velocity: Vec3i16 { x: 0, y: 0, z: 0 },
     };
-    let _ = output_tx.try_send(ServerOutput::Packet(EncodablePacket::new(
+    let _ = output_tx.try_send(ServerOutput::Plain(EncodablePacket::new(
         ClientboundPlaySpawnEntity::PACKET_ID,
         packet,
     )));

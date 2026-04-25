@@ -59,12 +59,13 @@ impl GameLoop {
 
         if event.is_cancelled() {
             if let Some(handle) = self.ecs.get::<OutputHandle>(eid) {
-                let _ = handle.tx.try_send(ServerOutput::BlockChanged {
-                    x,
-                    y,
-                    z,
-                    state: i32::from(original_state),
-                });
+                let _ = handle.tx.try_send(ServerOutput::plain(
+                    basalt_protocol::packets::play::world::ClientboundPlayBlockChange::PACKET_ID,
+                    basalt_protocol::packets::play::world::ClientboundPlayBlockChange {
+                        location: basalt_types::Position::new(x, y, z),
+                        r#type: i32::from(original_state),
+                    },
+                ));
             }
             return;
         }
@@ -175,12 +176,13 @@ impl GameLoop {
 
         if event.is_cancelled() {
             if let Some(handle) = self.ecs.get::<OutputHandle>(eid) {
-                let _ = handle.tx.try_send(ServerOutput::BlockChanged {
-                    x: px,
-                    y: py,
-                    z: pz,
-                    state: i32::from(basalt_world::block::AIR),
-                });
+                let _ = handle.tx.try_send(ServerOutput::plain(
+                    basalt_protocol::packets::play::world::ClientboundPlayBlockChange::PACKET_ID,
+                    basalt_protocol::packets::play::world::ClientboundPlayBlockChange {
+                        location: basalt_types::Position::new(px, py, pz),
+                        r#type: i32::from(basalt_world::block::AIR),
+                    },
+                ));
             }
             return;
         }
@@ -208,7 +210,7 @@ pub(super) fn face_offset(direction: i32) -> (i32, i32, i32) {
 mod tests {
     use basalt_types::Uuid;
 
-    use crate::messages::{BroadcastEvent, GameInput, ServerOutput};
+    use crate::messages::{GameInput, ServerOutput};
 
     #[test]
     fn block_dig_sets_air() {
@@ -259,11 +261,19 @@ mod tests {
         let mut got_block_change = false;
         while let Ok(msg) = rx.try_recv() {
             match &msg {
-                ServerOutput::BlockAck { .. } => got_ack = true,
-                ServerOutput::Broadcast(bc) => {
-                    if matches!(bc.event, BroadcastEvent::BlockChanged { .. }) {
-                        got_block_change = true;
-                    }
+                ServerOutput::Plain(ep)
+                    if ep.id()
+                        == basalt_protocol::packets::play::world::ClientboundPlayAcknowledgePlayerDigging::PACKET_ID =>
+                {
+                    got_ack = true;
+                }
+                ServerOutput::Cached(bc)
+                    if bc.packets.iter().any(|ep| {
+                        ep.id()
+                            == basalt_protocol::packets::play::world::ClientboundPlayBlockChange::PACKET_ID
+                    }) =>
+                {
+                    got_block_change = true;
                 }
                 _ => {}
             }
@@ -538,9 +548,14 @@ mod tests {
         assert!(game_loop.world.get_block_entity(5, 64, 3).is_none());
 
         // Should have spawned dropped items (chest contents + chest block itself)
+        use basalt_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
         let mut spawn_count = 0;
         while let Ok(msg) = rx.try_recv() {
-            if matches!(&msg, ServerOutput::Broadcast(bc) if matches!(bc.event, BroadcastEvent::SpawnItemEntity { .. }))
+            if let ServerOutput::Cached(bc) = &msg
+                && bc
+                    .packets
+                    .iter()
+                    .any(|ep| ep.id() == ClientboundPlaySpawnEntity::PACKET_ID)
             {
                 spawn_count += 1;
             }

@@ -180,7 +180,7 @@ mod tests {
 
         let mut got_spawn = false;
         while let Ok(msg) = rx.try_recv() {
-            if matches!(&msg, ServerOutput::Broadcast(_)) {
+            if matches!(&msg, ServerOutput::Cached(_)) {
                 got_spawn = true;
             }
         }

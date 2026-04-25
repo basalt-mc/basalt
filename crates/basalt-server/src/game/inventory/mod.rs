@@ -63,10 +63,14 @@ impl GameLoop {
             .map(|inv| inv.slots[held_idx].clone())
             .unwrap_or_default();
         self.send_to(eid, |tx| {
-            let _ = tx.try_send(crate::messages::ServerOutput::SetSlot {
-                slot: held_idx as i16,
-                item: slot_after,
-            });
+            use basalt_protocol::packets::play::inventory::ClientboundPlaySetPlayerInventory;
+            let _ = tx.try_send(crate::messages::ServerOutput::plain(
+                ClientboundPlaySetPlayerInventory::PACKET_ID,
+                ClientboundPlaySetPlayerInventory {
+                    slot_id: i32::from(held_idx as i16),
+                    contents: slot_after,
+                },
+            ));
         });
     }
 
@@ -431,7 +435,7 @@ mod tests {
 
         let mut got_spawn = false;
         while let Ok(msg) = rx.try_recv() {
-            if matches!(&msg, ServerOutput::Broadcast(_)) {
+            if matches!(&msg, ServerOutput::Cached(_)) {
                 got_spawn = true;
             }
         }

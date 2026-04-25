@@ -294,7 +294,7 @@ mod tests {
         // Items should have been dropped (broadcast as spawn entities)
         let mut spawn_count = 0;
         while let Ok(msg) = rx.try_recv() {
-            if matches!(&msg, ServerOutput::Broadcast(_)) {
+            if matches!(&msg, ServerOutput::Cached(_)) {
                 spawn_count += 1;
             }
         }
