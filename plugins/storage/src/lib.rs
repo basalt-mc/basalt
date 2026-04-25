@@ -35,17 +35,17 @@ impl Plugin for StoragePlugin {
     fn on_enable(&self, registrar: &mut PluginRegistrar) {
         registrar.on::<BlockEntityCreatedEvent>(Stage::Post, 0, |event, ctx| {
             let (x, z) = (event.position.x, event.position.z);
-            ctx.world_ctx().world().mark_chunk_dirty(x >> 4, z >> 4);
+            ctx.world_ctx().mark_chunk_dirty(x >> 4, z >> 4);
         });
 
         registrar.on::<BlockEntityModifiedEvent>(Stage::Post, 0, |event, ctx| {
             let (x, z) = (event.position.x, event.position.z);
-            ctx.world_ctx().world().mark_chunk_dirty(x >> 4, z >> 4);
+            ctx.world_ctx().mark_chunk_dirty(x >> 4, z >> 4);
         });
 
         registrar.on::<BlockEntityDestroyedEvent>(Stage::Post, 0, |event, ctx| {
             let (x, z) = (event.position.x, event.position.z);
-            ctx.world_ctx().world().mark_chunk_dirty(x >> 4, z >> 4);
+            ctx.world_ctx().mark_chunk_dirty(x >> 4, z >> 4);
         });
     }
 }
