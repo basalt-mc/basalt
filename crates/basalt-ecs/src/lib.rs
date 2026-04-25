@@ -9,7 +9,7 @@
 //! - **System**: a function that runs each tick with access to the ECS.
 //!
 //! This crate has **zero domain knowledge** — no Minecraft types, no
-//! game-specific components. Component types are defined in `basalt-core`.
+//! game-specific components. Component types are defined in `basalt-api`.
 
 mod ecs;
 pub(crate) mod parallel;
