@@ -5,7 +5,8 @@
 //! into `ProtocolType` values. This replaces the old `map_type`
 //! function and `types_ctx: &Value` threading.
 
-use std::collections::BTreeMap;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashSet};
 
 use serde_json::{Map, Value};
 
@@ -20,6 +21,11 @@ use crate::types::{CountType, PacketDef, ProtocolType, ResolvedField, SwitchVari
 /// Local definitions take priority over global ones.
 pub(crate) struct TypeRegistry {
     types: Map<String, Value>,
+    /// Set of named types currently on the resolution stack — when a
+    /// type's definition references one of its ancestors, we return
+    /// [`ProtocolType::SelfRef`] instead of recursing infinitely.
+    /// Wrapped in `RefCell` so the resolver methods can stay `&self`.
+    currently_resolving: RefCell<HashSet<String>>,
 }
 
 impl TypeRegistry {
@@ -36,7 +42,10 @@ impl TypeRegistry {
                 types.insert(k.clone(), v.clone());
             }
         }
-        Self { types }
+        Self {
+            types,
+            currently_resolving: RefCell::new(HashSet::new()),
+        }
     }
 
     /// Parses all packets for one direction within a protocol state.
@@ -256,7 +265,44 @@ impl TypeRegistry {
     }
 
     /// Resolves a custom type name by looking it up in the registry.
+    ///
+    /// If the named type is already on the resolution stack
+    /// (`currently_resolving`), returns [`ProtocolType::SelfRef`] so
+    /// the caller's post-pass can wrap the cycle in `Box`.
+    /// Otherwise, the name is pushed onto the stack for the duration
+    /// of the resolution and popped on exit.
+    ///
+    /// For container-typed entries the resolver first tries to detect
+    /// a switch group at the top of the container (the
+    /// `[discriminator, switch]` pattern shared by `RecipeDisplay` /
+    /// `SlotDisplay` etc.). If detected, the entire container collapses
+    /// into a [`ProtocolType::SwitchEnum`] named exactly after the
+    /// type — the discriminator and the switch field are both consumed
+    /// into the enum. Otherwise the container becomes an
+    /// [`ProtocolType::InlineStruct`].
     fn resolve_custom(
+        &self,
+        name: &str,
+        parent_name: &str,
+        field_name: &str,
+        is_last: bool,
+    ) -> ProtocolType {
+        if self.currently_resolving.borrow().contains(name) {
+            return ProtocolType::SelfRef(name.to_string());
+        }
+
+        self.currently_resolving
+            .borrow_mut()
+            .insert(name.to_string());
+        let result = self.resolve_custom_inner(name, parent_name, field_name, is_last);
+        self.currently_resolving.borrow_mut().remove(name);
+        result
+    }
+
+    /// Inner body of [`resolve_custom`](Self::resolve_custom) — split
+    /// out so the cycle-tracking push/pop happens unconditionally
+    /// regardless of which path the resolution takes.
+    fn resolve_custom_inner(
         &self,
         name: &str,
         parent_name: &str,
@@ -267,6 +313,9 @@ impl TypeRegistry {
         match resolved {
             Some(value) if !value.is_null() => {
                 if value.is_array() && value[0].as_str() == Some("container") {
+                    if let Some(enum_type) = self.detect_standalone_switch(value, name) {
+                        return enum_type;
+                    }
                     let struct_name = format!("{}{}", parent_name, to_pascal_case(name));
                     let inner_fields = self.parse_container(value, &struct_name, false);
                     ProtocolType::InlineStruct {
@@ -282,6 +331,48 @@ impl TypeRegistry {
                 ProtocolType::Opaque
             }
         }
+    }
+
+    /// Detects whether a container-typed JSON definition collapses to a
+    /// single [`SwitchEnum`](ProtocolType::SwitchEnum). The pattern is
+    /// `[discriminator, switch_on_discriminator]` (with the
+    /// discriminator typically a `mapper` over a varint), as used by
+    /// `RecipeDisplay`, `SlotDisplay`, and similar standalone tagged
+    /// unions.
+    ///
+    /// Returns `Some(ProtocolType::SwitchEnum { name = type_name, … })`
+    /// on success, with direct self-references in the variant fields
+    /// already wrapped in [`Boxed`](ProtocolType::Boxed). Returns
+    /// `None` when the container has any structure that can't be
+    /// expressed as a single enum.
+    fn detect_standalone_switch(&self, value: &Value, name: &str) -> Option<ProtocolType> {
+        let field_array = value[1].as_array()?;
+        let group = self.detect_switch_group(field_array, name)?;
+        let ProtocolType::SwitchEnum { variants, .. } = group.enum_type else {
+            return None;
+        };
+        // Sanity check: every non-discriminator, non-switch field must
+        // be absent. A standalone-switch type collapses the entire
+        // container into the enum; if there are extra fields, fall
+        // back to InlineStruct.
+        let consumed = group.switch_indices.len() + 1; // switches + discriminator
+        if field_array.len() != consumed {
+            return None;
+        }
+        // Wrap any direct self-references in `Box` — `SmithingTrim`,
+        // `WithRemainder` etc. need heap indirection to compile.
+        let variants = variants
+            .into_iter()
+            .map(|mut v| {
+                box_direct_self_refs(&mut v.fields);
+                v
+            })
+            .collect();
+        Some(ProtocolType::SwitchEnum {
+            name: name.to_string(),
+            variants,
+            kind: crate::types::SwitchEnumKind::Shared,
+        })
     }
 
     /// Resolves a compound type (2-element JSON array like `["buffer", {...}]`).
@@ -418,28 +509,70 @@ impl TypeRegistry {
 
         let compare_to = compare_to?;
 
-        // Collect variant fields by discriminator value
-        let mut all_ids: BTreeMap<i32, Vec<ResolvedField>> = BTreeMap::new();
+        // If the discriminator field is a `mapper`, capture its
+        // mappings so string-keyed switch variants (e.g. `RecipeDisplay`'s
+        // `crafting_shapeless`) can be translated to numeric ids and
+        // get human-readable variant names.
+        let mapper_mappings = self.discriminator_mappings(fields, &compare_to);
+
+        // Collect variant fields by discriminator value, plus the
+        // optional source name used for variant naming when keys are
+        // strings translated through a mapper.
+        //
+        // Three cases for the variant data:
+        // - `["container", [...]]` → flatten the container's fields
+        //   directly into the enum variant (no inline wrapper struct).
+        // - `"void"` (or resolves to `ProtocolType::Void`) → keep the
+        //   variant in the enum with no fields (a Rust unit variant).
+        // - Anything else → wrap in a single `ResolvedField` named
+        //   after the switch field (existing behaviour for top-level
+        //   packet switches that contribute one field per id).
+        let mut all_ids: BTreeMap<i32, (Option<String>, Vec<ResolvedField>)> = BTreeMap::new();
         for (field_name, sw) in &switch_defs {
             let sw_fields = sw["fields"].as_object()?;
             for (id_str, type_def) in sw_fields {
-                let id: i32 = id_str.parse().ok()?;
-                let pt = self.resolve(type_def, parent_name, field_name, false);
-                if !matches!(pt, ProtocolType::Void) {
-                    all_ids.entry(id).or_default().push(ResolvedField {
-                        name: to_snake_case(field_name),
-                        protocol_type: pt,
-                    });
+                let (id, source_name) = match id_str.parse::<i32>() {
+                    Ok(n) => (n, None),
+                    Err(_) => {
+                        let mapped = mapper_mappings.as_ref()?.get(id_str)?;
+                        (*mapped, Some(id_str.clone()))
+                    }
+                };
+
+                let entry = all_ids
+                    .entry(id)
+                    .or_insert_with(|| (source_name.clone(), Vec::new()));
+                if entry.0.is_none() {
+                    entry.0 = source_name.clone();
                 }
+
+                if type_def.is_array() && type_def[0].as_str() == Some("container") {
+                    entry
+                        .1
+                        .extend(self.parse_container(type_def, parent_name, false));
+                    continue;
+                }
+
+                let pt = self.resolve(type_def, parent_name, field_name, false);
+                if matches!(pt, ProtocolType::Void) {
+                    continue;
+                }
+                entry.1.push(ResolvedField {
+                    name: to_snake_case(field_name),
+                    protocol_type: pt,
+                });
             }
         }
 
         let enum_name = format!("{}{}", parent_name, to_pascal_case(&compare_to));
         let variants: Vec<SwitchVariant> = all_ids
             .iter()
-            .map(|(&id, variant_fields)| SwitchVariant {
+            .map(|(&id, (source_name, variant_fields))| SwitchVariant {
                 id,
-                name: format!("Variant{id}"),
+                name: source_name
+                    .as_ref()
+                    .map(|s| to_pascal_case(s))
+                    .unwrap_or_else(|| format!("Variant{id}")),
                 fields: variant_fields.clone(),
             })
             .collect();
@@ -450,8 +583,37 @@ impl TypeRegistry {
             enum_type: ProtocolType::SwitchEnum {
                 name: enum_name,
                 variants,
+                kind: crate::types::SwitchEnumKind::Inline,
             },
         })
+    }
+
+    /// Looks up the discriminator field by name and, if its type is a
+    /// `mapper`, returns the variant-name → id mapping. Used by
+    /// [`detect_switch_group`](Self::detect_switch_group) to translate
+    /// string-keyed switch variants (e.g. `crafting_shapeless`) into
+    /// numeric ids and human-readable variant names.
+    fn discriminator_mappings(
+        &self,
+        fields: &[Value],
+        compare_to: &str,
+    ) -> Option<BTreeMap<String, i32>> {
+        let disc = fields
+            .iter()
+            .find(|f| f["name"].as_str() == Some(compare_to))?;
+        let ty = &disc["type"];
+        let arr = ty.as_array()?;
+        if arr.len() != 2 || arr[0].as_str() != Some("mapper") {
+            return None;
+        }
+        let mappings = arr[1]["mappings"].as_object()?;
+        let mut out = BTreeMap::new();
+        for (id_str, name_value) in mappings {
+            let id = id_str.parse::<i32>().ok()?;
+            let name = name_value.as_str()?.to_string();
+            out.insert(name, id);
+        }
+        Some(out)
     }
 }
 
@@ -462,7 +624,24 @@ struct SwitchGroup {
     enum_type: ProtocolType,
 }
 
-/// Returns true if a container field's type is a switch compound.
+/// Wraps any direct [`SelfRef`](ProtocolType::SelfRef) field types in
+/// [`Boxed`](ProtocolType::Boxed) to break recursion at the type
+/// system level.
+///
+/// Self-references that already sit inside an
+/// [`Array`](ProtocolType::Array) or [`Optional`](ProtocolType::Optional)
+/// are left alone — `Vec` and `Option` already provide the heap
+/// indirection that breaks the infinite-size cycle, so wrapping in an
+/// extra `Box` would just add overhead.
+fn box_direct_self_refs(fields: &mut [ResolvedField]) {
+    for field in fields {
+        if matches!(field.protocol_type, ProtocolType::SelfRef(_)) {
+            let inner = std::mem::replace(&mut field.protocol_type, ProtocolType::Void);
+            field.protocol_type = ProtocolType::Boxed(Box::new(inner));
+        }
+    }
+}
+
 /// Returns true if a container field's type is a switch compound.
 fn is_switch_field(field: &Value) -> bool {
     let field_type = &field["type"];
@@ -823,7 +1002,7 @@ mod tests {
         assert_eq!(fields[0].name, "target");
         assert_eq!(fields[1].name, "action");
         match &fields[1].protocol_type {
-            ProtocolType::SwitchEnum { name, variants } => {
+            ProtocolType::SwitchEnum { name, variants, .. } => {
                 assert_eq!(name, "TestAction");
                 assert!(variants.len() >= 2);
             }
@@ -867,7 +1046,7 @@ mod tests {
         assert_eq!(fields.len(), 1);
         assert_eq!(fields[0].name, "id");
         match &fields[0].protocol_type {
-            ProtocolType::SwitchEnum { name, variants } => {
+            ProtocolType::SwitchEnum { name, variants, .. } => {
                 assert_eq!(name, "TestId");
                 assert_eq!(variants.len(), 1);
                 assert_eq!(variants[0].id, 1);

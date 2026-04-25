@@ -123,14 +123,6 @@ pub struct ClientboundPlayChunkBiomes {
     pub biomes: Vec<ClientboundPlayChunkBiomesBiomes>,
 }
 
-/// Inline data structure used by [`ClientboundPlayExplosion`].
-#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
-pub struct ClientboundPlayExplosionParticle {
-    #[field(varint)]
-    pub r#type: i32,
-    pub data: Vec<u8>,
-}
-
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x21)]
 pub struct ClientboundPlayExplosion {
@@ -139,7 +131,7 @@ pub struct ClientboundPlayExplosion {
     pub z: f64,
     #[field(optional)]
     pub player_knockback: Option<Vec3f64>,
-    pub explosion_particle: ClientboundPlayExplosionParticle,
+    pub explosion_particle: crate::packets::play::types::Particle,
     #[field(rest)]
     pub sound: Vec<u8>,
 }
@@ -352,14 +344,6 @@ pub struct ClientboundPlayWorldEvent {
     pub global: bool,
 }
 
-/// Inline data structure used by [`ClientboundPlayWorldParticles`].
-#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]
-pub struct ClientboundPlayWorldParticlesParticle {
-    #[field(varint)]
-    pub r#type: i32,
-    pub data: Vec<u8>,
-}
-
 #[derive(Debug, Clone, Default, PartialEq)]
 #[packet(id = 0x2a)]
 pub struct ClientboundPlayWorldParticles {
@@ -373,5 +357,5 @@ pub struct ClientboundPlayWorldParticles {
     pub offset_z: f32,
     pub velocity_offset: f32,
     pub amount: i32,
-    pub particle: ClientboundPlayWorldParticlesParticle,
+    pub particle: crate::packets::play::types::Particle,
 }

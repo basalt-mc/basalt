@@ -152,6 +152,72 @@ fn collect_imports_from_fields(
     }
 }
 
+/// Collects only the basalt-types imports actually referenced by a
+/// list of resolved fields, treating `NbtCompound` separately because
+/// it lives under `basalt_types::nbt::NbtCompound`.
+///
+/// Used by the play-codegen pass when generating
+/// `crates/basalt-protocol/src/packets/play/types.rs` — that file
+/// always pulls in the derive macros, so we only need the runtime
+/// import set.
+pub(crate) fn collect_basalt_imports_from_fields(
+    fields: &[ResolvedField],
+    basalt_imports: &mut BTreeSet<&'static str>,
+    needs_nbt: &mut bool,
+) {
+    for field in fields {
+        collect_basalt_imports_from_type(&field.protocol_type, basalt_imports, needs_nbt);
+    }
+}
+
+/// Collects basalt-types imports from a single `ProtocolType`.
+fn collect_basalt_imports_from_type(
+    pt: &ProtocolType,
+    basalt_imports: &mut BTreeSet<&'static str>,
+    needs_nbt: &mut bool,
+) {
+    match pt {
+        ProtocolType::NbtCompound | ProtocolType::OptionalNbt => {
+            *needs_nbt = true;
+        }
+        ProtocolType::Uuid => {
+            basalt_imports.insert("Uuid");
+        }
+        ProtocolType::Position => {
+            basalt_imports.insert("Position");
+        }
+        ProtocolType::Slot => {
+            basalt_imports.insert("Slot");
+        }
+        ProtocolType::Vec2f => {
+            basalt_imports.insert("Vec2f");
+        }
+        ProtocolType::Vec3f => {
+            basalt_imports.insert("Vec3f");
+        }
+        ProtocolType::Vec3f64 => {
+            basalt_imports.insert("Vec3f64");
+        }
+        ProtocolType::Vec3i16 => {
+            basalt_imports.insert("Vec3i16");
+        }
+        ProtocolType::Array { inner, .. }
+        | ProtocolType::Optional(inner)
+        | ProtocolType::Boxed(inner) => {
+            collect_basalt_imports_from_type(inner, basalt_imports, needs_nbt);
+        }
+        ProtocolType::InlineStruct { fields, .. } => {
+            collect_basalt_imports_from_fields(fields, basalt_imports, needs_nbt);
+        }
+        ProtocolType::SwitchEnum { variants, .. } => {
+            for variant in variants {
+                collect_basalt_imports_from_fields(&variant.fields, basalt_imports, needs_nbt);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Recursively collects import requirements from a protocol type.
 fn collect_imports_from_type(
     pt: &ProtocolType,
@@ -171,10 +237,18 @@ fn collect_imports_from_type(
         ProtocolType::InlineStruct { fields, .. } => {
             collect_imports_from_fields(fields, needs_derive, basalt_imports);
         }
-        ProtocolType::SwitchEnum { variants, .. } => {
-            for variant in variants {
-                collect_imports_from_fields(&variant.fields, needs_derive, basalt_imports);
+        ProtocolType::SwitchEnum { variants, kind, .. } => {
+            // Shared switch enums live in `play/types.rs` and pull
+            // their own imports there. Only descend into Inline
+            // variants (those emitted alongside this packet).
+            if *kind == crate::types::SwitchEnumKind::Inline {
+                for variant in variants {
+                    collect_imports_from_fields(&variant.fields, needs_derive, basalt_imports);
+                }
             }
+        }
+        ProtocolType::Boxed(inner) => {
+            collect_imports_from_type(inner, needs_derive, basalt_imports);
         }
         _ => {}
     }
@@ -238,7 +312,15 @@ fn emit_inline_types(pt: &ProtocolType, packet_name: &str, out: &mut String) {
             }
             out.push_str("}\n\n");
         }
-        ProtocolType::SwitchEnum { name, variants } => {
+        ProtocolType::SwitchEnum {
+            name,
+            variants,
+            kind,
+        } => {
+            // Shared types are emitted once in `play/types.rs`.
+            if *kind == crate::types::SwitchEnumKind::Shared {
+                return;
+            }
             emit_switch_enum(name, variants, packet_name, out);
         }
         ProtocolType::Array { inner, .. } | ProtocolType::Optional(inner) => {
@@ -252,11 +334,45 @@ fn emit_inline_types(pt: &ProtocolType, packet_name: &str, out: &mut String) {
 /// and a `Default` impl.
 fn emit_switch_enum(name: &str, variants: &[SwitchVariant], packet_name: &str, out: &mut String) {
     out.push_str(&format!("/// Switch enum used by [`{packet_name}`].\n"));
-    out.push_str("#[derive(Debug, Clone, PartialEq, Encode, Decode, EncodedSize)]\n");
+    write_switch_enum_body(name, variants, out);
+}
+
+/// Emits a shared switch-enum definition without the
+/// per-packet documentation comment. Used by the play-codegen pass
+/// when collecting `Shared`-kind enums into `play/types.rs`.
+pub(crate) fn emit_named_switch_enum(name: &str, variants: &[SwitchVariant], out: &mut String) {
+    write_switch_enum_body(name, variants, out);
+}
+
+/// Shared body for [`emit_switch_enum`] / [`emit_named_switch_enum`].
+///
+/// Strategy for `Default`:
+/// - If any variant is a unit (no fields), pick the first such
+///   variant and use `#[derive(Default)]` with `#[default]` on it.
+///   This is idempotent and trivially correct.
+/// - Otherwise, hand-write `Default::default()` returning the first
+///   variant whose fields contain no `Boxed` self-reference — using
+///   such a variant would recurse infinitely through `Default`.
+/// - If neither path applies (every variant contains a `Boxed`
+///   self-reference), panic at codegen time. The only way to hit
+///   this is a pathological JSON definition; our current protocol
+///   has no such type.
+fn write_switch_enum_body(name: &str, variants: &[SwitchVariant], out: &mut String) {
+    let default_unit = variants.iter().position(|v| v.fields.is_empty());
+    let derive_default = default_unit.is_some();
+
+    if derive_default {
+        out.push_str("#[derive(Debug, Clone, Default, PartialEq, Encode, Decode, EncodedSize)]\n");
+    } else {
+        out.push_str("#[derive(Debug, Clone, PartialEq, Encode, Decode, EncodedSize)]\n");
+    }
     out.push_str(&format!("pub enum {name} {{\n"));
 
-    for variant in variants {
+    for (i, variant) in variants.iter().enumerate() {
         out.push_str(&format!("    #[variant(id = {})]\n", variant.id));
+        if Some(i) == default_unit {
+            out.push_str("    #[default]\n");
+        }
         if variant.fields.is_empty() {
             out.push_str(&format!("    {},\n", variant.name));
         } else {
@@ -274,17 +390,30 @@ fn emit_switch_enum(name: &str, variants: &[SwitchVariant], packet_name: &str, o
 
     out.push_str("}\n\n");
 
-    // Default impl — returns first variant
-    let first = &variants[0];
+    if derive_default {
+        return;
+    }
+
+    let safe_first = variants.iter().find(|v| {
+        v.fields
+            .iter()
+            .all(|f| !matches!(f.protocol_type, ProtocolType::Boxed(_)))
+    });
+    let chosen = safe_first.unwrap_or_else(|| {
+        panic!(
+            "enum `{name}` has no variant safe for Default: every variant contains a Boxed self-reference",
+        );
+    });
+
     out.push_str(&format!(
         "impl Default for {name} {{\n    fn default() -> Self {{\n        Self::{}",
-        first.name
+        chosen.name
     ));
-    if first.fields.is_empty() {
+    if chosen.fields.is_empty() {
         out.push_str("\n    }\n}\n");
     } else {
         out.push_str(" {\n");
-        for field in &first.fields {
+        for field in &chosen.fields {
             out.push_str(&format!(
                 "            {}: Default::default(),\n",
                 field.name

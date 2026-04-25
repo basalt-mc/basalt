@@ -73,6 +73,10 @@ pub(crate) enum ProtocolType {
     SwitchEnum {
         name: std::string::String,
         variants: Vec<SwitchVariant>,
+        /// Whether this enum is local to a single packet (inlined in
+        /// the packet's category file) or shared across packets
+        /// (emitted once in `packets/play/types.rs`).
+        kind: SwitchEnumKind,
     },
 
     // -- Special --
@@ -82,6 +86,24 @@ pub(crate) enum ProtocolType {
     Opaque,
     /// No data on the wire — the field should be filtered out.
     Void,
+    /// Forward reference to a type currently being resolved.
+    ///
+    /// Emitted only by [`TypeRegistry::resolve_custom`] when it detects
+    /// a cycle (the same name is already on the resolution stack). The
+    /// `to_rust` emission is just the type name — this variant is
+    /// always wrapped in [`Boxed`](Self::Boxed) when used as a direct
+    /// struct/variant field, so the recursion compiles without
+    /// infinite size.
+    SelfRef(std::string::String),
+    /// Heap-indirected wrapper for recursive types.
+    ///
+    /// Emitted as a post-pass over [`SelfRef`](Self::SelfRef) when the
+    /// containing position is a struct/variant field (not a `Vec` or
+    /// `Option`, which already provide indirection). The Rust output
+    /// is `Box<{inner}>`; the derive macros handle `Box<T>` natively
+    /// because `Box<T>: Encode` / `Decode` / `EncodedSize` whenever
+    /// `T` does.
+    Boxed(Box<ProtocolType>),
 }
 
 /// A resolved field ready for code generation.
@@ -91,6 +113,20 @@ pub(crate) struct ResolvedField {
     pub name: std::string::String,
     /// The resolved protocol type.
     pub protocol_type: ProtocolType,
+}
+
+/// Where a [`SwitchEnum`](ProtocolType::SwitchEnum) gets emitted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SwitchEnumKind {
+    /// Inline to a single packet — emitted alongside the packet
+    /// struct in its category file. Names follow the
+    /// `{ParentPacket}{Field}` pattern so collisions can't occur.
+    Inline,
+    /// Shared across multiple packets — emitted once in
+    /// `crates/basalt-protocol/src/packets/play/types.rs` and
+    /// re-exported through `play/mod.rs`. Used for standalone named
+    /// types like `RecipeDisplay` / `SlotDisplay`.
+    Shared,
 }
 
 /// A single variant in a switch enum.
@@ -186,7 +222,10 @@ impl ProtocolType {
             }
             Self::Rest => ("Vec<u8>".into(), Some("rest".into())),
             Self::InlineStruct { name, .. } => (name.clone(), None),
-            Self::SwitchEnum { name, .. } => (name.clone(), None),
+            Self::SwitchEnum { name, kind, .. } => match kind {
+                SwitchEnumKind::Inline => (name.clone(), None),
+                SwitchEnumKind::Shared => (format!("crate::packets::play::types::{name}"), None),
+            },
             Self::Bitfield(bits) => {
                 let ty = match bits {
                     0..=8 => "u8",
@@ -198,13 +237,26 @@ impl ProtocolType {
             }
             Self::Opaque => ("Vec<u8>".into(), None),
             Self::Void => ("__void__".into(), None),
+            Self::SelfRef(name) => (name.clone(), None),
+            Self::Boxed(inner) => {
+                let (inner_rust, inner_attr) = inner.to_rust();
+                (format!("Box<{inner_rust}>"), inner_attr)
+            }
         }
     }
 
     /// Returns true if this type needs `Encode`/`Decode`/`EncodedSize`
-    /// derive imports (inline structs and switch enums).
+    /// derive imports in the file that carries it.
+    ///
+    /// `Shared` switch enums live in `play/types.rs` and pull their
+    /// own derives there, so a packet file that only references a
+    /// `Shared` enum does not need to import the derive macros.
     pub fn needs_derive_imports(&self) -> bool {
-        matches!(self, Self::InlineStruct { .. } | Self::SwitchEnum { .. })
+        match self {
+            Self::InlineStruct { .. } => true,
+            Self::SwitchEnum { kind, .. } => *kind == SwitchEnumKind::Inline,
+            _ => false,
+        }
     }
 
     /// Collects the basalt-types import name if this type needs one.
@@ -370,8 +422,22 @@ mod tests {
         let pt = ProtocolType::SwitchEnum {
             name: "MyEnum".into(),
             variants: vec![],
+            kind: SwitchEnumKind::Inline,
         };
         assert_eq!(pt.to_rust(), ("MyEnum".into(), None));
+    }
+
+    #[test]
+    fn to_rust_switch_enum_shared() {
+        let pt = ProtocolType::SwitchEnum {
+            name: "RecipeDisplay".into(),
+            variants: vec![],
+            kind: SwitchEnumKind::Shared,
+        };
+        assert_eq!(
+            pt.to_rust(),
+            ("crate::packets::play::types::RecipeDisplay".into(), None)
+        );
     }
 
     #[test]
@@ -386,7 +452,8 @@ mod tests {
         assert!(
             ProtocolType::SwitchEnum {
                 name: "X".into(),
-                variants: vec![]
+                variants: vec![],
+                kind: SwitchEnumKind::Inline,
             }
             .needs_derive_imports()
         );
