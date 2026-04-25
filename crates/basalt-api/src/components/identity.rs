@@ -1,6 +1,6 @@
 //! Entity identity and state components.
 
-use super::Component;
+use crate::components::Component;
 
 /// Minecraft entity type ID.
 ///

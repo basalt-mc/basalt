@@ -1,7 +1,7 @@
 //! Crafting events: grid changes, recipe matching, craft execution,
 //! and recipe-registry lifecycle.
 
-use basalt_core::context::UnlockReason;
+use crate::context::UnlockReason;
 use basalt_recipes::{Recipe, RecipeId};
 use basalt_types::Slot;
 

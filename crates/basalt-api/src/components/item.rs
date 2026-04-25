@@ -1,6 +1,6 @@
 //! Item and container components.
 
-use super::Component;
+use crate::components::Component;
 
 /// A dropped item on the ground.
 ///

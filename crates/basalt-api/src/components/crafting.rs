@@ -2,7 +2,7 @@
 
 use basalt_types::Slot;
 
-use super::Component;
+use crate::components::Component;
 
 /// Tracks the contents of a player's crafting grid.
 ///

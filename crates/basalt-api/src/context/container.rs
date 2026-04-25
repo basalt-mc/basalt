@@ -1,7 +1,7 @@
 //! ContainerContext implementation for ServerContext.
 
-use basalt_core::ContainerContext;
-use basalt_core::components::BlockPosition;
+use crate::components::BlockPosition;
+use crate::context::ContainerContext;
 
 use super::ServerContext;
 use super::response::Response;
@@ -18,7 +18,7 @@ impl ContainerContext for ServerContext {
         });
     }
 
-    fn open(&self, container: &basalt_core::container::Container) {
+    fn open(&self, container: &crate::container::Container) {
         self.responses
             .push(Response::OpenContainer(container.clone()));
     }

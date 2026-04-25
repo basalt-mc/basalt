@@ -11,15 +11,18 @@
 //! - [`world`] — block states, collision, block entities
 
 pub mod broadcast;
+pub mod budget;
+pub mod components;
 pub mod container;
 pub mod context;
 pub mod events;
+pub mod gamemode;
 pub mod logger;
+pub mod player;
 pub mod plugin;
 pub mod recipes;
-
-pub mod components;
 pub mod system;
+pub mod testing;
 
 /// Command argument types, parsing, validation, and dispatch.
 pub mod command;
@@ -62,10 +65,12 @@ pub mod prelude {
     pub use crate::plugin::{Plugin, PluginMetadata, PluginRegistrar};
 
     // Context traits
-    pub use basalt_core::{
-        BroadcastMessage, ChatContext, ContainerContext, Context, EntityContext, Gamemode,
-        PlayerContext, RecipeContext, UnlockReason, WorldContext,
+    pub use crate::broadcast::BroadcastMessage;
+    pub use crate::context::{
+        ChatContext, ContainerContext, Context, EntityContext, PlayerContext, RecipeContext,
+        UnlockReason, WorldContext,
     };
+    pub use crate::gamemode::Gamemode;
 
     // Event system
     pub use crate::events::{Event, Stage};

@@ -2,11 +2,11 @@
 
 use std::sync::Arc;
 
-use basalt_core::Context;
-use basalt_core::broadcast::BroadcastMessage;
-use basalt_core::components::Rotation;
-use basalt_core::gamemode::Gamemode;
-use basalt_core::player::PlayerInfo;
+use crate::broadcast::BroadcastMessage;
+use crate::components::Rotation;
+use crate::context::Context;
+use crate::gamemode::Gamemode;
+use crate::player::PlayerInfo;
 use basalt_types::Uuid;
 
 use super::ServerContext;
@@ -27,7 +27,7 @@ fn test_ctx() -> ServerContext {
                 yaw: 0.0,
                 pitch: 0.0,
             },
-            position: basalt_core::Position {
+            position: crate::components::Position {
                 x: 0.0,
                 y: 64.0,
                 z: 0.0,
@@ -108,7 +108,7 @@ fn context_trait_is_usable_as_dyn() {
 
 #[test]
 fn recipes_unlock_queues_response() {
-    use basalt_core::context::UnlockReason;
+    use crate::context::UnlockReason;
     use basalt_recipes::RecipeId;
 
     let ctx = test_ctx();
@@ -146,7 +146,7 @@ fn recipes_lock_queues_response() {
 
 #[test]
 fn recipes_has_reads_snapshot() {
-    use basalt_core::components::KnownRecipes;
+    use crate::components::KnownRecipes;
     use basalt_recipes::RecipeId;
 
     let id = RecipeId::vanilla("oak_planks");
@@ -163,7 +163,7 @@ fn recipes_has_reads_snapshot() {
                 yaw: 0.0,
                 pitch: 0.0,
             },
-            position: basalt_core::Position {
+            position: crate::components::Position {
                 x: 0.0,
                 y: 64.0,
                 z: 0.0,

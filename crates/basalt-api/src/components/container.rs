@@ -1,6 +1,6 @@
 //! Component for storing slots of virtual (non-block-backed) containers.
 
-use super::Component;
+use crate::components::Component;
 
 /// Holds the slot contents of a virtual container window.
 ///

@@ -2,9 +2,9 @@
 
 use std::cell::RefCell;
 
-use basalt_core::broadcast::BroadcastMessage;
-use basalt_core::components::{BlockPosition, ChunkPosition, Position, Rotation};
-use basalt_core::context::UnlockReason;
+use crate::broadcast::BroadcastMessage;
+use crate::components::{BlockPosition, ChunkPosition, Position, Rotation};
+use crate::context::UnlockReason;
 use basalt_recipes::RecipeId;
 use basalt_types::Slot;
 use basalt_types::nbt::NbtCompound;
@@ -67,9 +67,9 @@ pub enum Response {
     },
     /// Open a custom container window for the current player.
     ///
-    /// Accepts a [`Container`](basalt_core::container::Container) template
-    /// value built via [`Container::builder()`](basalt_core::container::Container::builder).
-    OpenContainer(basalt_core::container::Container),
+    /// Accepts a [`Container`](crate::container::Container) template
+    /// value built via [`Container::builder()`](crate::container::Container::builder).
+    OpenContainer(crate::container::Container),
     /// Broadcast a `BlockAction` packet to all connected players.
     ///
     /// Used by container/door/note-block plugins for state-change

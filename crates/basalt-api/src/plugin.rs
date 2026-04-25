@@ -5,8 +5,8 @@
 //! during [`on_enable`](Plugin::on_enable).
 
 use crate::command::{Arg, CommandArg, CommandArgs, Validation};
+use crate::context::Context;
 use crate::events::{BusKind, Event, EventBus, EventRouting, Stage};
-use basalt_core::Context;
 
 use crate::context::ServerContext;
 
@@ -67,7 +67,7 @@ pub struct PluginRegistrar<'a> {
     /// Collected command entries.
     commands: &'a mut Vec<CommandEntry>,
     /// Collected system descriptors.
-    systems: &'a mut Vec<basalt_core::SystemDescriptor>,
+    systems: &'a mut Vec<crate::system::SystemDescriptor>,
     /// Shared world reference, available to all plugins.
     world: std::sync::Arc<basalt_world::World>,
     /// Mutable recipe registry for plugin customisation.
@@ -90,7 +90,7 @@ impl<'a> PluginRegistrar<'a> {
         instant_bus: &'a mut EventBus,
         game_bus: &'a mut EventBus,
         commands: &'a mut Vec<CommandEntry>,
-        systems: &'a mut Vec<basalt_core::SystemDescriptor>,
+        systems: &'a mut Vec<crate::system::SystemDescriptor>,
         world: std::sync::Arc<basalt_world::World>,
         recipes: &'a mut basalt_recipes::RecipeRegistry,
         bootstrap_ctx: &'a ServerContext,
@@ -141,7 +141,7 @@ impl<'a> PluginRegistrar<'a> {
         &mut self,
         stage: Stage,
         priority: i32,
-        handler: impl Fn(&mut E, &dyn basalt_core::Context) + Send + Sync + 'static,
+        handler: impl Fn(&mut E, &dyn crate::context::Context) + Send + Sync + 'static,
     ) where
         E: Event + EventRouting + 'static,
     {
@@ -149,7 +149,7 @@ impl<'a> PluginRegistrar<'a> {
         // The EventBus stores handlers typed on the concrete context (ServerContext),
         // but plugins receive the abstract &dyn Context interface.
         let wrapper = move |event: &mut E, ctx: &ServerContext| {
-            handler(event, ctx as &dyn basalt_core::Context);
+            handler(event, ctx as &dyn crate::context::Context);
         };
         match E::BUS {
             BusKind::Instant => self
@@ -179,7 +179,7 @@ impl<'a> PluginRegistrar<'a> {
     pub fn system(&mut self, name: &str) -> PluginSystemBuilder<'_, 'a> {
         PluginSystemBuilder {
             registrar: self,
-            builder: basalt_core::SystemBuilder::new(name),
+            builder: crate::system::SystemBuilder::new(name),
         }
     }
 
@@ -197,16 +197,16 @@ impl<'a> PluginRegistrar<'a> {
 
 /// Fluent builder for registering a system via a plugin.
 ///
-/// Wraps [`SystemBuilder`](basalt_core::SystemBuilder) and pushes the
+/// Wraps [`SystemBuilder`](crate::system::SystemBuilder) and pushes the
 /// resulting descriptor into the registrar's system list on `run()`.
 pub struct PluginSystemBuilder<'r, 'a> {
     registrar: &'r mut PluginRegistrar<'a>,
-    builder: basalt_core::SystemBuilder,
+    builder: crate::system::SystemBuilder,
 }
 
 impl<'r, 'a> PluginSystemBuilder<'r, 'a> {
     /// Sets which tick phase this system runs in.
-    pub fn phase(mut self, phase: basalt_core::Phase) -> Self {
+    pub fn phase(mut self, phase: crate::components::Phase) -> Self {
         self.builder = self.builder.phase(phase);
         self
     }
@@ -218,19 +218,19 @@ impl<'r, 'a> PluginSystemBuilder<'r, 'a> {
     }
 
     /// Declares that this system reads a component type.
-    pub fn reads<T: basalt_core::Component>(mut self) -> Self {
+    pub fn reads<T: crate::components::Component>(mut self) -> Self {
         self.builder = self.builder.reads::<T>();
         self
     }
 
     /// Declares that this system writes a component type.
-    pub fn writes<T: basalt_core::Component>(mut self) -> Self {
+    pub fn writes<T: crate::components::Component>(mut self) -> Self {
         self.builder = self.builder.writes::<T>();
         self
     }
 
     /// Sets the system runner and registers the system.
-    pub fn run<F: FnMut(&mut dyn basalt_core::SystemContext) + Send + 'static>(self, runner: F) {
+    pub fn run<F: FnMut(&mut dyn crate::system::SystemContext) + Send + 'static>(self, runner: F) {
         let descriptor = self.builder.run(runner);
         self.registrar.systems.push(descriptor);
     }
@@ -343,7 +343,7 @@ mod tests {
     /// Builds a stub bootstrap [`ServerContext`] for tests that need
     /// to construct a [`PluginRegistrar`] without a real player.
     fn bootstrap_ctx(world: std::sync::Arc<basalt_world::World>) -> ServerContext {
-        ServerContext::new(world, basalt_core::player::PlayerInfo::stub())
+        ServerContext::new(world, crate::player::PlayerInfo::stub())
     }
 
     struct TestPlugin;

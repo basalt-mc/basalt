@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use basalt_core::Context;
+use crate::context::Context;
 
 use super::args::CommandArgs;
 use super::dispatch::Command;
@@ -71,7 +71,7 @@ impl Default for CommandRegistry {
 
 #[cfg(test)]
 mod tests {
-    use basalt_core::testing::NoopContext;
+    use crate::testing::NoopContext;
 
     use super::super::args::Arg;
     use super::*;

@@ -1,6 +1,6 @@
 //! Block interaction events: breaking, placing, right-click.
 
-use basalt_core::BlockPosition;
+use crate::components::BlockPosition;
 
 /// A player broke a block.
 ///
