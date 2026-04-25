@@ -17,10 +17,43 @@
 //! - `minecraft:jukebox_song` — music disc definitions
 //! - `minecraft:instrument` — goat horn instrument definitions
 
+use std::sync::OnceLock;
+
 use crate::packets::configuration::{
     ClientboundConfigurationRegistryData, ClientboundConfigurationRegistryDataEntries,
 };
 use basalt_types::nbt::{NbtCompound, NbtTag};
+use basalt_types::{Encode, EncodedSize};
+
+/// Returns the pre-encoded payloads of every default registry packet,
+/// suitable for direct write via a `RawSlice`-style wrapper.
+///
+/// `build_default_registries` produces identical content for every
+/// login (six static registries: dimension type, biome, damage type,
+/// painting variant, wolf variant, chat type), so encoding it fresh
+/// per connection is pure waste — most visible on cold-start mass
+/// joins. This function encodes each registry once on first call,
+/// caches the byte vectors in a `OnceLock`, and returns the slice
+/// for every subsequent caller. The packet ID is unchanged across
+/// payloads (`ClientboundConfigurationRegistryData::PACKET_ID`); the
+/// caller frames each slice with that id.
+///
+/// Order matches `build_default_registries` exactly — keeping the
+/// cache and the builder bytewise comparable in tests.
+pub fn cached_registry_payloads() -> &'static [Vec<u8>] {
+    static CACHE: OnceLock<Vec<Vec<u8>>> = OnceLock::new();
+    CACHE.get_or_init(|| {
+        build_default_registries()
+            .into_iter()
+            .map(|reg| {
+                let mut buf = Vec::with_capacity(reg.encoded_size());
+                reg.encode(&mut buf)
+                    .expect("registry data encoding cannot fail");
+                buf
+            })
+            .collect()
+    })
+}
 
 /// Builds all required registry data packets for the Configuration state.
 ///
@@ -685,7 +718,6 @@ fn build_chat_type_registry() -> ClientboundConfigurationRegistryData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use basalt_types::{Encode, EncodedSize};
 
     #[test]
     fn build_all_registries() {
@@ -756,5 +788,34 @@ mod tests {
                 reg.id
             );
         }
+    }
+
+    #[test]
+    fn cached_payloads_match_freshly_built() {
+        let cached = cached_registry_payloads();
+        let built: Vec<Vec<u8>> = build_default_registries()
+            .into_iter()
+            .map(|reg| {
+                let mut buf = Vec::with_capacity(reg.encoded_size());
+                reg.encode(&mut buf).unwrap();
+                buf
+            })
+            .collect();
+        assert_eq!(cached.len(), built.len(), "cached entry count mismatch");
+        for (i, (c, b)) in cached.iter().zip(built.iter()).enumerate() {
+            assert_eq!(c, b, "cached payload {i} differs from freshly encoded");
+        }
+    }
+
+    #[test]
+    fn cached_payloads_returns_same_storage_across_calls() {
+        // Two consecutive calls must hand back the same backing slice —
+        // proves the OnceLock is hit instead of rebuilding on every call.
+        let first = cached_registry_payloads();
+        let second = cached_registry_payloads();
+        assert!(
+            std::ptr::eq(first.as_ptr(), second.as_ptr()),
+            "cached_registry_payloads must return the same storage on repeat calls"
+        );
     }
 }
