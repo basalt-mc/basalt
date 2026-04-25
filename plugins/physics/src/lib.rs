@@ -98,7 +98,7 @@ fn physics_tick(ctx: &mut dyn SystemContext) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use basalt_testkit::SystemTestContext;
+    use basalt_api::testing::SystemTestContext;
 
     #[test]
     fn gravity_applies_to_velocity() {
