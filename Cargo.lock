@@ -108,7 +108,6 @@ version = "0.1.0"
 dependencies = [
  "basalt-command",
  "basalt-core",
- "basalt-events",
  "basalt-protocol",
  "basalt-recipes",
  "basalt-types",
@@ -153,10 +152,6 @@ dependencies = [
  "log",
  "rayon",
 ]
-
-[[package]]
-name = "basalt-events"
-version = "0.1.0"
 
 [[package]]
 name = "basalt-net"

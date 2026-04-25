@@ -20,7 +20,6 @@ basalt-world = { path = "crates/basalt-world" }
 basalt-core = { path = "crates/basalt-core" }
 basalt-api = { path = "crates/basalt-api" }
 basalt-command = { path = "crates/basalt-command" }
-basalt-events = { path = "crates/basalt-events" }
 basalt-storage = { path = "crates/basalt-storage" }
 basalt-ecs = { path = "crates/basalt-ecs" }
 basalt-testkit = { path = "crates/basalt-testkit" }
