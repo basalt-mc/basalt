@@ -91,8 +91,8 @@ pub mod prelude {
         CraftingCraftedEvent, CraftingGridChangedEvent, CraftingPreCraftEvent,
         CraftingRecipeClearedEvent, CraftingRecipeMatchedEvent, CraftingShiftClickBatchEvent,
         DragType, PlayerInteractEvent, PlayerJoinedEvent, PlayerLeftEvent, PlayerMovedEvent,
-        RecipeLockedEvent, RecipeRegisterEvent, RecipeRegisteredEvent, RecipeUnlockedEvent,
-        RecipeUnregisteredEvent, WindowSlotKind,
+        RecipeBookFillRequestEvent, RecipeBookFilledEvent, RecipeLockedEvent, RecipeRegisterEvent,
+        RecipeRegisteredEvent, RecipeUnlockedEvent, RecipeUnregisteredEvent, WindowSlotKind,
     };
 
     // Recipe types referenced by registry-lifecycle events.
