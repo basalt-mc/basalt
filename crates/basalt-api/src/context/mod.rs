@@ -9,6 +9,7 @@ mod chat;
 mod container;
 mod entity;
 mod player;
+mod recipe;
 mod response;
 mod world;
 
@@ -21,10 +22,11 @@ pub(crate) use response::ResponseQueue;
 use std::cell::RefCell;
 use std::sync::Arc;
 
+use basalt_core::components::KnownRecipes;
 use basalt_core::player::PlayerInfo;
 use basalt_core::{
     ChatContext, ContainerContext, Context, EntityContext, PlayerContext, PluginLogger,
-    WorldContext,
+    RecipeContext, WorldContext,
 };
 
 /// Context available to event handlers during dispatch.
@@ -39,6 +41,11 @@ pub struct ServerContext {
     pub(super) responses: ResponseQueue,
     /// Identity and state of the player who triggered this action.
     pub(super) player: PlayerInfo,
+    /// Snapshot of the player's [`KnownRecipes`] at context construction
+    /// — read-only view used by [`RecipeContext::has`] and
+    /// [`RecipeContext::unlocked`]. Mutations queue a `Response::UnlockRecipe`
+    /// / `LockRecipe` and only land in the ECS after dispatch completes.
+    pub(super) known_recipes: KnownRecipes,
     /// Name of the plugin currently being dispatched.
     pub(super) plugin_name: RefCell<String>,
     /// Registered command list (name, description) for /help.
@@ -47,14 +54,29 @@ pub struct ServerContext {
 
 impl ServerContext {
     /// Creates a new context for a single event dispatch.
+    ///
+    /// The player's `KnownRecipes` snapshot defaults to empty —
+    /// callers that need plugins to read live recipe state should use
+    /// [`with_known_recipes`](Self::with_known_recipes) to attach a
+    /// snapshot from the ECS.
     pub fn new(world: Arc<basalt_world::World>, player: PlayerInfo) -> Self {
         Self {
             world,
             responses: ResponseQueue::new(),
             player,
+            known_recipes: KnownRecipes::default(),
             plugin_name: RefCell::new(String::new()),
             command_list: RefCell::new(Vec::new()),
         }
+    }
+
+    /// Attaches a snapshot of the player's current `KnownRecipes` so
+    /// [`RecipeContext::has`] / [`RecipeContext::unlocked`] reflect
+    /// live state. The server clones this from the ECS at the start
+    /// of each dispatch.
+    pub fn with_known_recipes(mut self, known_recipes: KnownRecipes) -> Self {
+        self.known_recipes = known_recipes;
+        self
     }
 
     /// Sets the registered command list for /help.
@@ -95,6 +117,10 @@ impl Context for ServerContext {
     }
 
     fn containers(&self) -> &dyn ContainerContext {
+        self
+    }
+
+    fn recipes(&self) -> &dyn RecipeContext {
         self
     }
 }

@@ -4,6 +4,8 @@ use std::cell::RefCell;
 
 use basalt_core::broadcast::BroadcastMessage;
 use basalt_core::components::{BlockPosition, ChunkPosition, Position, Rotation};
+use basalt_core::context::UnlockReason;
+use basalt_recipes::RecipeId;
 use basalt_types::Slot;
 use basalt_types::nbt::NbtCompound;
 
@@ -109,6 +111,28 @@ pub enum Response {
     DestroyBlockEntity {
         /// World position of the block entity to remove.
         position: BlockPosition,
+    },
+    /// Unlock a recipe for the current player.
+    ///
+    /// The server inserts the recipe id into the player's
+    /// `KnownRecipes` component, sends a `Recipe Book Add` S2C packet,
+    /// and dispatches `RecipeUnlockedEvent` at Post. No-op if the
+    /// recipe is already unlocked.
+    UnlockRecipe {
+        /// Stable identifier of the recipe to unlock.
+        recipe_id: RecipeId,
+        /// Why the unlock happened — surfaced on `RecipeUnlockedEvent`.
+        reason: UnlockReason,
+    },
+    /// Lock a recipe for the current player.
+    ///
+    /// The server removes the recipe from the player's `KnownRecipes`,
+    /// sends a `Recipe Book Remove` S2C packet, and dispatches
+    /// `RecipeLockedEvent` at Post. No-op if the recipe is not
+    /// currently unlocked.
+    LockRecipe {
+        /// Stable identifier of the recipe to lock.
+        recipe_id: RecipeId,
     },
 }
 
