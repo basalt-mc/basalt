@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use basalt_core::broadcast::ProfileProperty;
+use basalt_api::broadcast::ProfileProperty;
 use basalt_types::{Encode, EncodedSize, Slot, Uuid};
 use tokio::sync::mpsc;
 

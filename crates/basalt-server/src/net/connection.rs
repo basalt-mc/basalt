@@ -8,7 +8,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use basalt_api::EventBus;
+use basalt_api::events::EventBus;
 use basalt_net::connection::{Connection, Handshake, HandshakeResult};
 use basalt_protocol::packets::configuration::ClientboundConfigurationRegistryData;
 use basalt_protocol::packets::login::{ClientboundLoginSuccess, ServerboundLoginPacket};

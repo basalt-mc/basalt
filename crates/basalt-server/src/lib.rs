@@ -122,20 +122,20 @@ impl Server {
         // ECS with core components
         let mut ecs = basalt_ecs::Ecs::new();
         ecs.set_world(Arc::clone(&world));
-        ecs.register_component::<basalt_core::Position>();
-        ecs.register_component::<basalt_core::Rotation>();
-        ecs.register_component::<basalt_core::Velocity>();
-        ecs.register_component::<basalt_core::BoundingBox>();
-        ecs.register_component::<basalt_core::EntityKind>();
-        ecs.register_component::<basalt_core::Health>();
-        ecs.register_component::<basalt_core::Lifetime>();
-        ecs.register_component::<basalt_core::PickupDelay>();
-        ecs.register_component::<basalt_core::DroppedItem>();
-        ecs.register_component::<basalt_core::OpenContainer>();
-        ecs.register_component::<basalt_core::PlayerRef>();
-        ecs.register_component::<basalt_core::Inventory>();
-        ecs.register_component::<basalt_core::CraftingGrid>();
-        ecs.register_component::<basalt_core::VirtualContainerSlots>();
+        ecs.register_component::<basalt_api::components::Position>();
+        ecs.register_component::<basalt_api::components::Rotation>();
+        ecs.register_component::<basalt_api::components::Velocity>();
+        ecs.register_component::<basalt_api::components::BoundingBox>();
+        ecs.register_component::<basalt_api::components::EntityKind>();
+        ecs.register_component::<basalt_api::components::Health>();
+        ecs.register_component::<basalt_api::components::Lifetime>();
+        ecs.register_component::<basalt_api::components::PickupDelay>();
+        ecs.register_component::<basalt_api::components::DroppedItem>();
+        ecs.register_component::<basalt_api::components::OpenContainer>();
+        ecs.register_component::<basalt_api::components::PlayerRef>();
+        ecs.register_component::<basalt_api::components::Inventory>();
+        ecs.register_component::<basalt_api::components::CraftingGrid>();
+        ecs.register_component::<basalt_api::components::VirtualContainerSlots>();
         // Apply budget overrides from config before registering systems
         let budgets = &self.config.server.budgets;
         for mut system in plugin_systems {
@@ -154,12 +154,12 @@ impl Server {
             basalt_ecs::SystemBuilder::new("lifetime")
                 .phase(basalt_ecs::Phase::Simulate)
                 .every(1)
-                .reads::<basalt_core::Lifetime>()
-                .writes::<basalt_core::Lifetime>()
-                .run(|ctx: &mut dyn basalt_core::SystemContext| {
-                    use basalt_core::SystemContextExt;
-                    for id in ctx.query::<basalt_core::Lifetime>() {
-                        if let Some(lt) = ctx.get_mut::<basalt_core::Lifetime>(id)
+                .reads::<basalt_api::components::Lifetime>()
+                .writes::<basalt_api::components::Lifetime>()
+                .run(|ctx: &mut dyn basalt_api::system::SystemContext| {
+                    use basalt_api::system::SystemContextExt;
+                    for id in ctx.query::<basalt_api::components::Lifetime>() {
+                        if let Some(lt) = ctx.get_mut::<basalt_api::components::Lifetime>(id)
                             && lt.remaining_ticks > 0
                         {
                             lt.remaining_ticks -= 1;
@@ -171,12 +171,12 @@ impl Server {
             basalt_ecs::SystemBuilder::new("pickup_delay")
                 .phase(basalt_ecs::Phase::Simulate)
                 .every(1)
-                .reads::<basalt_core::PickupDelay>()
-                .writes::<basalt_core::PickupDelay>()
-                .run(|ctx: &mut dyn basalt_core::SystemContext| {
-                    use basalt_core::SystemContextExt;
-                    for id in ctx.query::<basalt_core::PickupDelay>() {
-                        if let Some(delay) = ctx.get_mut::<basalt_core::PickupDelay>(id)
+                .reads::<basalt_api::components::PickupDelay>()
+                .writes::<basalt_api::components::PickupDelay>()
+                .run(|ctx: &mut dyn basalt_api::system::SystemContext| {
+                    use basalt_api::system::SystemContextExt;
+                    for id in ctx.query::<basalt_api::components::PickupDelay>() {
+                        if let Some(delay) = ctx.get_mut::<basalt_api::components::PickupDelay>(id)
                             && delay.remaining_ticks > 0
                         {
                             delay.remaining_ticks -= 1;

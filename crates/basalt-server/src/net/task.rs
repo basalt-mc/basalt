@@ -12,7 +12,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Instant;
 
-use basalt_api::EventBus;
+use basalt_api::events::EventBus;
 use basalt_net::connection::{Connection, Play};
 use basalt_protocol::packets::play::ServerboundPlayPacket;
 use basalt_protocol::packets::play::misc::ClientboundPlayKeepAlive;

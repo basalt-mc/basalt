@@ -45,21 +45,23 @@ impl GameLoop {
     /// and `backing` fields. Returns `PlayerInventory` if no container
     /// is open.
     pub(super) fn determine_window_type(&self, eid: basalt_ecs::EntityId) -> WindowType {
-        let Some(oc) = self.ecs.get::<basalt_core::OpenContainer>(eid) else {
+        let Some(oc) = self.ecs.get::<basalt_api::components::OpenContainer>(eid) else {
             return WindowType::PlayerInventory;
         };
 
         let window_id = oc.window_id;
 
         match oc.inventory_type {
-            basalt_core::InventoryType::Crafting => WindowType::CraftingTable { window_id },
+            basalt_api::container::InventoryType::Crafting => {
+                WindowType::CraftingTable { window_id }
+            }
             _ => {
                 let container_size = oc.inventory_type.slot_count();
                 let position = match oc.backing {
-                    basalt_core::ContainerBacking::Block { position } => {
+                    basalt_api::container::ContainerBacking::Block { position } => {
                         (position.x, position.y, position.z)
                     }
-                    basalt_core::ContainerBacking::Virtual => (0, 0, 0),
+                    basalt_api::container::ContainerBacking::Virtual => (0, 0, 0),
                 };
                 WindowType::Chest {
                     window_id,
@@ -92,18 +94,18 @@ impl GameLoop {
         match ws {
             WindowSlot::CraftOutput => self
                 .ecs
-                .get::<basalt_core::CraftingGrid>(eid)
+                .get::<basalt_api::components::CraftingGrid>(eid)
                 .map(|g| g.output.clone())
                 .unwrap_or_default(),
             WindowSlot::CraftGrid(i) => self
                 .ecs
-                .get::<basalt_core::CraftingGrid>(eid)
+                .get::<basalt_api::components::CraftingGrid>(eid)
                 .map(|g| g.slots[*i].clone())
                 .unwrap_or_default(),
             WindowSlot::Armor(_) => Slot::empty(),
             WindowSlot::MainInventory(i) | WindowSlot::Hotbar(i) => self
                 .ecs
-                .get::<basalt_core::Inventory>(eid)
+                .get::<basalt_api::components::Inventory>(eid)
                 .map(|inv| inv.slots[*i].clone())
                 .unwrap_or_default(),
             WindowSlot::Offhand => Slot::empty(),
@@ -134,17 +136,23 @@ impl GameLoop {
     ) {
         match ws {
             WindowSlot::CraftOutput => {
-                if let Some(grid) = self.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+                if let Some(grid) = self
+                    .ecs
+                    .get_mut::<basalt_api::components::CraftingGrid>(eid)
+                {
                     grid.output = item;
                 }
             }
             WindowSlot::CraftGrid(i) => {
-                if let Some(grid) = self.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+                if let Some(grid) = self
+                    .ecs
+                    .get_mut::<basalt_api::components::CraftingGrid>(eid)
+                {
                     grid.slots[*i] = item;
                 }
             }
             WindowSlot::MainInventory(i) | WindowSlot::Hotbar(i) => {
-                if let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid) {
+                if let Some(inv) = self.ecs.get_mut::<basalt_api::components::Inventory>(eid) {
                     inv.slots[*i] = item;
                 }
             }
@@ -210,7 +218,7 @@ impl GameLoop {
     pub(super) fn sync_cursor(&self, eid: basalt_ecs::EntityId) {
         let cursor = self
             .ecs
-            .get::<basalt_core::Inventory>(eid)
+            .get::<basalt_api::components::Inventory>(eid)
             .map(|inv| inv.cursor.clone())
             .unwrap_or_default();
         self.send_to(eid, |tx| {

@@ -26,17 +26,17 @@ fn block_entity_kind(be: &BlockEntity) -> BlockEntityKind {
 /// Returns 0 for `Virtual` backings (per-player, no co-viewing).
 pub(super) fn container_viewer_count(
     ecs: &basalt_ecs::Ecs,
-    backing: &basalt_core::ContainerBacking,
+    backing: &basalt_api::container::ContainerBacking,
 ) -> u32 {
-    let basalt_core::ContainerBacking::Block { position } = backing else {
+    let basalt_api::container::ContainerBacking::Block { position } = backing else {
         return 0;
     };
     let target = (position.x, position.y, position.z);
-    ecs.iter::<basalt_core::OpenContainer>()
+    ecs.iter::<basalt_api::components::OpenContainer>()
         .filter(|(_, oc)| {
             matches!(
                 &oc.backing,
-                basalt_core::ContainerBacking::Block { position: p }
+                basalt_api::container::ContainerBacking::Block { position: p }
                     if (p.x, p.y, p.z) == target
             )
         })
@@ -48,19 +48,19 @@ pub(super) fn container_viewer_count(
 /// chest-lid close animations after a player closes the window.
 pub(super) fn container_viewer_count_excluding(
     ecs: &basalt_ecs::Ecs,
-    backing: &basalt_core::ContainerBacking,
+    backing: &basalt_api::container::ContainerBacking,
     exclude: basalt_ecs::EntityId,
 ) -> u32 {
-    let basalt_core::ContainerBacking::Block { position } = backing else {
+    let basalt_api::container::ContainerBacking::Block { position } = backing else {
         return 0;
     };
     let target = (position.x, position.y, position.z);
-    ecs.iter::<basalt_core::OpenContainer>()
+    ecs.iter::<basalt_api::components::OpenContainer>()
         .filter(|(eid, oc)| {
             *eid != exclude
                 && matches!(
                     &oc.backing,
-                    basalt_core::ContainerBacking::Block { position: p }
+                    basalt_api::container::ContainerBacking::Block { position: p }
                         if (p.x, p.y, p.z) == target
                 )
         })
@@ -194,7 +194,7 @@ impl GameLoop {
         }
 
         // Player inventory
-        if let Some(inv) = self.ecs.get::<basalt_core::Inventory>(eid) {
+        if let Some(inv) = self.ecs.get::<basalt_api::components::Inventory>(eid) {
             window_slots.extend_from_slice(&inv.slots[9..]); // main
             window_slots.extend_from_slice(&inv.slots[..9]); // hotbar
         }
@@ -202,15 +202,15 @@ impl GameLoop {
         let container_pos = view.parts.first().map_or((0, 0, 0), |p| p.position);
         self.ecs.set(
             eid,
-            basalt_core::OpenContainer {
+            basalt_api::components::OpenContainer {
                 window_id,
                 inventory_type: if view.size == 27 {
-                    basalt_core::InventoryType::Generic9x3
+                    basalt_api::container::InventoryType::Generic9x3
                 } else {
-                    basalt_core::InventoryType::Generic9x6
+                    basalt_api::container::InventoryType::Generic9x6
                 },
-                backing: basalt_core::ContainerBacking::Block {
-                    position: basalt_core::BlockPosition {
+                backing: basalt_api::container::ContainerBacking::Block {
+                    position: basalt_api::components::BlockPosition {
                         x: container_pos.0,
                         y: container_pos.1,
                         z: container_pos.2,
@@ -247,12 +247,12 @@ impl GameLoop {
         // viewer_count includes the just-opened viewer (the
         // OpenContainer component was set above).
         let inventory_type = if view.size == 27 {
-            basalt_core::InventoryType::Generic9x3
+            basalt_api::container::InventoryType::Generic9x3
         } else {
-            basalt_core::InventoryType::Generic9x6
+            basalt_api::container::InventoryType::Generic9x6
         };
-        let backing = basalt_core::ContainerBacking::Block {
-            position: basalt_core::BlockPosition {
+        let backing = basalt_api::container::ContainerBacking::Block {
+            position: basalt_api::components::BlockPosition {
                 x: container_pos.0,
                 y: container_pos.1,
                 z: container_pos.2,
@@ -368,12 +368,12 @@ impl GameLoop {
         window_slot: i16,
         item: &basalt_types::Slot,
     ) {
-        for (other_eid, oc) in self.ecs.iter::<basalt_core::OpenContainer>() {
+        for (other_eid, oc) in self.ecs.iter::<basalt_api::components::OpenContainer>() {
             let pos = match &oc.backing {
-                basalt_core::ContainerBacking::Block { position } => {
+                basalt_api::container::ContainerBacking::Block { position } => {
                     (position.x, position.y, position.z)
                 }
-                basalt_core::ContainerBacking::Virtual => continue,
+                basalt_api::container::ContainerBacking::Virtual => continue,
             };
             if other_eid != exclude_eid && pos == container_pos {
                 use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
@@ -400,7 +400,7 @@ impl GameLoop {
     /// a vector of `size` empty slots.
     pub(super) fn read_all_container_slots(
         &self,
-        position: &basalt_core::BlockPosition,
+        position: &basalt_api::components::BlockPosition,
         size: usize,
     ) -> Vec<basalt_types::Slot> {
         self.world
@@ -428,7 +428,7 @@ impl GameLoop {
         &mut self,
         eid: basalt_ecs::EntityId,
         uuid: Uuid,
-        container: basalt_core::container::Container,
+        container: basalt_api::container::Container,
     ) {
         let inventory_type = container.inventory_type;
         let backing = container.backing;
@@ -460,20 +460,20 @@ impl GameLoop {
             s
         } else {
             match &backing {
-                basalt_core::ContainerBacking::Block { position } => {
+                basalt_api::container::ContainerBacking::Block { position } => {
                     self.read_all_container_slots(position, size)
                 }
-                basalt_core::ContainerBacking::Virtual => {
+                basalt_api::container::ContainerBacking::Virtual => {
                     vec![basalt_types::Slot::empty(); size]
                 }
             }
         };
 
         // For virtual containers, store slots on the player entity
-        if matches!(backing, basalt_core::ContainerBacking::Virtual) {
+        if matches!(backing, basalt_api::container::ContainerBacking::Virtual) {
             self.ecs.set(
                 eid,
-                basalt_core::VirtualContainerSlots {
+                basalt_api::components::VirtualContainerSlots {
                     slots: container_slots.clone(),
                 },
             );
@@ -484,7 +484,7 @@ impl GameLoop {
         // Set OpenContainer component
         self.ecs.set(
             eid,
-            basalt_core::OpenContainer {
+            basalt_api::components::OpenContainer {
                 window_id,
                 inventory_type,
                 backing,
@@ -494,7 +494,7 @@ impl GameLoop {
         // Build full window slots: container + player main + player hotbar
         let mut window_slots = Vec::with_capacity(size + 36);
         window_slots.extend(container_slots);
-        if let Some(inv) = self.ecs.get::<basalt_core::Inventory>(eid) {
+        if let Some(inv) = self.ecs.get::<basalt_api::components::Inventory>(eid) {
             window_slots.extend_from_slice(&inv.slots[9..]); // main
             window_slots.extend_from_slice(&inv.slots[..9]); // hotbar
         }
@@ -555,7 +555,7 @@ impl GameLoop {
         reason: CloseReason,
         crafting_grid_state: Option<[basalt_types::Slot; 9]>,
     ) {
-        let Some(oc) = self.ecs.get::<basalt_core::OpenContainer>(eid) else {
+        let Some(oc) = self.ecs.get::<basalt_api::components::OpenContainer>(eid) else {
             return;
         };
         let window_id = oc.window_id;
@@ -605,7 +605,7 @@ impl GameLoop {
         if let Some((entity_id, username, yaw, pitch)) = self.player_info(eid) {
             let ctx = self.make_context(uuid, entity_id, &username, yaw, pitch);
             let mut event = BlockEntityCreatedEvent {
-                position: basalt_core::BlockPosition { x, y, z },
+                position: basalt_api::components::BlockPosition { x, y, z },
                 kind,
             };
             self.dispatch_event(&mut event, &ctx);
@@ -637,7 +637,7 @@ impl GameLoop {
         if let Some((entity_id, username, yaw, pitch)) = self.player_info(eid) {
             let ctx = self.make_context(uuid, entity_id, &username, yaw, pitch);
             let mut event = BlockEntityModifiedEvent {
-                position: basalt_core::BlockPosition { x, y, z },
+                position: basalt_api::components::BlockPosition { x, y, z },
                 kind,
             };
             self.dispatch_event(&mut event, &ctx);
@@ -670,7 +670,7 @@ impl GameLoop {
         if let Some((entity_id, username, yaw, pitch)) = self.player_info(eid) {
             let ctx = self.make_context(uuid, entity_id, &username, yaw, pitch);
             let mut event = BlockEntityDestroyedEvent {
-                position: basalt_core::BlockPosition { x, y, z },
+                position: basalt_api::components::BlockPosition { x, y, z },
                 kind,
                 last_state: last.clone(),
             };
@@ -729,7 +729,11 @@ mod tests {
 
         // Player should have OpenContainer component
         let eid = game_loop.find_by_uuid(uuid).unwrap();
-        assert!(game_loop.ecs.has::<basalt_core::OpenContainer>(eid));
+        assert!(
+            game_loop
+                .ecs
+                .has::<basalt_api::components::OpenContainer>(eid)
+        );
     }
 
     #[test]
@@ -742,7 +746,7 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(1, 5);
 
@@ -751,7 +755,10 @@ mod tests {
         game_loop.tick(1);
 
         // Cursor should be empty, item should be in inventory
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert!(inv.cursor.is_empty(), "cursor should be empty after close");
         // Item should have been inserted somewhere
         let has_item = inv
@@ -794,7 +801,7 @@ mod tests {
         // Set cursor item server-side, then left-click to place into chest slot 0
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(1, 10);
 
@@ -885,11 +892,11 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop.ecs.set(
             eid,
-            basalt_core::OpenContainer {
+            basalt_api::components::OpenContainer {
                 window_id: 1,
-                inventory_type: basalt_core::InventoryType::Generic9x3,
-                backing: basalt_core::ContainerBacking::Block {
-                    position: basalt_core::BlockPosition { x: 5, y: 64, z: 3 },
+                inventory_type: basalt_api::container::InventoryType::Generic9x3,
+                backing: basalt_api::container::ContainerBacking::Block {
+                    position: basalt_api::components::BlockPosition { x: 5, y: 64, z: 3 },
                 },
             },
         );
@@ -898,7 +905,9 @@ mod tests {
         game_loop.tick(1);
 
         assert!(
-            !game_loop.ecs.has::<basalt_core::OpenContainer>(eid),
+            !game_loop
+                .ecs
+                .has::<basalt_api::components::OpenContainer>(eid),
             "CloseWindow should remove OpenContainer"
         );
     }
@@ -936,7 +945,7 @@ mod tests {
         // Set cursor item
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(1, 8);
 
@@ -951,7 +960,10 @@ mod tests {
         });
         game_loop.tick(2);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert!(
             inv.cursor.is_empty(),
             "cursor should be empty after drop outside container"
@@ -1128,7 +1140,7 @@ mod tests {
         // Set cursor item, then left-click chest slot 0
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = basalt_types::Slot::new(1, 10);
 

@@ -405,8 +405,8 @@ impl ServerConfig {
     }
 
     /// Returns the list of plugins to register based on the config.
-    pub fn create_plugins(&self) -> Vec<Box<dyn basalt_api::Plugin>> {
-        let mut plugins: Vec<Box<dyn basalt_api::Plugin>> = Vec::new();
+    pub fn create_plugins(&self) -> Vec<Box<dyn basalt_api::plugin::Plugin>> {
+        let mut plugins: Vec<Box<dyn basalt_api::plugin::Plugin>> = Vec::new();
 
         if self.plugins.lifecycle {
             plugins.push(Box::new(basalt_plugin_lifecycle::LifecyclePlugin));

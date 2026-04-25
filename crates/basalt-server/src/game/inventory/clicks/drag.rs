@@ -47,7 +47,7 @@ impl GameLoop {
             .collect();
         let cursor = self
             .ecs
-            .get::<basalt_core::Inventory>(eid)
+            .get::<basalt_api::components::Inventory>(eid)
             .map(|inv| inv.cursor.clone())
             .unwrap_or_default();
 
@@ -91,7 +91,7 @@ impl GameLoop {
                 );
             }
         }
-        if let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid) {
+        if let Some(inv) = self.ecs.get_mut::<basalt_api::components::Inventory>(eid) {
             inv.cursor = new_cursor;
         }
 
@@ -114,13 +114,17 @@ impl GameLoop {
     ) -> bool {
         let (window_id, backing) = match wt {
             WindowType::CraftingTable { window_id } => {
-                let oc = self.ecs.get::<basalt_core::OpenContainer>(eid);
-                let backing = oc.map_or(basalt_core::ContainerBacking::Virtual, |o| o.backing);
+                let oc = self.ecs.get::<basalt_api::components::OpenContainer>(eid);
+                let backing = oc.map_or(basalt_api::container::ContainerBacking::Virtual, |o| {
+                    o.backing
+                });
                 (*window_id, backing)
             }
             WindowType::Chest { window_id, .. } => {
-                let oc = self.ecs.get::<basalt_core::OpenContainer>(eid);
-                let backing = oc.map_or(basalt_core::ContainerBacking::Virtual, |o| o.backing);
+                let oc = self.ecs.get::<basalt_api::components::OpenContainer>(eid);
+                let backing = oc.map_or(basalt_api::container::ContainerBacking::Virtual, |o| {
+                    o.backing
+                });
                 (*window_id, backing)
             }
             WindowType::PlayerInventory => return false,
@@ -190,7 +194,7 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = Slot::new(1, 8);
 
@@ -202,7 +206,10 @@ mod tests {
         // End left drag
         click(&game_tx, &mut game_loop, uuid, -999, 2, 5);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.slots[9].item_count, 4);
         assert_eq!(inv.slots[10].item_count, 4);
         assert!(inv.cursor.is_empty());
@@ -217,7 +224,7 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = Slot::new(1, 10);
 
@@ -230,7 +237,10 @@ mod tests {
         // End right drag
         click(&game_tx, &mut game_loop, uuid, -999, 6, 5);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.slots[9].item_count, 1);
         assert_eq!(inv.slots[10].item_count, 1);
         assert_eq!(inv.slots[11].item_count, 1);

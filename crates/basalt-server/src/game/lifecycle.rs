@@ -21,7 +21,7 @@ impl GameLoop {
         entity_id: i32,
         uuid: Uuid,
         username: String,
-        skin_properties: Vec<basalt_core::broadcast::ProfileProperty>,
+        skin_properties: Vec<basalt_api::broadcast::ProfileProperty>,
         position: (f64, f64, f64),
         yaw: f32,
         pitch: f32,
@@ -31,31 +31,34 @@ impl GameLoop {
         self.ecs.spawn_with_id(eid);
         self.ecs.set(
             eid,
-            basalt_core::PlayerRef {
+            basalt_api::components::PlayerRef {
                 uuid,
                 username: username.clone(),
             },
         );
         self.ecs.set(
             eid,
-            basalt_core::Position {
+            basalt_api::components::Position {
                 x: position.0,
                 y: position.1,
                 z: position.2,
             },
         );
-        self.ecs.set(eid, basalt_core::Rotation { yaw, pitch });
+        self.ecs
+            .set(eid, basalt_api::components::Rotation { yaw, pitch });
         self.ecs.set(
             eid,
-            basalt_core::BoundingBox {
+            basalt_api::components::BoundingBox {
                 width: 0.6,
                 height: 1.8,
             },
         );
-        self.ecs.set(eid, basalt_core::Inventory::empty());
-        self.ecs.set(eid, basalt_core::CraftingGrid::empty());
         self.ecs
-            .set(eid, basalt_core::components::KnownRecipes::default());
+            .set(eid, basalt_api::components::Inventory::empty());
+        self.ecs
+            .set(eid, basalt_api::components::CraftingGrid::empty());
+        self.ecs
+            .set(eid, basalt_api::components::KnownRecipes::default());
         self.ecs.set(
             eid,
             SkinData {
@@ -95,7 +98,7 @@ impl GameLoop {
         // Send all existing players to the new player, and broadcast join to them
         let other_eids: Vec<basalt_ecs::EntityId> = self
             .ecs
-            .iter::<basalt_core::PlayerRef>()
+            .iter::<basalt_api::components::PlayerRef>()
             .filter(|&(id, _)| id != eid)
             .map(|(id, _)| id)
             .collect();
@@ -103,9 +106,10 @@ impl GameLoop {
         for other_eid in &other_eids {
             // Build snapshot of existing player
             if let (Some(pr), Some(pos), Some(rot)) = (
-                self.ecs.get::<basalt_core::PlayerRef>(*other_eid),
-                self.ecs.get::<basalt_core::Position>(*other_eid),
-                self.ecs.get::<basalt_core::Rotation>(*other_eid),
+                self.ecs
+                    .get::<basalt_api::components::PlayerRef>(*other_eid),
+                self.ecs.get::<basalt_api::components::Position>(*other_eid),
+                self.ecs.get::<basalt_api::components::Rotation>(*other_eid),
             ) {
                 let skin = self
                     .ecs
@@ -289,7 +293,7 @@ impl GameLoop {
         });
 
         // Sync full inventory
-        if let Some(inv) = self.ecs.get::<basalt_core::Inventory>(eid) {
+        if let Some(inv) = self.ecs.get::<basalt_api::components::Inventory>(eid) {
             let protocol_slots = inv.to_protocol_slots();
             self.send_to(eid, |tx| {
                 use basalt_protocol::packets::play::inventory::ClientboundPlayWindowItems;
@@ -313,24 +317,24 @@ impl GameLoop {
         };
 
         let (entity_id, username) = {
-            let Some(pr) = self.ecs.get::<basalt_core::PlayerRef>(eid) else {
+            let Some(pr) = self.ecs.get::<basalt_api::components::PlayerRef>(eid) else {
                 return;
             };
             (eid as i32, pr.username.clone())
         };
 
         // Dispatch ContainerClosedEvent before despawn (if container is open)
-        if self.ecs.has::<basalt_core::OpenContainer>(eid) {
+        if self.ecs.has::<basalt_api::components::OpenContainer>(eid) {
             // Snapshot crafting grid for the disconnect path so plugins
             // can drop items even when the player crashes out.
             let crafting_grid_state = if matches!(
                 self.ecs
-                    .get::<basalt_core::OpenContainer>(eid)
+                    .get::<basalt_api::components::OpenContainer>(eid)
                     .map(|oc| oc.inventory_type),
-                Some(basalt_core::InventoryType::Crafting)
+                Some(basalt_api::container::InventoryType::Crafting)
             ) {
                 self.ecs
-                    .get::<basalt_core::CraftingGrid>(eid)
+                    .get::<basalt_api::components::CraftingGrid>(eid)
                     .map(|g| g.slots.clone())
             } else {
                 None
@@ -428,12 +432,20 @@ mod tests {
         let _rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
 
         let eid = game_loop.find_by_uuid(uuid).unwrap();
-        assert!(game_loop.ecs.has::<basalt_core::Position>(eid));
-        assert!(game_loop.ecs.has::<basalt_core::Rotation>(eid));
-        assert!(game_loop.ecs.has::<basalt_core::BoundingBox>(eid));
-        assert!(game_loop.ecs.has::<basalt_core::Inventory>(eid));
-        assert!(game_loop.ecs.has::<basalt_core::CraftingGrid>(eid));
-        assert!(game_loop.ecs.has::<basalt_core::PlayerRef>(eid));
+        assert!(game_loop.ecs.has::<basalt_api::components::Position>(eid));
+        assert!(game_loop.ecs.has::<basalt_api::components::Rotation>(eid));
+        assert!(
+            game_loop
+                .ecs
+                .has::<basalt_api::components::BoundingBox>(eid)
+        );
+        assert!(game_loop.ecs.has::<basalt_api::components::Inventory>(eid));
+        assert!(
+            game_loop
+                .ecs
+                .has::<basalt_api::components::CraftingGrid>(eid)
+        );
+        assert!(game_loop.ecs.has::<basalt_api::components::PlayerRef>(eid));
         assert!(game_loop.ecs.has::<super::super::SkinData>(eid));
         assert!(game_loop.ecs.has::<super::super::ChunkView>(eid));
         assert!(game_loop.ecs.has::<super::super::OutputHandle>(eid));
@@ -448,7 +460,7 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         let grid = game_loop
             .ecs
-            .get::<basalt_core::CraftingGrid>(eid)
+            .get::<basalt_api::components::CraftingGrid>(eid)
             .expect("CraftingGrid should be initialized on connect");
         assert_eq!(grid.grid_size, 2, "default grid should be 2x2");
         for slot in &grid.slots {

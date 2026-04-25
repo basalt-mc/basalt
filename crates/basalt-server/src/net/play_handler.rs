@@ -8,11 +8,11 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Instant;
 
-use basalt_api::EventBus;
+use basalt_api::components::Rotation;
 use basalt_api::context::{Response, ServerContext};
+use basalt_api::events::EventBus;
 use basalt_api::events::{ChatMessageEvent, CommandEvent, RawPacketEvent};
-use basalt_core::PlayerInfo;
-use basalt_core::components::Rotation;
+use basalt_api::player::PlayerInfo;
 use basalt_net::connection::{Connection, Play};
 use basalt_protocol::packets::play::ServerboundPlayPacket;
 use basalt_protocol::packets::play::chat::{
@@ -60,7 +60,7 @@ pub(super) async fn handle_packet(
                 yaw: 0.0,
                 pitch: 0.0,
             },
-            position: basalt_core::Position {
+            position: basalt_api::components::Position {
                 x: 0.0,
                 y: 0.0,
                 z: 0.0,
@@ -115,7 +115,7 @@ pub(super) async fn handle_packet(
                     },
                     // Net task lacks ECS access; instant events don't
                     // currently expose position to plugins.
-                    position: basalt_core::Position {
+                    position: basalt_api::components::Position {
                         x: 0.0,
                         y: 0.0,
                         z: 0.0,
@@ -161,7 +161,7 @@ pub(super) async fn handle_packet(
                     },
                     // Net task lacks ECS access; instant events don't
                     // currently expose position to plugins.
-                    position: basalt_core::Position {
+                    position: basalt_api::components::Position {
                         x: 0.0,
                         y: 0.0,
                         z: 0.0,

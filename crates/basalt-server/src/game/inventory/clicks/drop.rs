@@ -15,7 +15,7 @@ impl GameLoop {
     ) {
         let cursor = self
             .ecs
-            .get::<basalt_core::Inventory>(eid)
+            .get::<basalt_api::components::Inventory>(eid)
             .map(|inv| inv.cursor.clone())
             .unwrap_or_default();
         let Some(item_id) = cursor.item_id else {
@@ -24,7 +24,7 @@ impl GameLoop {
 
         let drop_count = if drop_all { cursor.item_count } else { 1 };
 
-        if let Some(pos) = self.ecs.get::<basalt_core::Position>(eid) {
+        if let Some(pos) = self.ecs.get::<basalt_api::components::Position>(eid) {
             self.spawn_item_entity(
                 pos.x as i32,
                 pos.y as i32 + 1,
@@ -34,7 +34,7 @@ impl GameLoop {
             );
         }
 
-        if let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid) {
+        if let Some(inv) = self.ecs.get_mut::<basalt_api::components::Inventory>(eid) {
             if drop_count >= inv.cursor.item_count {
                 inv.cursor = basalt_types::Slot::empty();
             } else {
@@ -58,7 +58,7 @@ impl GameLoop {
 
         let drop_count = if drop_all { item.item_count } else { 1 };
 
-        if let Some(pos) = self.ecs.get::<basalt_core::Position>(eid) {
+        if let Some(pos) = self.ecs.get::<basalt_api::components::Position>(eid) {
             self.spawn_item_entity(
                 pos.x as i32,
                 pos.y as i32 + 1,
@@ -120,7 +120,7 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .slots[0] = Slot::new(1, 10);
         while rx.try_recv().is_ok() {}
@@ -128,7 +128,10 @@ mod tests {
         // Q key on hotbar 0 (mode 4, button 0 = single)
         click(&game_tx, &mut game_loop, uuid, 36, 0, 4);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.slots[0].item_count, 9);
     }
 
@@ -141,7 +144,7 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = Slot::new(1, 16);
         while rx.try_recv().is_ok() {}
@@ -151,7 +154,10 @@ mod tests {
         // But mode 4, slot -999 => DropCursor
         click(&game_tx, &mut game_loop, uuid, -999, 0, 4);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.cursor.item_count, 15, "should drop 1 item");
     }
 
@@ -164,7 +170,7 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = Slot::new(1, 16);
         while rx.try_recv().is_ok() {}
@@ -172,7 +178,10 @@ mod tests {
         // Drop all (mode 4, button 1, slot -999)
         click(&game_tx, &mut game_loop, uuid, -999, 1, 4);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert!(
             inv.cursor.is_empty(),
             "cursor should be empty after full drop"

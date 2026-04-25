@@ -35,7 +35,7 @@ impl GameLoop {
         let slot_item = self.read_slot(eid, &ws, container_pos);
         let cursor = self
             .ecs
-            .get::<basalt_core::Inventory>(eid)
+            .get::<basalt_api::components::Inventory>(eid)
             .map(|inv| inv.cursor.clone())
             .unwrap_or_default();
 
@@ -49,7 +49,7 @@ impl GameLoop {
         };
 
         self.write_slot(eid, &ws, new_slot.clone(), container_pos);
-        if let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid) {
+        if let Some(inv) = self.ecs.get_mut::<basalt_api::components::Inventory>(eid) {
             inv.cursor = new_cursor;
         }
         self.sync_slot(eid, wt, &ws, new_slot.clone());
@@ -80,7 +80,7 @@ impl GameLoop {
     ) -> bool {
         let output = self
             .ecs
-            .get::<basalt_core::CraftingGrid>(eid)
+            .get::<basalt_api::components::CraftingGrid>(eid)
             .map(|g| g.output.clone())
             .unwrap_or_default();
         if output.is_empty() {
@@ -89,7 +89,7 @@ impl GameLoop {
 
         let cursor = self
             .ecs
-            .get::<basalt_core::Inventory>(eid)
+            .get::<basalt_api::components::Inventory>(eid)
             .map(|inv| inv.cursor.clone())
             .unwrap_or_default();
 
@@ -109,12 +109,12 @@ impl GameLoop {
         // carries the pre-consumption state.
         let consumed = self
             .ecs
-            .get::<basalt_core::CraftingGrid>(eid)
+            .get::<basalt_api::components::CraftingGrid>(eid)
             .map(|g| g.slots.clone())
             .unwrap_or_else(|| std::array::from_fn(|_| basalt_types::Slot::empty()));
         let produced = output.clone();
 
-        if let Some(inv) = self.ecs.get_mut::<basalt_core::Inventory>(eid) {
+        if let Some(inv) = self.ecs.get_mut::<basalt_api::components::Inventory>(eid) {
             if inv.cursor.is_empty() {
                 inv.cursor = output;
             } else {
@@ -171,7 +171,7 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .slots[0] = Slot::new(1, 10);
         while rx.try_recv().is_ok() {}
@@ -179,7 +179,10 @@ mod tests {
         // Left-click hotbar slot 0 (window slot 36)
         click(&game_tx, &mut game_loop, uuid, 36, 0, 0);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert!(inv.slots[0].is_empty(), "slot should be empty after pickup");
         assert_eq!(inv.cursor.item_id, Some(1));
         assert_eq!(inv.cursor.item_count, 10);
@@ -194,14 +197,17 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = Slot::new(1, 10);
 
         // Left-click empty main slot 9 (window slot 9)
         click(&game_tx, &mut game_loop, uuid, 9, 0, 0);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.slots[9].item_id, Some(1));
         assert_eq!(inv.slots[9].item_count, 10);
         assert!(inv.cursor.is_empty());
@@ -217,7 +223,7 @@ mod tests {
         {
             let inv = game_loop
                 .ecs
-                .get_mut::<basalt_core::Inventory>(eid)
+                .get_mut::<basalt_api::components::Inventory>(eid)
                 .unwrap();
             inv.slots[0] = Slot::new(1, 10);
             inv.cursor = Slot::new(2, 5);
@@ -225,7 +231,10 @@ mod tests {
 
         click(&game_tx, &mut game_loop, uuid, 36, 0, 0);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.slots[0].item_id, Some(2));
         assert_eq!(inv.slots[0].item_count, 5);
         assert_eq!(inv.cursor.item_id, Some(1));
@@ -242,7 +251,7 @@ mod tests {
         {
             let inv = game_loop
                 .ecs
-                .get_mut::<basalt_core::Inventory>(eid)
+                .get_mut::<basalt_api::components::Inventory>(eid)
                 .unwrap();
             inv.slots[0] = Slot::new(1, 30);
             inv.cursor = Slot::new(1, 20);
@@ -250,7 +259,10 @@ mod tests {
 
         click(&game_tx, &mut game_loop, uuid, 36, 0, 0);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.slots[0].item_count, 50);
         assert!(inv.cursor.is_empty());
     }
@@ -266,13 +278,16 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .slots[0] = Slot::new(1, 10);
 
         click(&game_tx, &mut game_loop, uuid, 36, 1, 0);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.slots[0].item_count, 5);
         assert_eq!(inv.cursor.item_count, 5);
     }
@@ -286,13 +301,16 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = Slot::new(1, 10);
 
         click(&game_tx, &mut game_loop, uuid, 9, 1, 0);
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.slots[9].item_id, Some(1));
         assert_eq!(inv.slots[9].item_count, 1);
         assert_eq!(inv.cursor.item_count, 9);
@@ -331,7 +349,7 @@ mod tests {
 
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .cursor = Slot::new(1, 10);
 
@@ -345,7 +363,10 @@ mod tests {
             }
         }
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert!(inv.cursor.is_empty());
     }
 
@@ -360,7 +381,7 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .ecs
-            .get_mut::<basalt_core::Inventory>(eid)
+            .get_mut::<basalt_api::components::Inventory>(eid)
             .unwrap()
             .slots[0] = Slot::new(1, 10);
         while rx.try_recv().is_ok() {}
@@ -397,7 +418,10 @@ mod tests {
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
-        if let Some(grid) = game_loop.ecs.get_mut::<basalt_core::CraftingGrid>(eid) {
+        if let Some(grid) = game_loop
+            .ecs
+            .get_mut::<basalt_api::components::CraftingGrid>(eid)
+        {
             grid.slots[0] = Slot::new(43, 1);
             grid.slots[1] = Slot::new(43, 1);
             grid.slots[3] = Slot::new(43, 1);
@@ -407,11 +431,17 @@ mod tests {
 
         click(&game_tx, &mut game_loop, uuid, 0, 0, 0);
 
-        let grid = game_loop.ecs.get::<basalt_core::CraftingGrid>(eid).unwrap();
+        let grid = game_loop
+            .ecs
+            .get::<basalt_api::components::CraftingGrid>(eid)
+            .unwrap();
         assert!(grid.slots[0].is_empty());
         assert!(grid.slots[1].is_empty());
 
-        let inv = game_loop.ecs.get::<basalt_core::Inventory>(eid).unwrap();
+        let inv = game_loop
+            .ecs
+            .get::<basalt_api::components::Inventory>(eid)
+            .unwrap();
         assert_eq!(inv.cursor.item_id, Some(314));
     }
 }
