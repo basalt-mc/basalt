@@ -139,6 +139,11 @@ impl PluginTestHarness {
                     yaw: 0.0,
                     pitch: 0.0,
                 },
+                position: basalt_core::Position {
+                    x: 0.0,
+                    y: 64.0,
+                    z: 0.0,
+                },
             },
         )
     }
@@ -154,6 +159,11 @@ impl PluginTestHarness {
                 rotation: Rotation {
                     yaw: 0.0,
                     pitch: 0.0,
+                },
+                position: basalt_core::Position {
+                    x: 0.0,
+                    y: 64.0,
+                    z: 0.0,
                 },
             },
         )

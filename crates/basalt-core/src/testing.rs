@@ -34,6 +34,9 @@ impl PlayerContext for NoopContext {
     fn pitch(&self) -> f32 {
         0.0
     }
+    fn position(&self) -> (f64, f64, f64) {
+        (0.0, 0.0, 0.0)
+    }
     fn teleport(&self, _x: f64, _y: f64, _z: f64, _yaw: f32, _pitch: f32) {}
     fn set_gamemode(&self, _mode: Gamemode) {}
     fn registered_commands(&self) -> Vec<(String, String)> {

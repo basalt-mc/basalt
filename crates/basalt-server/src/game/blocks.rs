@@ -34,6 +34,19 @@ impl GameLoop {
                     yaw: 0.0,
                     pitch: 0.0,
                 },
+                position: self
+                    .ecs
+                    .get::<basalt_core::Position>(eid)
+                    .map(|p| basalt_core::Position {
+                        x: p.x,
+                        y: p.y,
+                        z: p.z,
+                    })
+                    .unwrap_or(basalt_core::Position {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    }),
             },
         );
         let mut event = BlockBrokenEvent {
@@ -133,6 +146,19 @@ impl GameLoop {
                 entity_id,
                 username: username.clone(),
                 rotation: basalt_core::Rotation { yaw, pitch },
+                position: self
+                    .ecs
+                    .get::<basalt_core::Position>(eid)
+                    .map(|p| basalt_core::Position {
+                        x: p.x,
+                        y: p.y,
+                        z: p.z,
+                    })
+                    .unwrap_or(basalt_core::Position {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    }),
             },
         );
         let mut event = BlockPlacedEvent {

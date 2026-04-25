@@ -300,6 +300,7 @@ pub(super) mod tests {
             basalt_plugin_block::BlockPlugin.on_enable(&mut registrar);
             basalt_plugin_item::ItemPlugin.on_enable(&mut registrar);
             basalt_plugin_container::ContainerPlugin.on_enable(&mut registrar);
+            basalt_plugin_recipe::RecipePlugin.on_enable(&mut registrar);
         }
 
         let mut ecs = basalt_ecs::Ecs::new();

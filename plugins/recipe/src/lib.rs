@@ -1,22 +1,22 @@
 //! Recipe plugin — crafting table interaction and recipe event handling.
 //!
 //! Opens the 3x3 crafting table window on right-click via
-//! [`PlayerInteractEvent`]. Future extensions may add recipe validation,
-//! custom recipe registration, or crafting permissions.
+//! [`PlayerInteractEvent`] and drops crafting-grid contents at the
+//! player's feet when the window closes (covers manual close, ESC,
+//! and disconnect). Recipe matching itself runs through the
+//! `CraftingRecipeMatchedEvent` pipeline.
 
 use basalt_api::prelude::*;
 use basalt_api::world::block;
 
-/// Handles crafting table interaction and recipe-related events.
+/// Handles crafting table interaction and crafting-window cleanup.
 ///
-/// Currently registers a single handler:
+/// Handlers:
 /// - [`PlayerInteractEvent`] (Process, priority 0): opens the crafting
-///   table window when the player right-clicks a crafting table block,
-///   and cancels the event to prevent block placement.
-///
-/// Recipe matching itself is performed by the game loop after it
-/// dispatches [`CraftingGridChangedEvent`], using the shared
-/// [`RecipeRegistry`](basalt_api::recipes::RecipeRegistry).
+///   table window on right-click and cancels the event.
+/// - [`ContainerClosedEvent`] (Post, priority 0): drops every
+///   non-empty crafting grid slot as an item entity at the player's
+///   position when a crafting table window closes.
 pub struct RecipePlugin;
 
 impl Plugin for RecipePlugin {
@@ -39,6 +39,34 @@ impl Plugin for RecipePlugin {
                     event.position.z,
                 );
                 event.cancel();
+            }
+        });
+
+        // Drop crafting grid contents at the player's position when a
+        // crafting table window closes. The server has already
+        // captured `event.crafting_grid_state` and reset the grid to
+        // 2x2; this handler just spawns the item entities.
+        registrar.on::<ContainerClosedEvent>(Stage::Post, 0, |event, ctx| {
+            if event.inventory_type != InventoryType::Crafting {
+                return;
+            }
+            let Some(slots) = &event.crafting_grid_state else {
+                return;
+            };
+            let (px, py, pz) = ctx.player().position();
+            let drop_x = px as i32;
+            let drop_y = py as i32 + 1;
+            let drop_z = pz as i32;
+            for slot in slots.iter() {
+                if let Some(item_id) = slot.item_id {
+                    ctx.entities().spawn_dropped_item(
+                        drop_x,
+                        drop_y,
+                        drop_z,
+                        item_id,
+                        slot.item_count,
+                    );
+                }
             }
         });
     }

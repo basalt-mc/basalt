@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use basalt_api::context::ServerContext;
 use basalt_core::PlayerInfo;
-use basalt_core::components::Rotation;
+use basalt_core::components::{Position, Rotation};
 use basalt_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
 use basalt_types::{Encode, Uuid, VarInt, Vec3i16};
 use tokio::sync::mpsc;
@@ -34,6 +34,19 @@ impl GameLoop {
         yaw: f32,
         pitch: f32,
     ) -> ServerContext {
+        // Resolve the player's current position from the ECS so plugin
+        // handlers see fresh state. Falls back to (0, 0, 0) if the
+        // entity has no Position component (shouldn't happen for
+        // online players but stays defensive).
+        let position = self
+            .find_by_uuid(uuid)
+            .and_then(|eid| self.ecs.get::<Position>(eid).map(|p| (p.x, p.y, p.z)))
+            .map(|(x, y, z)| Position { x, y, z })
+            .unwrap_or(Position {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            });
         ServerContext::new(
             Arc::clone(&self.world),
             PlayerInfo {
@@ -41,6 +54,7 @@ impl GameLoop {
                 entity_id,
                 username: username.to_string(),
                 rotation: Rotation { yaw, pitch },
+                position,
             },
         )
     }
