@@ -15,11 +15,14 @@ use crate::world::collision::{Aabb, RayHit};
 
 /// Long-lived handle to the world runtime.
 ///
-/// `Send + Sync + 'static` so it can be captured in system closures
-/// and passed across threads. Pure read/write operations only -- no
-/// response queueing (see [`WorldContext`](crate::context::WorldContext)
-/// for that).
-pub trait WorldHandle: Send + Sync {
+/// Pure read/write operations only -- no response queueing (see
+/// [`WorldContext`](crate::context::WorldContext) for that).
+///
+/// Concrete types stored in `Arc` for cross-thread sharing (e.g.
+/// `Arc<World>`) already implement `Send + Sync`. The trait itself
+/// does not require them so that per-dispatch types like
+/// `ServerContext` (which uses `RefCell`) can implement it too.
+pub trait WorldHandle {
     /// Returns the block state at the given position.
     ///
     /// Generates or loads the chunk if it is not cached. Returns `0`

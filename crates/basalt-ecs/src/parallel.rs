@@ -93,7 +93,7 @@ impl<'scope> ParallelSystemContext<'scope> {
     }
 }
 
-impl SystemContext for ParallelSystemContext<'_> {
+impl basalt_api::world::handle::WorldHandle for ParallelSystemContext<'_> {
     fn get_block(&self, x: i32, y: i32, z: i32) -> u16 {
         self.world.get_block(x, y, z)
     }
@@ -125,6 +125,14 @@ impl SystemContext for ParallelSystemContext<'_> {
         self.world.mark_chunk_dirty(cx, cz);
     }
 
+    fn persist_chunk(&self, cx: i32, cz: i32) {
+        self.world.persist_chunk(cx, cz);
+    }
+
+    fn dirty_chunks(&self) -> Vec<(i32, i32)> {
+        self.world.dirty_chunks()
+    }
+
     fn check_overlap(&self, aabb: &basalt_api::world::collision::Aabb) -> bool {
         basalt_api::world::collision::check_overlap(self.world, aabb)
     }
@@ -147,7 +155,9 @@ impl SystemContext for ParallelSystemContext<'_> {
     ) -> (f64, f64, f64) {
         basalt_api::world::collision::resolve_movement(self.world, aabb, dx, dy, dz)
     }
+}
 
+impl SystemContext for ParallelSystemContext<'_> {
     fn spawn(&mut self) -> EntityId {
         let id = self.next_entity_id.fetch_add(1, Ordering::Relaxed);
         self.deferred.push(DeferredCommand::Spawn { entity_id: id });

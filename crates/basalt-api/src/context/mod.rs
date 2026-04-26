@@ -93,46 +93,32 @@ pub trait ChatContext {
     fn broadcast_component(&self, component: &TextComponent);
 }
 
-/// World access: blocks, chunks, persistence.
-pub trait WorldContext {
-    /// Returns the block state at the given position.
-    ///
-    /// Generates or loads the chunk if it is not cached. Returns 0
-    /// (air) for positions outside the valid Y range.
-    fn get_block(&self, x: i32, y: i32, z: i32) -> u16;
-
-    /// Sets a block state at the given position.
-    ///
-    /// Generates or loads the chunk if it is not cached. Marks the
-    /// containing chunk as dirty for persistence.
-    fn set_block(&self, x: i32, y: i32, z: i32, state: u16);
-
-    /// Returns a cloned block entity at the given position, if any.
-    fn get_block_entity(
-        &self,
-        x: i32,
-        y: i32,
-        z: i32,
-    ) -> Option<basalt_world::block_entity::BlockEntity>;
-
-    /// Sets a block entity at the given position.
-    fn set_block_entity(
-        &self,
-        x: i32,
-        y: i32,
-        z: i32,
-        entity: basalt_world::block_entity::BlockEntity,
-    );
-
-    /// Marks a chunk as dirty so the persistence system flushes it.
-    fn mark_chunk_dirty(&self, cx: i32, cz: i32);
-
+/// Per-dispatch context for world-related operations.
+///
+/// Extends [`WorldHandle`](crate::world::handle::WorldHandle) with
+/// methods that queue deferred responses (chunk streaming, block
+/// acknowledgements, block-entity destruction events). The pure
+/// world ops (`get_block`, `set_block`, `check_overlap`, ...) come
+/// from `WorldHandle` and are not redeclared here.
+///
+/// `persist_chunk` is intentionally re-declared: the `WorldHandle`
+/// version is synchronous (calls `World::persist_chunk` directly),
+/// while this version queues a `Response::PersistChunk` for the
+/// game loop to route to the I/O thread asynchronously.
+pub trait WorldContext: crate::world::handle::WorldHandle {
     /// Sends a block action acknowledgement to the current player.
     fn send_block_ack(&self, sequence: i32);
+
     /// Streams chunks around the given chunk coordinates.
     fn stream_chunks(&self, cx: i32, cz: i32);
+
     /// Schedules a chunk for asynchronous persistence on the I/O thread.
+    ///
+    /// Unlike [`WorldHandle::persist_chunk`](crate::world::handle::WorldHandle::persist_chunk)
+    /// which is synchronous, this version queues a deferred response
+    /// that the game loop routes to the I/O thread.
     fn persist_chunk(&self, cx: i32, cz: i32);
+
     /// Removes a block entity at the given position and fires a
     /// `BlockEntityDestroyedEvent` carrying the last state.
     ///

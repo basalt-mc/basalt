@@ -13,73 +13,16 @@ pub use crate::components::{EntityId, Phase};
 
 /// Abstract interface for system runners.
 ///
-/// Implemented by `basalt-server` to wrap the ECS. System closures
-/// receive this trait object instead of a raw `&mut Ecs`, keeping
-/// the ECS as an implementation detail.
+/// Extends [`WorldHandle`](crate::world::handle::WorldHandle) with
+/// ECS storage methods (spawn, despawn, component access). System
+/// closures receive this trait object instead of a raw `&mut Ecs`,
+/// keeping the ECS as an implementation detail.
 ///
-/// Methods use `TypeId` + `dyn Any` internally. Typed access is
-/// provided via free functions ([`get`], [`get_mut`], [`iter`]).
-pub trait SystemContext {
-    /// Returns the block state at the given position.
-    ///
-    /// Generates or loads the chunk if it is not cached. Returns 0
-    /// (air) for positions outside the valid Y range.
-    fn get_block(&self, x: i32, y: i32, z: i32) -> u16;
-
-    /// Sets a block state at the given position.
-    ///
-    /// Generates or loads the chunk if it is not cached. Marks the
-    /// containing chunk as dirty for persistence.
-    fn set_block(&self, x: i32, y: i32, z: i32, state: u16);
-
-    /// Returns a cloned block entity at the given position, if any.
-    fn get_block_entity(
-        &self,
-        x: i32,
-        y: i32,
-        z: i32,
-    ) -> Option<basalt_world::block_entity::BlockEntity>;
-
-    /// Sets a block entity at the given position.
-    fn set_block_entity(
-        &self,
-        x: i32,
-        y: i32,
-        z: i32,
-        entity: basalt_world::block_entity::BlockEntity,
-    );
-
-    /// Marks a chunk as dirty so the persistence system flushes it.
-    fn mark_chunk_dirty(&self, cx: i32, cz: i32);
-
-    /// Checks if an AABB overlaps any solid block in the world.
-    ///
-    /// Used for ground detection and simple overlap tests in
-    /// physics systems.
-    fn check_overlap(&self, aabb: &crate::world::collision::Aabb) -> bool;
-
-    /// Casts a ray through the world and returns the first solid block hit.
-    ///
-    /// Returns `None` if no solid block is found within `max_distance`.
-    fn ray_cast(
-        &self,
-        origin: (f64, f64, f64),
-        direction: (f64, f64, f64),
-        max_distance: f64,
-    ) -> Option<crate::world::collision::RayHit>;
-
-    /// Resolves movement of an AABB against solid blocks.
-    ///
-    /// Takes the entity's AABB and desired velocity, returns the
-    /// actual velocity after clamping against solid blocks.
-    fn resolve_movement(
-        &self,
-        aabb: &crate::world::collision::Aabb,
-        dx: f64,
-        dy: f64,
-        dz: f64,
-    ) -> (f64, f64, f64);
-
+/// Pure world ops (`get_block`, `set_block`, `check_overlap`, ...)
+/// come from `WorldHandle` and are not redeclared here. ECS methods
+/// use `TypeId` + `dyn Any` internally; typed access is provided via
+/// [`SystemContextExt`].
+pub trait SystemContext: crate::world::handle::WorldHandle {
     /// Spawns a new entity and returns its unique ID.
     fn spawn(&mut self) -> EntityId;
 
