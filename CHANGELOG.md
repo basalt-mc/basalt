@@ -1,6 +1,318 @@
 # Changelog
 
 All notable changes to Basalt are documented here.
+## [0.2.0] - 2026-04-26
+
+### Block Plugin
+
+- Migrate from basalt-testkit to basalt-api testing feature
+
+
+### Chat Plugin
+
+- Migrate from basalt-testkit to basalt-api testing feature
+
+
+### Code Generation
+
+- Xtask recipes subcommand
+
+- Emit recursive switch-on-tag union types natively
+
+- Collapse if-in-match arms for clippy 1.95
+
+
+### Commands
+
+- Delete basalt-command crate
+
+- Migrate from basalt-testkit to basalt-api testing feature
+
+
+### Container Plugin
+
+- Migrate chest behaviour to event handlers
+
+- Migrate to typed WorldContext methods
+
+- Migrate from basalt-testkit to basalt-api testing feature
+
+
+### Core
+
+- Add TickBudget struct and SystemContext budget API
+
+- Add CraftingGrid component
+
+- Add InventoryType, ContainerBacking, Container template
+
+- Add VirtualContainerSlots component and CRAFTING_TABLE block
+
+- Store inventory_type and backing in open container
+
+- Add open() method to ContainerContext trait
+
+- Add PlayerInfo::stub for bootstrap dispatches
+
+- Add KnownRecipes component, RecipeContext trait, UnlockReason
+
+- Delete basalt-core crate after full inlining into basalt-api
+
+
+### Documentation
+
+- Add contributing guide
+
+- Add security policy
+
+- Document event-first feature development workflow
+
+
+### ECS
+
+- Parallel system dispatch with rayon thread pool
+
+- Integrate tick budgets with system dispatch and overrun logging
+
+- Skip timing overhead when overrun detection is disabled
+
+- Migrate from basalt-core to basalt-api
+
+
+### Events
+
+- Delete basalt-events crate
+
+- Drop generic C parameter from EventBus
+
+
+### Item Plugin
+
+- Migrate from basalt-testkit to basalt-api testing feature
+
+
+### Lifecycle Plugin
+
+- Migrate from basalt-testkit to basalt-api testing feature
+
+
+### Movement Plugin
+
+- Migrate from basalt-testkit to basalt-api testing feature
+
+
+### Networking
+
+- Add packet-write benchmarks for buffer pool decision
+
+- Reuse staging buffers on packet-write hot path
+
+- Extract write_buffered helper from Stage 4
+
+- Make ProtocolStream generic + add prod-path bench
+
+- Pool read frame buffer to eliminate per-packet alloc
+
+
+### Other
+
+- Add basalt-recipes crate scaffold
+
+- Add RecipePlugin with crafting table support
+
+- Introduce RecipeId, Recipe enum, regenerate codegen ids
+
+- Add find_by_id lookup on RecipeRegistry
+
+- Migrate from basalt-testkit to basalt-api testing feature
+
+- Bump internal crate version specifiers in make release
+
+
+### Physics Plugin
+
+- Migrate to typed SystemContext::resolve_movement
+
+- Migrate from basalt-testkit to basalt-api testing feature
+
+- Document basalt-api as standalone foundation crate
+
+
+### Plugin API
+
+- Add crafting events
+
+- Expose container builder and open response
+
+- Expose RecipeRegistry through PluginRegistrar
+
+- Define 9 container and block entity events
+
+- Add 4 crafting events and rename CraftingOutputClickedEvent
+
+- Add context APIs and event fields for plugin migration
+
+- Add recipe registry lifecycle events + RecipeRegistrar
+
+- Add recipe-book lifecycle events + RecipeContext impl
+
+- Add recipe-book fill-request and filled events
+
+- Raw packet pre-dispatch hook for plugins
+
+- Inline event-bus types and migrate consumers
+
+- Fix stale macro references in EventRouting docs
+
+- Convert command module to directory layout
+
+- Add command args module content
+
+- Add Command trait module content
+
+- Add CommandRegistry module content
+
+- Wire command module to local files
+
+- Convert world module to directory layout
+
+- Add collision module content
+
+- Wire local collision module
+
+- Convert inline components and system modules to file modules
+
+- Add component sub-module files from basalt-core
+
+- Add budget, gamemode, player, and testing files from basalt-core
+
+- Wire local modules and drop basalt-core dependency
+
+- Add typed world methods to WorldContext and SystemContext
+
+- Migrate block plugin to typed WorldContext methods
+
+- Remove world() from WorldContext and SystemContext traits
+
+- Gate raw-packets behind feature flag
+
+- Add testing feature with PluginTestHarness and SystemTestContext
+
+- Introduce WorldHandle trait abstraction
+
+- Make WorldContext and SystemContext extend WorldHandle
+
+- Address Task 2 code review findings
+
+- Use trait objects in PluginRegistrar
+
+- Move block, block_entity to basalt-api and invert world dep
+
+- Move recipe data types to basalt-api and invert recipes dep
+
+- Add BlockEntityKind discriminator and dedupe with events
+
+- Use re-exported NoopContext path in bus tests
+
+
+### Protocol
+
+- Hand-roll SlotDisplay/RecipeDisplay/RecipeBookEntry/IDSet
+
+- Drop hand-rolled RecipeDisplay/SlotDisplay/RecipeBookEntry
+
+- Cache encoded registry data payloads at first use
+
+
+### Server
+
+- Integrate parallel ECS dispatch with rayon thread pool
+
+- Configurable per-system CPU budgets
+
+- Click action parser and pure click handlers
+
+- Server-authoritative inventory click dispatch
+
+- Widen SetContainerSlot window_id to i32
+
+- Crafting and container integration in game loop
+
+- Remove unused mut in read_container_slot test
+
+- Split match cycle into compute and sync helpers
+
+- Dispatch shift-click batch and crafted events
+
+- Migrate crafting cleanup to ContainerClosedEvent handler
+
+- Build bootstrap context for plugin loading
+
+- Wire recipe-book unlock/lock/on-join + ghost-recipe
+
+- Auto-fill crafting grid on Place Recipe
+
+- Make_all stacking on recipe-book auto-fill
+
+- Use codegen recipe-book packets directly
+
+- Implement chunk batch rate control protocol
+
+- Drain initial chunks deterministically in e2e helper
+
+- Make chunk batch e2e test deterministic
+
+- Typed payload downcast on EncodablePacket
+
+- Collapse messaging layer into byte-strategy taxonomy
+
+- Migrate construction sites and tests to new taxonomy
+
+- Per-player inbound packet rate limit
+
+- Migrate play_handler.rs to basalt_api::command paths
+
+- Migrate state.rs to basalt_api::command paths
+
+- Drop basalt-command dep
+
+- Migrate from basalt-core to basalt-api
+
+- Remove unused ServerContext import in crafting tests
+
+- Move ServerContext from basalt-api to basalt-server
+
+
+### Storage
+
+- Mark chunks dirty via block entity events
+
+- Migrate to typed WorldContext::mark_chunk_dirty
+
+- Migrate from basalt-testkit to basalt-api testing feature
+
+
+### Test Kit
+
+- Migrate command parser call to basalt_api::command path
+
+- Drop basalt-command dep
+
+- Migrate from basalt-core to basalt-api
+
+
+### Types
+
+- Blanket Encode/Decode/EncodedSize impls for Box<T>
+
+
+### World
+
+- Drop collision module
+
+- Migrate from basalt-testkit to basalt-api testing feature
+
+
 ## [0.1.0] - 2026-04-20
 
 ### Chat Plugin
