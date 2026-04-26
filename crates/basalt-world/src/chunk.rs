@@ -7,7 +7,7 @@
 use basalt_types::nbt::{NbtCompound, NbtTag};
 use basalt_types::{Encode, VarInt};
 
-use crate::block;
+use basalt_api::world::block;
 
 /// Builds a BitSet where the first `count` bits are set.
 ///

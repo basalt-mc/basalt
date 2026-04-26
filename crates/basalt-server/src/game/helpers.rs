@@ -82,7 +82,7 @@ impl GameLoop {
         // Send block entity data for chests in this chunk
         for (x, y, z, be) in self.world.block_entities_in_chunk(cx, cz) {
             let action = match &be {
-                basalt_world::block_entity::BlockEntity::Chest { .. } => 2,
+                basalt_api::world::block_entity::BlockEntity::Chest { .. } => 2,
             };
             self.send_to(eid, |tx| {
                 let _ = tx.try_send(ServerOutput::plain(

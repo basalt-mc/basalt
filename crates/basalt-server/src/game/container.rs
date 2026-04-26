@@ -4,8 +4,8 @@ use basalt_api::events::{
     BlockEntityCreatedEvent, BlockEntityDestroyedEvent, BlockEntityKind, BlockEntityModifiedEvent,
     CloseReason, ContainerClosedEvent, ContainerOpenRequestEvent, ContainerOpenedEvent,
 };
+use basalt_api::world::block_entity::BlockEntity;
 use basalt_types::Uuid;
-use basalt_world::block_entity::BlockEntity;
 
 use super::GameLoop;
 use crate::messages::ServerOutput;
@@ -186,7 +186,7 @@ impl GameLoop {
             }
             if let Some(be) = self.world.get_block_entity(px, py, pz) {
                 match &*be {
-                    basalt_world::block_entity::BlockEntity::Chest { slots } => {
+                    basalt_api::world::block_entity::BlockEntity::Chest { slots } => {
                         window_slots.extend_from_slice(&slots[..part.slot_count.min(slots.len())]);
                     }
                 }
@@ -276,21 +276,21 @@ impl GameLoop {
     /// Builds a ContainerView for a chest at the given position.
     pub(super) fn build_chest_view(&self, x: i32, y: i32, z: i32) -> ContainerView {
         let state = self.world.get_block(x, y, z);
-        let ct = basalt_world::block::chest_type(state);
+        let ct = basalt_api::world::block::chest_type(state);
         if ct == 0 {
             return ContainerView::single_chest((x, y, z));
         }
-        let facing = basalt_world::block::chest_facing(state);
-        let other = basalt_world::block::chest_adjacent_offsets(facing)
+        let facing = basalt_api::world::block::chest_facing(state);
+        let other = basalt_api::world::block::chest_adjacent_offsets(facing)
             .iter()
             .find_map(|&(dx, dz)| {
                 let nx = x + dx;
                 let nz = z + dz;
                 let n = self.world.get_block(nx, y, nz);
-                if basalt_world::block::is_chest(n)
-                    && basalt_world::block::chest_facing(n) == facing
-                    && basalt_world::block::chest_type(n) != 0
-                    && basalt_world::block::chest_type(n) != ct
+                if basalt_api::world::block::is_chest(n)
+                    && basalt_api::world::block::chest_facing(n) == facing
+                    && basalt_api::world::block::chest_type(n) != 0
+                    && basalt_api::world::block::chest_type(n) != ct
                 {
                     Some((nx, y, nz))
                 } else {
@@ -322,7 +322,7 @@ impl GameLoop {
         self.world
             .get_block_entity(pos.0, pos.1, pos.2)
             .map(|be| match &*be {
-                basalt_world::block_entity::BlockEntity::Chest { slots } => {
+                basalt_api::world::block_entity::BlockEntity::Chest { slots } => {
                     slots.get(idx).cloned().unwrap_or_default()
                 }
             })
@@ -345,12 +345,12 @@ impl GameLoop {
                 pos.0,
                 pos.1,
                 pos.2,
-                basalt_world::block_entity::BlockEntity::empty_chest(),
+                basalt_api::world::block_entity::BlockEntity::empty_chest(),
             );
         }
         if let Some(mut be) = self.world.get_block_entity_mut(pos.0, pos.1, pos.2) {
             match &mut *be {
-                basalt_world::block_entity::BlockEntity::Chest { slots } => {
+                basalt_api::world::block_entity::BlockEntity::Chest { slots } => {
                     if idx < slots.len() {
                         slots[idx] = item;
                     }
@@ -406,7 +406,7 @@ impl GameLoop {
         self.world
             .get_block_entity(position.x, position.y, position.z)
             .map(|be| match &*be {
-                basalt_world::block_entity::BlockEntity::Chest { slots } => {
+                basalt_api::world::block_entity::BlockEntity::Chest { slots } => {
                     let mut result: Vec<basalt_types::Slot> = slots.to_vec();
                     result.resize(size, basalt_types::Slot::empty());
                     result
@@ -698,12 +698,12 @@ mod tests {
         // Place chest
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CHEST);
+            .set_block(5, 64, 3, basalt_api::world::block::CHEST);
         game_loop.world.set_block_entity(
             5,
             64,
             3,
-            basalt_world::block_entity::BlockEntity::empty_chest(),
+            basalt_api::world::block_entity::BlockEntity::empty_chest(),
         );
 
         // Right-click the chest (BlockPlace on the chest block)
@@ -780,12 +780,12 @@ mod tests {
         // Place and open chest
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CHEST);
+            .set_block(5, 64, 3, basalt_api::world::block::CHEST);
         game_loop.world.set_block_entity(
             5,
             64,
             3,
-            basalt_world::block_entity::BlockEntity::empty_chest(),
+            basalt_api::world::block_entity::BlockEntity::empty_chest(),
         );
         let _ = game_tx.send(GameInput::BlockPlace {
             uuid,
@@ -818,7 +818,7 @@ mod tests {
         // Chest should have the item
         let be = game_loop.world.get_block_entity(5, 64, 3).unwrap();
         match &*be {
-            basalt_world::block_entity::BlockEntity::Chest { slots } => {
+            basalt_api::world::block_entity::BlockEntity::Chest { slots } => {
                 assert_eq!(slots[0].item_id, Some(1));
                 assert_eq!(slots[0].item_count, 10);
             }
@@ -835,9 +835,9 @@ mod tests {
         // Place and open chest with an item in slot 0
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CHEST);
-        let mut be = basalt_world::block_entity::BlockEntity::empty_chest();
-        let basalt_world::block_entity::BlockEntity::Chest { ref mut slots } = be;
+            .set_block(5, 64, 3, basalt_api::world::block::CHEST);
+        let mut be = basalt_api::world::block_entity::BlockEntity::empty_chest();
+        let basalt_api::world::block_entity::BlockEntity::Chest { ref mut slots } = be;
         slots[0] = basalt_types::Slot::new(1, 10);
         game_loop.world.set_block_entity(5, 64, 3, be);
 
@@ -867,7 +867,7 @@ mod tests {
         // Chest slot 0 should have 9 items
         let chest_be = game_loop.world.get_block_entity(5, 64, 3).unwrap();
         match &*chest_be {
-            basalt_world::block_entity::BlockEntity::Chest { slots } => {
+            basalt_api::world::block_entity::BlockEntity::Chest { slots } => {
                 assert_eq!(slots[0].item_count, 9);
             }
         }
@@ -924,12 +924,12 @@ mod tests {
         // Open a chest
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CHEST);
+            .set_block(5, 64, 3, basalt_api::world::block::CHEST);
         game_loop.world.set_block_entity(
             5,
             64,
             3,
-            basalt_world::block_entity::BlockEntity::empty_chest(),
+            basalt_api::world::block_entity::BlockEntity::empty_chest(),
         );
         let _ = game_tx.send(GameInput::BlockPlace {
             uuid,
@@ -974,8 +974,8 @@ mod tests {
     fn read_container_slot_returns_item() {
         let (game_loop, _game_tx, _io_rx) = super::super::tests::test_game_loop();
 
-        let mut be = basalt_world::block_entity::BlockEntity::empty_chest();
-        let basalt_world::block_entity::BlockEntity::Chest { ref mut slots } = be;
+        let mut be = basalt_api::world::block_entity::BlockEntity::empty_chest();
+        let basalt_api::world::block_entity::BlockEntity::Chest { ref mut slots } = be;
         slots[5] = basalt_types::Slot::new(42, 16);
         game_loop.world.set_block_entity(10, 64, 20, be);
 
@@ -1005,7 +1005,7 @@ mod tests {
 
         let be = game_loop.world.get_block_entity(7, 64, 3).unwrap();
         match &*be {
-            basalt_world::block_entity::BlockEntity::Chest { slots } => {
+            basalt_api::world::block_entity::BlockEntity::Chest { slots } => {
                 assert_eq!(slots[0].item_id, Some(1));
                 assert_eq!(slots[0].item_count, 10);
             }
@@ -1045,7 +1045,7 @@ mod tests {
             10,
             64,
             20,
-            basalt_world::block_entity::BlockEntity::empty_chest(),
+            basalt_api::world::block_entity::BlockEntity::empty_chest(),
         );
 
         let be = game_loop.world.get_block_entity(10, 64, 20);
@@ -1063,15 +1063,15 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
 
         // Create with an item in slot 0
-        let mut be = basalt_world::block_entity::BlockEntity::empty_chest();
-        let basalt_world::block_entity::BlockEntity::Chest { ref mut slots } = be;
+        let mut be = basalt_api::world::block_entity::BlockEntity::empty_chest();
+        let basalt_api::world::block_entity::BlockEntity::Chest { ref mut slots } = be;
         slots[0] = basalt_types::Slot::new(42, 16);
         game_loop.world.set_block_entity(10, 64, 20, be);
 
         let last = game_loop.destroy_block_entity(uuid, eid, 10, 64, 20);
         assert!(last.is_some(), "destroy should return the removed entity");
         match last.unwrap() {
-            basalt_world::block_entity::BlockEntity::Chest { slots } => {
+            basalt_api::world::block_entity::BlockEntity::Chest { slots } => {
                 assert_eq!(slots[0].item_id, Some(42));
                 assert_eq!(slots[0].item_count, 16);
             }
@@ -1119,12 +1119,12 @@ mod tests {
         // Place and open chest
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CHEST);
+            .set_block(5, 64, 3, basalt_api::world::block::CHEST);
         game_loop.world.set_block_entity(
             5,
             64,
             3,
-            basalt_world::block_entity::BlockEntity::empty_chest(),
+            basalt_api::world::block_entity::BlockEntity::empty_chest(),
         );
         let _ = game_tx.send(GameInput::BlockPlace {
             uuid,
@@ -1157,7 +1157,7 @@ mod tests {
         // Verify the block entity was modified (item placed)
         let be = game_loop.world.get_block_entity(5, 64, 3).unwrap();
         match &*be {
-            basalt_world::block_entity::BlockEntity::Chest { slots } => {
+            basalt_api::world::block_entity::BlockEntity::Chest { slots } => {
                 assert_eq!(
                     slots[0].item_id,
                     Some(1),

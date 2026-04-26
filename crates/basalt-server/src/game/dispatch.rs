@@ -278,7 +278,7 @@ mod tests {
         // Place a crafting table and open it
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -336,7 +336,7 @@ mod tests {
         // Place a crafting table and open it
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
 
         // Verify 3x3 mode

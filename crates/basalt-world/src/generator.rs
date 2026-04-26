@@ -5,8 +5,8 @@
 //! simple superflat world; future generators can add noise-based
 //! terrain, biomes, and structures.
 
-use crate::block;
 use crate::chunk::ChunkColumn;
+use basalt_api::world::block;
 
 /// Generates a superflat world with fixed layers.
 ///

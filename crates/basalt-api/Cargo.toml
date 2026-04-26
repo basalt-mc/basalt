@@ -20,6 +20,5 @@ testing = []
 [dependencies]
 basalt-protocol = { workspace = true, optional = true }
 basalt-types = { workspace = true }
-basalt-world = { workspace = true }
 basalt-recipes = { workspace = true }
 log = { workspace = true }

@@ -61,7 +61,7 @@ impl WorldHandle for NoopContext {
         _x: i32,
         _y: i32,
         _z: i32,
-    ) -> Option<basalt_world::block_entity::BlockEntity> {
+    ) -> Option<crate::world::block_entity::BlockEntity> {
         None
     }
     fn set_block_entity(
@@ -69,7 +69,7 @@ impl WorldHandle for NoopContext {
         _x: i32,
         _y: i32,
         _z: i32,
-        _entity: basalt_world::block_entity::BlockEntity,
+        _entity: crate::world::block_entity::BlockEntity,
     ) {
     }
     fn mark_chunk_dirty(&self, _cx: i32, _cz: i32) {}

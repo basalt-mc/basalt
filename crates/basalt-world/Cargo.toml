@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+basalt-api = { workspace = true }
 basalt-types = { workspace = true }
 basalt-storage = { workspace = true }
 dashmap = { workspace = true }

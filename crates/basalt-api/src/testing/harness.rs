@@ -23,7 +23,8 @@ use crate::world::handle::WorldHandle;
 use crate::{Event, EventBus, Plugin, Stage};
 use basalt_recipes::RecipeId;
 use basalt_types::{Slot, TextComponent, Uuid};
-use basalt_world::World;
+
+use super::mock_world::MockWorld;
 
 // ── HarnessContext ──────────────────────────────────────────────────
 
@@ -36,7 +37,7 @@ use basalt_world::World;
 /// needs for event dispatch assertions.
 struct HarnessContext {
     /// Shared world reference for block access and chunk persistence.
-    world: Arc<World>,
+    world: Arc<dyn WorldHandle + Send + Sync>,
     /// Queue for deferred async responses.
     responses: ResponseQueue,
     /// Identity and state of the player who triggered this action.
@@ -51,7 +52,7 @@ struct HarnessContext {
 
 impl HarnessContext {
     /// Creates a new harness context for a single event dispatch.
-    fn new(world: Arc<World>, player: PlayerInfo) -> Self {
+    fn new(world: Arc<dyn WorldHandle + Send + Sync>, player: PlayerInfo) -> Self {
         Self {
             world,
             responses: ResponseQueue::new(),
@@ -156,15 +157,15 @@ impl WorldHandle for HarnessContext {
         x: i32,
         y: i32,
         z: i32,
-    ) -> Option<basalt_world::block_entity::BlockEntity> {
-        self.world.get_block_entity(x, y, z).map(|r| r.clone())
+    ) -> Option<crate::world::block_entity::BlockEntity> {
+        self.world.get_block_entity(x, y, z)
     }
     fn set_block_entity(
         &self,
         x: i32,
         y: i32,
         z: i32,
-        entity: basalt_world::block_entity::BlockEntity,
+        entity: crate::world::block_entity::BlockEntity,
     ) {
         self.world.set_block_entity(x, y, z, entity);
     }
@@ -178,7 +179,7 @@ impl WorldHandle for HarnessContext {
         self.world.dirty_chunks()
     }
     fn check_overlap(&self, aabb: &Aabb) -> bool {
-        crate::world::collision::check_overlap(&self.world, aabb)
+        self.world.check_overlap(aabb)
     }
     fn ray_cast(
         &self,
@@ -186,10 +187,10 @@ impl WorldHandle for HarnessContext {
         direction: (f64, f64, f64),
         max_distance: f64,
     ) -> Option<RayHit> {
-        crate::world::collision::ray_cast(&self.world, origin, direction, max_distance)
+        self.world.ray_cast(origin, direction, max_distance)
     }
     fn resolve_movement(&self, aabb: &Aabb, dx: f64, dy: f64, dz: f64) -> (f64, f64, f64) {
-        crate::world::collision::resolve_movement(&self.world, aabb, dx, dy, dz)
+        self.world.resolve_movement(aabb, dx, dy, dz)
     }
 }
 
@@ -385,7 +386,7 @@ impl Context for HarnessContext {
 /// registration, event dispatch, and command execution.
 pub struct PluginTestHarness {
     /// Shared world instance for the test.
-    world: Arc<World>,
+    world: Arc<dyn WorldHandle + Send + Sync>,
     /// Event bus for instant events (chat, commands).
     instant_bus: EventBus,
     /// Event bus for game events (blocks, movement, lifecycle).
@@ -397,10 +398,10 @@ pub struct PluginTestHarness {
 }
 
 impl PluginTestHarness {
-    /// Creates a new test harness with a memory-only world (seed 42).
+    /// Creates a new test harness with a flat mock world.
     pub fn new() -> Self {
         Self {
-            world: Arc::new(World::new_memory(42)),
+            world: Arc::new(MockWorld::flat()),
             instant_bus: EventBus::new(),
             game_bus: EventBus::new(),
             commands: Vec::new(),
@@ -409,7 +410,7 @@ impl PluginTestHarness {
     }
 
     /// Creates a new test harness with the given world.
-    pub fn with_world(world: Arc<World>) -> Self {
+    pub fn with_world(world: Arc<dyn WorldHandle + Send + Sync>) -> Self {
         Self {
             world,
             instant_bus: EventBus::new(),
@@ -419,8 +420,8 @@ impl PluginTestHarness {
         }
     }
 
-    /// Returns a reference to the shared world.
-    pub fn world(&self) -> &Arc<World> {
+    /// Returns a reference to the shared world handle.
+    pub fn world(&self) -> &Arc<dyn WorldHandle + Send + Sync> {
         &self.world
     }
 
@@ -803,25 +804,25 @@ pub struct SystemTestContext {
     /// Counter for generating unique entity IDs.
     next_id: crate::components::EntityId,
     /// Shared world for block/collision queries.
-    world: Arc<World>,
+    world: Arc<dyn WorldHandle + Send + Sync>,
     /// Unlimited budget for test systems.
     budget: crate::budget::TickBudget,
 }
 
 impl SystemTestContext {
-    /// Creates a new context with a flat world.
+    /// Creates a new context with a flat mock world.
     pub fn new() -> Self {
         Self {
             components: std::collections::HashMap::new(),
             entities: std::collections::HashSet::new(),
             next_id: 0,
-            world: Arc::new(World::flat()),
+            world: Arc::new(MockWorld::flat()),
             budget: crate::budget::TickBudget::unlimited(),
         }
     }
 
     /// Creates a new context with a custom world.
-    pub fn with_world(world: Arc<World>) -> Self {
+    pub fn with_world(world: Arc<dyn WorldHandle + Send + Sync>) -> Self {
         Self {
             components: std::collections::HashMap::new(),
             entities: std::collections::HashSet::new(),
@@ -852,8 +853,8 @@ impl crate::world::handle::WorldHandle for SystemTestContext {
         x: i32,
         y: i32,
         z: i32,
-    ) -> Option<basalt_world::block_entity::BlockEntity> {
-        self.world.get_block_entity(x, y, z).map(|r| r.clone())
+    ) -> Option<crate::world::block_entity::BlockEntity> {
+        self.world.get_block_entity(x, y, z)
     }
 
     fn set_block_entity(
@@ -861,7 +862,7 @@ impl crate::world::handle::WorldHandle for SystemTestContext {
         x: i32,
         y: i32,
         z: i32,
-        entity: basalt_world::block_entity::BlockEntity,
+        entity: crate::world::block_entity::BlockEntity,
     ) {
         self.world.set_block_entity(x, y, z, entity);
     }
@@ -879,7 +880,7 @@ impl crate::world::handle::WorldHandle for SystemTestContext {
     }
 
     fn check_overlap(&self, aabb: &crate::world::collision::Aabb) -> bool {
-        crate::world::collision::check_overlap(&self.world, aabb)
+        self.world.check_overlap(aabb)
     }
 
     fn ray_cast(
@@ -888,7 +889,7 @@ impl crate::world::handle::WorldHandle for SystemTestContext {
         direction: (f64, f64, f64),
         max_distance: f64,
     ) -> Option<crate::world::collision::RayHit> {
-        crate::world::collision::ray_cast(&self.world, origin, direction, max_distance)
+        self.world.ray_cast(origin, direction, max_distance)
     }
 
     fn resolve_movement(
@@ -898,7 +899,7 @@ impl crate::world::handle::WorldHandle for SystemTestContext {
         dy: f64,
         dz: f64,
     ) -> (f64, f64, f64) {
-        crate::world::collision::resolve_movement(&self.world, aabb, dx, dy, dz)
+        self.world.resolve_movement(aabb, dx, dy, dz)
     }
 }
 

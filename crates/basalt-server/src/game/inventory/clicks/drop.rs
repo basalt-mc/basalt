@@ -207,9 +207,9 @@ mod tests {
 
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CHEST);
-        let mut be = basalt_world::block_entity::BlockEntity::empty_chest();
-        let basalt_world::block_entity::BlockEntity::Chest { ref mut slots } = be;
+            .set_block(5, 64, 3, basalt_api::world::block::CHEST);
+        let mut be = basalt_api::world::block_entity::BlockEntity::empty_chest();
+        let basalt_api::world::block_entity::BlockEntity::Chest { ref mut slots } = be;
         slots[0] = Slot::new(1, 10);
         game_loop.world.set_block_entity(5, 64, 3, be);
 
@@ -229,7 +229,7 @@ mod tests {
 
         let chest_be = game_loop.world.get_block_entity(5, 64, 3).unwrap();
         match &*chest_be {
-            basalt_world::block_entity::BlockEntity::Chest { slots } => {
+            basalt_api::world::block_entity::BlockEntity::Chest { slots } => {
                 assert_eq!(slots[0].item_count, 9);
             }
         }

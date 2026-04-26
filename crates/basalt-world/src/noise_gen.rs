@@ -13,8 +13,8 @@
 
 use noise::{NoiseFn, Perlin};
 
-use crate::block;
 use crate::chunk::ChunkColumn;
+use basalt_api::world::block;
 
 /// Sea level Y coordinate — water fills up to this level.
 const SEA_LEVEL: i32 = 62;

@@ -560,7 +560,7 @@ mod tests {
         // Place crafting table and open it
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -613,7 +613,7 @@ mod tests {
         // Place crafting table and open it
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -693,7 +693,7 @@ mod tests {
         // Open crafting table
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -764,7 +764,7 @@ mod tests {
         // Open crafting table
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -831,7 +831,7 @@ mod tests {
         // Open crafting table
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -896,7 +896,7 @@ mod tests {
         // Open crafting table
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -988,7 +988,7 @@ mod tests {
         // Place a crafting table
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
 
         // Open the crafting table directly
         game_loop.open_crafting_table(eid, 5, 64, 3);
@@ -1045,7 +1045,7 @@ mod tests {
         // Open crafting table
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -1099,7 +1099,7 @@ mod tests {
         // Open crafting table
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -1164,7 +1164,7 @@ mod tests {
         // Open crafting table
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -1227,7 +1227,7 @@ mod tests {
 
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -1275,7 +1275,7 @@ mod tests {
 
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -1330,7 +1330,7 @@ mod tests {
 
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -1381,7 +1381,7 @@ mod tests {
 
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -1430,7 +1430,7 @@ mod tests {
 
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -1478,7 +1478,7 @@ mod tests {
 
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -1532,7 +1532,7 @@ mod tests {
 
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -1593,7 +1593,7 @@ mod tests {
 
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -1644,7 +1644,7 @@ mod tests {
 
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 
@@ -1741,7 +1741,7 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 

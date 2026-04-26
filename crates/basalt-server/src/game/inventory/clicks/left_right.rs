@@ -329,12 +329,12 @@ mod tests {
 
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CHEST);
+            .set_block(5, 64, 3, basalt_api::world::block::CHEST);
         game_loop.world.set_block_entity(
             5,
             64,
             3,
-            basalt_world::block_entity::BlockEntity::empty_chest(),
+            basalt_api::world::block_entity::BlockEntity::empty_chest(),
         );
         let _ = game_tx.send(GameInput::BlockPlace {
             uuid,
@@ -357,7 +357,7 @@ mod tests {
 
         let be = game_loop.world.get_block_entity(5, 64, 3).unwrap();
         match &*be {
-            basalt_world::block_entity::BlockEntity::Chest { slots } => {
+            basalt_api::world::block_entity::BlockEntity::Chest { slots } => {
                 assert_eq!(slots[0].item_id, Some(1));
                 assert_eq!(slots[0].item_count, 10);
             }
@@ -414,7 +414,7 @@ mod tests {
         let eid = game_loop.find_by_uuid(uuid).unwrap();
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CRAFTING_TABLE);
+            .set_block(5, 64, 3, basalt_api::world::block::CRAFTING_TABLE);
         game_loop.open_crafting_table(eid, 5, 64, 3);
         while rx.try_recv().is_ok() {}
 

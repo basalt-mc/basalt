@@ -50,7 +50,7 @@ impl PalettedContainer {
     pub fn non_air_count(&self) -> i16 {
         self.blocks
             .iter()
-            .filter(|&&state| state != crate::block::AIR)
+            .filter(|&&state| state != basalt_api::world::block::AIR)
             .count() as i16
     }
 
@@ -180,7 +180,7 @@ fn bits_needed(n: u32) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block;
+    use basalt_api::world::block;
 
     #[test]
     fn single_value_palette() {

@@ -648,7 +648,7 @@ impl basalt_api::world::handle::WorldHandle for Ecs {
         x: i32,
         y: i32,
         z: i32,
-    ) -> Option<basalt_world::block_entity::BlockEntity> {
+    ) -> Option<basalt_api::world::block_entity::BlockEntity> {
         self.world_ref()
             .get_block_entity(x, y, z)
             .map(|r| r.clone())
@@ -659,7 +659,7 @@ impl basalt_api::world::handle::WorldHandle for Ecs {
         x: i32,
         y: i32,
         z: i32,
-        entity: basalt_world::block_entity::BlockEntity,
+        entity: basalt_api::world::block_entity::BlockEntity,
     ) {
         self.world_ref().set_block_entity(x, y, z, entity);
     }

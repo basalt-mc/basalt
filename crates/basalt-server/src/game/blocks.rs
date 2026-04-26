@@ -126,7 +126,7 @@ impl GameLoop {
             let Some(item_id) = inv.held_item().item_id else {
                 return;
             };
-            let Some(block_state) = basalt_world::block::item_to_default_block_state(item_id)
+            let Some(block_state) = basalt_api::world::block::item_to_default_block_state(item_id)
             else {
                 return;
             };
@@ -180,7 +180,7 @@ impl GameLoop {
                     basalt_protocol::packets::play::world::ClientboundPlayBlockChange::PACKET_ID,
                     basalt_protocol::packets::play::world::ClientboundPlayBlockChange {
                         location: basalt_types::Position::new(px, py, pz),
-                        r#type: i32::from(basalt_world::block::AIR),
+                        r#type: i32::from(basalt_api::world::block::AIR),
                     },
                 ));
             }
@@ -219,7 +219,7 @@ mod tests {
         let _rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::STONE);
+            .set_block(5, 64, 3, basalt_api::world::block::STONE);
 
         let _ = game_tx.send(GameInput::BlockDig {
             uuid,
@@ -232,7 +232,7 @@ mod tests {
         game_loop.tick(2);
         assert_eq!(
             game_loop.world.get_block(5, 64, 3),
-            basalt_world::block::AIR
+            basalt_api::world::block::AIR
         );
     }
 
@@ -243,7 +243,7 @@ mod tests {
         let mut rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::STONE);
+            .set_block(5, 64, 3, basalt_api::world::block::STONE);
 
         while rx.try_recv().is_ok() {}
 
@@ -331,7 +331,7 @@ mod tests {
 
         assert_eq!(
             game_loop.world.get_block(5, 64, 3),
-            basalt_world::block::STONE
+            basalt_api::world::block::STONE
         );
     }
 
@@ -401,7 +401,7 @@ mod tests {
         let state = game_loop.world.get_block(5, -59, 3);
         assert_eq!(
             state,
-            basalt_world::block::chest_state_for_yaw(180.0),
+            basalt_api::world::block::chest_state_for_yaw(180.0),
             "chest should face south when player faces north"
         );
     }
@@ -438,7 +438,7 @@ mod tests {
 
         let first_state = game_loop.world.get_block(5, -59, 3);
         assert!(
-            basalt_world::block::is_single_chest(first_state),
+            basalt_api::world::block::is_single_chest(first_state),
             "first chest should be single"
         );
 
@@ -455,24 +455,27 @@ mod tests {
 
         let left = game_loop.world.get_block(5, -59, 3);
         let right = game_loop.world.get_block(6, -59, 3);
-        assert!(basalt_world::block::is_chest(left), "left should be chest");
         assert!(
-            basalt_world::block::is_chest(right),
+            basalt_api::world::block::is_chest(left),
+            "left should be chest"
+        );
+        assert!(
+            basalt_api::world::block::is_chest(right),
             "right should be chest"
         );
         assert_ne!(
-            basalt_world::block::chest_type(left),
+            basalt_api::world::block::chest_type(left),
             0,
             "left should not be single"
         );
         assert_ne!(
-            basalt_world::block::chest_type(right),
+            basalt_api::world::block::chest_type(right),
             0,
             "right should not be single"
         );
         assert_ne!(
-            basalt_world::block::chest_type(left),
-            basalt_world::block::chest_type(right),
+            basalt_api::world::block::chest_type(left),
+            basalt_api::world::block::chest_type(right),
             "left and right should have different types"
         );
     }
@@ -484,21 +487,21 @@ mod tests {
         let _rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
 
         // Manually place a double chest (north-facing, left at x=5, right at x=6)
-        let left_state = basalt_world::block::chest_state(0, 1); // north, left
-        let right_state = basalt_world::block::chest_state(0, 2); // north, right
+        let left_state = basalt_api::world::block::chest_state(0, 1); // north, left
+        let right_state = basalt_api::world::block::chest_state(0, 2); // north, right
         game_loop.world.set_block(5, 64, 3, left_state);
         game_loop.world.set_block(6, 64, 3, right_state);
         game_loop.world.set_block_entity(
             5,
             64,
             3,
-            basalt_world::block_entity::BlockEntity::empty_chest(),
+            basalt_api::world::block_entity::BlockEntity::empty_chest(),
         );
         game_loop.world.set_block_entity(
             6,
             64,
             3,
-            basalt_world::block_entity::BlockEntity::empty_chest(),
+            basalt_api::world::block_entity::BlockEntity::empty_chest(),
         );
 
         // Break the left half
@@ -515,7 +518,7 @@ mod tests {
         // Right half should be single now
         let remaining = game_loop.world.get_block(6, 64, 3);
         assert!(
-            basalt_world::block::is_single_chest(remaining),
+            basalt_api::world::block::is_single_chest(remaining),
             "remaining half should revert to single chest"
         );
     }
@@ -530,9 +533,9 @@ mod tests {
         // Place chest with items inside
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CHEST);
-        let mut be = basalt_world::block_entity::BlockEntity::empty_chest();
-        let basalt_world::block_entity::BlockEntity::Chest { ref mut slots } = be;
+            .set_block(5, 64, 3, basalt_api::world::block::CHEST);
+        let mut be = basalt_api::world::block_entity::BlockEntity::empty_chest();
+        let basalt_api::world::block_entity::BlockEntity::Chest { ref mut slots } = be;
         slots[0] = basalt_types::Slot::new(42, 16);
         game_loop.world.set_block_entity(5, 64, 3, be);
 
@@ -579,12 +582,12 @@ mod tests {
         // Place a chest block + entity manually
         game_loop
             .world
-            .set_block(5, 64, 3, basalt_world::block::CHEST);
+            .set_block(5, 64, 3, basalt_api::world::block::CHEST);
         game_loop.world.set_block_entity(
             5,
             64,
             3,
-            basalt_world::block_entity::BlockEntity::empty_chest(),
+            basalt_api::world::block_entity::BlockEntity::empty_chest(),
         );
 
         // Break it

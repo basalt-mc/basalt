@@ -4,8 +4,8 @@
 //! the block grid. These are the building blocks for the physics system
 //! and future gameplay mechanics (line-of-sight, block targeting).
 
-use basalt_world::World;
-use basalt_world::block::is_solid;
+use crate::world::block::is_solid;
+use crate::world::handle::WorldHandle;
 
 /// An axis-aligned bounding box in world coordinates.
 #[derive(Debug, Clone, Copy)]
@@ -73,7 +73,7 @@ impl Aabb {
 /// Iterates all block positions that the AABB spans and returns
 /// `true` if any of them are solid. Used for ground detection and
 /// simple collision checks.
-pub fn check_overlap(world: &World, aabb: &Aabb) -> bool {
+pub fn check_overlap(world: &dyn WorldHandle, aabb: &Aabb) -> bool {
     let min_bx = aabb.min_x.floor() as i32;
     let min_by = aabb.min_y.floor() as i32;
     let min_bz = aabb.min_z.floor() as i32;
@@ -111,7 +111,7 @@ pub struct RayHit {
 /// Uses a simple stepping algorithm along the ray direction.
 /// Returns `None` if no solid block is found within `max_distance`.
 pub fn ray_cast(
-    world: &World,
+    world: &dyn WorldHandle,
     origin: (f64, f64, f64),
     direction: (f64, f64, f64),
     max_distance: f64,
@@ -152,7 +152,13 @@ pub fn ray_cast(
 /// Takes the entity's AABB and desired velocity, returns the actual
 /// velocity after clamping against solid blocks. Each axis is resolved
 /// independently (Y first for gravity, then X, then Z).
-pub fn resolve_movement(world: &World, aabb: &Aabb, dx: f64, dy: f64, dz: f64) -> (f64, f64, f64) {
+pub fn resolve_movement(
+    world: &dyn WorldHandle,
+    aabb: &Aabb,
+    dx: f64,
+    dy: f64,
+    dz: f64,
+) -> (f64, f64, f64) {
     let mut resolved_dy = dy;
     let mut resolved_dx = dx;
     let mut resolved_dz = dz;
@@ -203,16 +209,58 @@ pub fn resolve_movement(world: &World, aabb: &Aabb, dx: f64, dy: f64, dz: f64) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::world::block;
+    use crate::world::block_entity::BlockEntity;
 
-    fn test_world() -> World {
-        // Flat world: solid blocks at y=-61 and below, air above
-        World::flat()
+    /// Minimal flat-world mock for collision tests.
+    ///
+    /// Returns solid blocks (bedrock/dirt/grass) at y <= -61 and air
+    /// above, matching the standard superflat layout.
+    struct FlatMock;
+
+    impl WorldHandle for FlatMock {
+        fn get_block(&self, _x: i32, y: i32, _z: i32) -> u16 {
+            match y {
+                -64 => block::BEDROCK,
+                -63 | -62 => block::DIRT,
+                -61 => block::GRASS_BLOCK,
+                _ => block::AIR,
+            }
+        }
+        fn set_block(&self, _x: i32, _y: i32, _z: i32, _state: u16) {}
+        fn get_block_entity(&self, _x: i32, _y: i32, _z: i32) -> Option<BlockEntity> {
+            None
+        }
+        fn set_block_entity(&self, _x: i32, _y: i32, _z: i32, _entity: BlockEntity) {}
+        fn mark_chunk_dirty(&self, _cx: i32, _cz: i32) {}
+        fn persist_chunk(&self, _cx: i32, _cz: i32) {}
+        fn dirty_chunks(&self) -> Vec<(i32, i32)> {
+            Vec::new()
+        }
+        fn check_overlap(&self, aabb: &Aabb) -> bool {
+            check_overlap(self, aabb)
+        }
+        fn ray_cast(
+            &self,
+            origin: (f64, f64, f64),
+            direction: (f64, f64, f64),
+            max_distance: f64,
+        ) -> Option<RayHit> {
+            ray_cast(self, origin, direction, max_distance)
+        }
+        fn resolve_movement(&self, aabb: &Aabb, dx: f64, dy: f64, dz: f64) -> (f64, f64, f64) {
+            resolve_movement(self, aabb, dx, dy, dz)
+        }
+    }
+
+    fn test_world() -> FlatMock {
+        FlatMock
     }
 
     #[test]
     fn aabb_from_entity() {
         let aabb = Aabb::from_entity(0.0, -60.0, 0.0, 0.6, 1.8);
-        // f32→f64 conversion causes small precision loss, use relaxed tolerance
+        // f32->f64 conversion causes small precision loss, use relaxed tolerance
         assert!(aabb.min_x < 0.0, "min_x should be negative");
         assert!((aabb.min_y - (-60.0)).abs() < 1e-6);
         assert!((aabb.max_y - (-58.2)).abs() < 1e-4);
@@ -229,7 +277,7 @@ mod tests {
     #[test]
     fn check_overlap_no_collision_in_air() {
         let world = test_world();
-        // AABB at y=-60 (above grass at -61) — all air
+        // AABB at y=-60 (above grass at -61) -- all air
         let aabb = Aabb::from_entity(0.0, -60.0, 0.0, 0.6, 1.8);
         assert!(!check_overlap(&world, &aabb));
     }
@@ -247,7 +295,7 @@ mod tests {
     #[test]
     fn ray_cast_misses_in_air() {
         let world = test_world();
-        // Cast horizontally at y=-50 — all air
+        // Cast horizontally at y=-50 -- all air
         let hit = ray_cast(&world, (0.5, -50.0, 0.5), (1.0, 0.0, 0.0), 5.0);
         assert!(hit.is_none());
     }
