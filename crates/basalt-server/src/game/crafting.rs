@@ -1765,13 +1765,11 @@ mod tests {
         let (mut game_loop, game_tx, uuid, eid, _rx) = setup_planks_grid(1);
 
         // Validate handler that always cancels the craft.
-        game_loop.bus.on::<CraftingPreCraftEvent, ServerContext>(
-            Stage::Validate,
-            0,
-            |event, _ctx| {
+        game_loop
+            .bus
+            .on::<CraftingPreCraftEvent>(Stage::Validate, 0, |event, _ctx| {
                 event.cancel();
-            },
-        );
+            });
 
         let _ = game_tx.send(GameInput::WindowClick {
             uuid,
@@ -1802,7 +1800,7 @@ mod tests {
         // Process handler that denies the recipe by zeroing the result.
         game_loop
             .bus
-            .on::<CraftingRecipeMatchedEvent, ServerContext>(Stage::Process, 100, |event, _ctx| {
+            .on::<CraftingRecipeMatchedEvent>(Stage::Process, 100, |event, _ctx| {
                 event.result = basalt_types::Slot::empty();
             });
 
@@ -1848,20 +1846,14 @@ mod tests {
         let crafted_clone = Arc::clone(&crafted);
         game_loop
             .bus
-            .on::<CraftingShiftClickBatchEvent, ServerContext>(
-                Stage::Validate,
-                0,
-                |event, _ctx| {
-                    event.max_count = 1;
-                },
-            );
-        game_loop.bus.on::<CraftingCraftedEvent, ServerContext>(
-            Stage::Post,
-            0,
-            move |_event, _ctx| {
+            .on::<CraftingShiftClickBatchEvent>(Stage::Validate, 0, |event, _ctx| {
+                event.max_count = 1;
+            });
+        game_loop
+            .bus
+            .on::<CraftingCraftedEvent>(Stage::Post, 0, move |_event, _ctx| {
                 crafted_clone.fetch_add(1, Ordering::SeqCst);
-            },
-        );
+            });
 
         // Shift-click on the output slot (mode = 1)
         let _ = game_tx.send(GameInput::WindowClick {
@@ -1893,13 +1885,9 @@ mod tests {
         let cleared_clone = Arc::clone(&cleared);
         game_loop
             .bus
-            .on::<CraftingRecipeClearedEvent, ServerContext>(
-                Stage::Post,
-                0,
-                move |_event, _ctx| {
-                    cleared_clone.fetch_add(1, Ordering::SeqCst);
-                },
-            );
+            .on::<CraftingRecipeClearedEvent>(Stage::Post, 0, move |_event, _ctx| {
+                cleared_clone.fetch_add(1, Ordering::SeqCst);
+            });
 
         // Pick up one plank — grid breaks the 2x2 pattern, output clears.
         let _ = game_tx.send(GameInput::WindowClick {

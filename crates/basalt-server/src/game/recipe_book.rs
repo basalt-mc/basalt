@@ -1150,13 +1150,11 @@ mod tests {
         let (mut game_loop, game_tx, _io_rx) = super::super::tests::test_game_loop();
 
         // Register a Validate handler that cancels every fill.
-        game_loop
-            .bus
-            .on::<RecipeBookFillRequestEvent, basalt_api::context::ServerContext>(
-                basalt_api::Stage::Validate,
-                0,
-                |event, _| event.cancel(),
-            );
+        game_loop.bus.on::<RecipeBookFillRequestEvent>(
+            basalt_api::Stage::Validate,
+            0,
+            |event, _| event.cancel(),
+        );
 
         let uuid = Uuid::from_bytes([1; 16]);
         let mut rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);

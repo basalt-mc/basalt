@@ -108,11 +108,10 @@ impl ServerState {
         if !commands.is_empty() {
             let commands: Vec<basalt_api::CommandEntry> = commands.into_iter().collect();
             let commands = Arc::new(commands);
-            instant_bus.on::<basalt_api::events::CommandEvent, basalt_api::context::ServerContext>(
+            instant_bus.on::<basalt_api::events::CommandEvent>(
                 basalt_api::Stage::Process,
                 -100,
                 move |event, ctx| {
-                    use basalt_api::context::Context;
                     let parts: Vec<&str> = event.command.splitn(2, ' ').collect();
                     let cmd = parts[0];
                     let args = parts.get(1).copied().unwrap_or("");

@@ -145,19 +145,9 @@ impl<'a> PluginRegistrar<'a> {
     ) where
         E: Event + EventRouting + 'static,
     {
-        // Wrap the handler to downcast from ServerContext to &dyn Context.
-        // The EventBus stores handlers typed on the concrete context (ServerContext),
-        // but plugins receive the abstract &dyn Context interface.
-        let wrapper = move |event: &mut E, ctx: &ServerContext| {
-            handler(event, ctx as &dyn crate::context::Context);
-        };
         match E::BUS {
-            BusKind::Instant => self
-                .instant_bus
-                .on::<E, ServerContext>(stage, priority, wrapper),
-            BusKind::Game => self
-                .game_bus
-                .on::<E, ServerContext>(stage, priority, wrapper),
+            BusKind::Instant => self.instant_bus.on::<E>(stage, priority, handler),
+            BusKind::Game => self.game_bus.on::<E>(stage, priority, handler),
         }
     }
 
@@ -516,7 +506,7 @@ mod tests {
         let post_seen = Arc::new(AtomicU32::new(0));
         {
             let p = Arc::clone(&post_seen);
-            game_bus.on::<RecipeRegisteredEvent, ServerContext>(Stage::Post, 0, move |_, _| {
+            game_bus.on::<RecipeRegisteredEvent>(Stage::Post, 0, move |_, _| {
                 p.fetch_add(1, Ordering::Relaxed);
             });
         }

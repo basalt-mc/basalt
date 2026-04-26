@@ -101,17 +101,12 @@ impl PluginTestHarness {
     ) where
         E: Event + EventRouting + 'static,
     {
-        let wrapper = move |event: &mut E, ctx: &ServerContext| {
-            handler(event, ctx as &dyn crate::context::Context);
-        };
         match E::BUS {
             BusKind::Instant => {
-                self.instant_bus
-                    .on::<E, ServerContext>(stage, priority, wrapper);
+                self.instant_bus.on::<E>(stage, priority, handler);
             }
             BusKind::Game => {
-                self.game_bus
-                    .on::<E, ServerContext>(stage, priority, wrapper);
+                self.game_bus.on::<E>(stage, priority, handler);
             }
         }
     }
@@ -220,9 +215,10 @@ impl PluginTestHarness {
 
     /// Routes a type-erased event to the correct bus.
     fn dispatch_routed(&self, event: &mut dyn Event, ctx: &ServerContext) {
+        let ctx_dyn: &dyn crate::context::Context = ctx;
         match event.bus_kind() {
-            BusKind::Instant => self.instant_bus.dispatch_dyn(event, ctx),
-            BusKind::Game => self.game_bus.dispatch_dyn(event, ctx),
+            BusKind::Instant => self.instant_bus.dispatch_dyn(event, ctx_dyn),
+            BusKind::Game => self.game_bus.dispatch_dyn(event, ctx_dyn),
         }
     }
 }

@@ -66,7 +66,8 @@ impl<'a> RecipeRegistrar<'a> {
             recipe: Recipe::Shaped(recipe),
             cancelled: false,
         };
-        self.bus.dispatch(&mut event, self.ctx);
+        self.bus
+            .dispatch(&mut event, self.ctx as &dyn crate::context::Context);
         if event.is_cancelled() {
             return false;
         }
@@ -79,7 +80,8 @@ impl<'a> RecipeRegistrar<'a> {
             }
         }
         let mut post = RecipeRegisteredEvent { recipe_id: id };
-        self.bus.dispatch(&mut post, self.ctx);
+        self.bus
+            .dispatch(&mut post, self.ctx as &dyn crate::context::Context);
         true
     }
 
@@ -94,7 +96,8 @@ impl<'a> RecipeRegistrar<'a> {
             recipe: Recipe::Shapeless(recipe),
             cancelled: false,
         };
-        self.bus.dispatch(&mut event, self.ctx);
+        self.bus
+            .dispatch(&mut event, self.ctx as &dyn crate::context::Context);
         if event.is_cancelled() {
             return false;
         }
@@ -103,7 +106,8 @@ impl<'a> RecipeRegistrar<'a> {
             Recipe::Shaped(_) => return false,
         }
         let mut post = RecipeRegisteredEvent { recipe_id: id };
-        self.bus.dispatch(&mut post, self.ctx);
+        self.bus
+            .dispatch(&mut post, self.ctx as &dyn crate::context::Context);
         true
     }
 
@@ -117,7 +121,8 @@ impl<'a> RecipeRegistrar<'a> {
             let mut event = RecipeUnregisteredEvent {
                 recipe_id: id.clone(),
             };
-            self.bus.dispatch(&mut event, self.ctx);
+            self.bus
+                .dispatch(&mut event, self.ctx as &dyn crate::context::Context);
             true
         } else {
             false
@@ -132,7 +137,8 @@ impl<'a> RecipeRegistrar<'a> {
         let count = removed.len();
         for recipe_id in removed {
             let mut event = RecipeUnregisteredEvent { recipe_id };
-            self.bus.dispatch(&mut event, self.ctx);
+            self.bus
+                .dispatch(&mut event, self.ctx as &dyn crate::context::Context);
         }
         count
     }
@@ -143,7 +149,8 @@ impl<'a> RecipeRegistrar<'a> {
         let removed = self.registry.clear();
         for recipe_id in removed {
             let mut event = RecipeUnregisteredEvent { recipe_id };
-            self.bus.dispatch(&mut event, self.ctx);
+            self.bus
+                .dispatch(&mut event, self.ctx as &dyn crate::context::Context);
         }
     }
 
@@ -204,13 +211,13 @@ mod tests {
 
         {
             let v = Arc::clone(&validate_seen);
-            bus.on::<RecipeRegisterEvent, ServerContext>(Stage::Validate, 0, move |_, _| {
+            bus.on::<RecipeRegisterEvent>(Stage::Validate, 0, move |_, _| {
                 v.fetch_add(1, Ordering::Relaxed);
             });
         }
         {
             let p = Arc::clone(&post_seen);
-            bus.on::<RecipeRegisteredEvent, ServerContext>(Stage::Post, 0, move |_, _| {
+            bus.on::<RecipeRegisteredEvent>(Stage::Post, 0, move |_, _| {
                 p.fetch_add(1, Ordering::Relaxed);
             });
         }
@@ -230,14 +237,14 @@ mod tests {
         let mut bus = EventBus::new();
         let ctx = ctx();
 
-        bus.on::<RecipeRegisterEvent, ServerContext>(Stage::Validate, 0, |event, _| {
+        bus.on::<RecipeRegisterEvent>(Stage::Validate, 0, |event, _| {
             event.cancel();
         });
 
         let post_seen = Arc::new(AtomicU32::new(0));
         {
             let p = Arc::clone(&post_seen);
-            bus.on::<RecipeRegisteredEvent, ServerContext>(Stage::Post, 0, move |_, _| {
+            bus.on::<RecipeRegisteredEvent>(Stage::Post, 0, move |_, _| {
                 p.fetch_add(1, Ordering::Relaxed);
             });
         }
@@ -278,7 +285,7 @@ mod tests {
         let unreg_seen = Arc::new(AtomicU32::new(0));
         {
             let u = Arc::clone(&unreg_seen);
-            bus.on::<RecipeUnregisteredEvent, ServerContext>(Stage::Post, 0, move |_, _| {
+            bus.on::<RecipeUnregisteredEvent>(Stage::Post, 0, move |_, _| {
                 u.fetch_add(1, Ordering::Relaxed);
             });
         }
@@ -298,7 +305,7 @@ mod tests {
         let unreg_seen = Arc::new(AtomicU32::new(0));
         {
             let u = Arc::clone(&unreg_seen);
-            bus.on::<RecipeUnregisteredEvent, ServerContext>(Stage::Post, 0, move |_, _| {
+            bus.on::<RecipeUnregisteredEvent>(Stage::Post, 0, move |_, _| {
                 u.fetch_add(1, Ordering::Relaxed);
             });
         }
@@ -320,7 +327,7 @@ mod tests {
         let unreg_seen = Arc::new(AtomicU32::new(0));
         {
             let u = Arc::clone(&unreg_seen);
-            bus.on::<RecipeUnregisteredEvent, ServerContext>(Stage::Post, 0, move |_, _| {
+            bus.on::<RecipeUnregisteredEvent>(Stage::Post, 0, move |_, _| {
                 u.fetch_add(1, Ordering::Relaxed);
             });
         }
@@ -341,7 +348,7 @@ mod tests {
         let unreg_seen = Arc::new(AtomicU32::new(0));
         {
             let u = Arc::clone(&unreg_seen);
-            bus.on::<RecipeUnregisteredEvent, ServerContext>(Stage::Post, 0, move |_, _| {
+            bus.on::<RecipeUnregisteredEvent>(Stage::Post, 0, move |_, _| {
                 u.fetch_add(1, Ordering::Relaxed);
             });
         }
