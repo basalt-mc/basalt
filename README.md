@@ -123,10 +123,11 @@ basalt/
     basalt-events      # Generic event bus with staged dispatch
     basalt-core        # Shared traits (Context, Gamemode, PluginLogger)
     basalt-command     # Typed command arguments and parsing
-    basalt-api         # Public plugin API (Plugin trait, ServerContext, events)
-    basalt-world       # World generation, chunk storage, paletted containers
+    basalt-api         # Standalone plugin API (Plugin trait, events, WorldHandle)
+    basalt-world       # World runtime, chunk cache, paletted containers
+    basalt-recipes     # Recipe registry, vanilla recipe data
     basalt-storage     # BSR region file format with LZ4 compression
-    basalt-server      # Server runtime: lifecycle, play loop, config
+    basalt-server      # Server runtime: game loop, net tasks, ServerContext
   plugins/
     chat/              # Chat broadcast
     command/           # /tp, /gamemode, /say, /help, /stop, /kick, /list
@@ -135,6 +136,9 @@ basalt/
     storage/           # Chunk persistence
     lifecycle/         # Join/leave broadcast
     movement/          # Position broadcast
+    physics/           # Gravity, AABB collision
+    item/              # Item drops on block break
+    container/         # Chest interaction, double chests
   fuzz/                # Fuzz targets for protocol decoders
   xtask/               # Code generation from minecraft-data
 ```

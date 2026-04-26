@@ -11,17 +11,19 @@
 
 ## Architecture
 
-Twelve crates in `crates/` (infrastructure), ten plugin crates in `plugins/` (features), and an `xtask` codegen tool:
+Eleven crates in `crates/` (infrastructure), ten plugin crates in `plugins/` (features), and an `xtask` codegen tool:
 
 ```
-basalt-types → basalt-core (Context, components, SystemContext) → basalt-command
-                    ↑                                                    ↑
-              basalt-world    basalt-ecs (pure storage)           basalt-api (Plugin API)
-                                   ↑                                     ↑
-basalt-derive → basalt-protocol → basalt-net → basalt-server → plugins/*
-                      ↑
-                   xtask
+basalt-derive ─┐
+basalt-types ──┴→ basalt-protocol
+        │              │
+        └──→ basalt-api ←──── basalt-world ←──── basalt-server
+                  ↑                  ↑               ↑
+              plugins/*          basalt-recipes   basalt-net
+                                 basalt-storage   basalt-ecs
 ```
+
+`basalt-api` is the standalone foundation crate. Its only `basalt-*` dependency is the optional `basalt-protocol` (gated behind the `raw-packets` feature). `basalt-world` and `basalt-recipes` depend ON `basalt-api`, not the reverse.
 
 | Crate | Purpose | Key dependencies |
 |-------|---------|-----------------|
@@ -32,12 +34,12 @@ basalt-derive → basalt-protocol → basalt-net → basalt-server → plugins/*
 | `basalt-events` | Generic event bus with staged handler dispatch (Validate → Process → Post) | none |
 | `basalt-core` | Context trait, component types, SystemContext, Phase, shared types | `basalt-types`, `basalt-world` |
 | `basalt-command` | Typed argument API (Arg, Validation, parsing), `Command` trait | `basalt-core` |
-| `basalt-api` | Public plugin API: `Plugin` trait, `ServerContext` (impl Context), events, `PluginRegistrar` | `basalt-core`, `basalt-command`, `basalt-events` |
-| `basalt-world` | World generation, chunk storage, paletted containers, block state registry | `basalt-types`, `basalt-storage` |
+| `basalt-api` | Standalone foundation: `Plugin` trait, `Context` trait, events, `PluginRegistrar`, block/block_entity data types, recipe data types, `WorldHandle`/`RecipeRegistryHandle` trait abstractions, collision algorithms, testing mocks | `basalt-types`, `log` |
+| `basalt-world` | World runtime: chunk cache, generation, paletted containers. Implements `WorldHandle` for `World` | `basalt-api`, `basalt-types`, `basalt-storage` |
+| `basalt-recipes` | Recipe registry runtime: vanilla recipe data, matching. Implements `RecipeRegistryHandle` for `RecipeRegistry` | `basalt-api` |
 | `basalt-storage` | BSR region file format with LZ4 compression for chunk persistence | `lz4_flex` |
 | `basalt-ecs` | Generic storage engine: entities, components, systems. Zero domain knowledge | `basalt-core`, `basalt-world` |
-| `basalt-testkit` | Testing framework: PluginTestHarness, SystemTestContext, NoopContext | `basalt-api`, `basalt-ecs`, `basalt-core` |
-| `basalt-server` | Server runtime: game loop, net tasks, I/O thread, plugin registration | `basalt-api`, `basalt-ecs`, `basalt-net`, all plugin crates |
+| `basalt-server` | Server runtime: game loop, net tasks, I/O thread, plugin registration. Owns `ServerContext` (production `Context` impl) | `basalt-api`, `basalt-ecs`, `basalt-net`, all plugin crates |
 | `xtask` | Code generation from minecraft-data JSON → Rust packet structs | `serde_json` |
 
 Plugin crates under `plugins/`:
@@ -65,14 +67,14 @@ Plugin crates under `plugins/`:
   - `NoopContext` in `testing` module for unit tests that need a `&dyn Context`
   - Shared broadcast types (`BroadcastMessage`, `PlayerSnapshot`, `ProfileProperty`)
 - `basalt-command` provides typed argument API (`Arg`, `Validation`, `CommandArg`, `CommandArgs`, parsing with variant support) and the `Command` trait. Depends on `basalt-core`, NOT on `basalt-api` (no circular dependency).
-- `basalt-api` provides `ServerContext` (implements `Context`), `Plugin` trait, `PluginRegistrar` with fluent command builder (`.command("tp").arg("pos", Arg::Vec3).handler(...)`).
-- `basalt-server` builds the DeclareCommands Brigadier tree from registered command args, handles TabComplete requests, and dispatches commands with auto-parsing/validation.
+- `basalt-api` provides the `Context` trait, `Plugin` trait, `PluginRegistrar` with fluent command builder (`.command("tp").arg("pos", Arg::Vec3).handler(...)`), `WorldHandle`/`RecipeRegistryHandle` trait abstractions, block/block_entity data types, recipe data types, collision algorithms, and built-in testing mocks (`MockWorld`, `MockRecipeRegistry`). `ServerContext` (the production `Context` impl) lives in `basalt-server`.
+- `basalt-server` owns `ServerContext` (the production `Context` implementation). Builds the DeclareCommands Brigadier tree from registered command args, handles TabComplete requests, and dispatches commands with auto-parsing/validation.
 - Plugin crates depend only on `basalt-api`. External plugins follow the same pattern as built-in ones.
 - `xtask` is a standalone binary that generates code into `basalt-protocol`.
 
 ### basalt-events architecture
 
-The event system provides a generic `EventBus` with three execution stages:
+The event system provides an `EventBus` with three execution stages. Handlers are typed on `&dyn Context` (no generic parameter):
 
 1. **Validate** — read-only checks, can cancel (permissions, anti-cheat, protection plugins)
 2. **Process** — state mutation, one logical owner per event (world changes)
@@ -82,23 +84,37 @@ If any Validate handler cancels an event, Process and Post are skipped entirely.
 
 Server features are implemented as plugin handlers registered on the event bus. Each plugin can be enabled/disabled via server config — zero overhead for disabled features. This enables composable server profiles: an auth server only registers login + commands, a lobby adds read-only world, a game server enables everything.
 
-### basalt-api (public plugin API)
+### basalt-api (standalone foundation crate)
 
-The API crate is the **sole dependency** for all plugins (built-in and external). It re-exports everything plugins need through focused modules:
+The API crate is the **sole dependency** for all plugins (built-in and external). It is a standalone, publishable crate with no dependency on `basalt-world`, `basalt-recipes`, or any other runtime crate. It re-exports everything plugins need through focused modules:
 
 - **`prelude`** — essentials for every plugin: `Plugin`, `PluginRegistrar`, context traits, `Stage`, `Event`, all event types, `BroadcastMessage`, `Gamemode`
 - **`components`** — ECS component types: `Position`, `Velocity`, `BlockPosition`, etc.
 - **`system`** — system registration: `SystemContext`, `SystemContextExt`, `Phase`, `SystemBuilder`
 - **`command`** — command types: `Arg`, `CommandArgs`, `Validation`
 - **`types`** — primitive types: `Uuid`, `Slot`, `TextComponent`, `NamedColor`, `TextColor`
-- **`world`** — re-export of `basalt-world`: block states, collision, block entities
+- **`world`** — block state constants (`AIR`, `STONE`, `CHEST`, ...), `is_solid()`, `BlockEntity`/`BlockEntityKind`, collision algorithms (`Aabb`, `RayHit`, `resolve_movement`), `WorldHandle` trait
+- **`recipes`** — recipe data types (`RecipeId`, `Recipe`, `OwnedShapedRecipe`, `OwnedShapelessRecipe`), `RecipeRegistryHandle` trait, `RecipeRegistrar` wrapper
 - **`events/`** — domain-grouped event files: `block.rs`, `player.rs`, `chat.rs`
+- **`testing`** — `MockWorld`, `MockRecipeRegistry`, `PluginTestHarness`, `SystemTestContext`, `NoopContext` (gated behind `testing` feature)
 
 Events use structured types (`BlockPosition`, `Position`, `Rotation`, `ChunkPosition`) instead of inline fields. Player identity is never in events — always use `ctx.player()`.
 
-Plugin handlers receive `&dyn Context` — they never reference `ServerContext` directly. `ServerContext` is an internal implementation detail shared between basalt-api, basalt-server, and basalt-testkit. Its implementation is split into domain sub-modules: `context/player.rs`, `context/chat.rs`, `context/world.rs`, `context/entity.rs`, `context/container.rs`, `context/response.rs`.
+Plugin handlers receive `&dyn Context` — they never reference `ServerContext` directly. `ServerContext` lives in `basalt-server` and is an internal implementation detail. Its implementation is split into domain sub-modules in basalt-server: `context/player.rs`, `context/chat.rs`, `context/world.rs`, `context/entity.rs`, `context/container.rs`, `context/recipe.rs`.
 
-`ServerContext` stores a `PlayerInfo` struct (uuid, entity_id, username, rotation) instead of inline fields. `Response` variants use structured types (`Position`, `Rotation`, `BlockPosition`, `ChunkPosition`).
+The `Context` trait, all sub-context traits (`PlayerContext`, `ChatContext`, `WorldContext`, `EntityContext`, `ContainerContext`, `RecipeContext`), `Response`/`ResponseQueue`, and `UnlockReason` stay in basalt-api. `ServerContext` stores a `PlayerInfo` struct (uuid, entity_id, username, rotation) instead of inline fields.
+
+#### WorldHandle and RecipeRegistryHandle traits
+
+Two abstract traits decouple plugins from runtime implementations:
+
+- **`WorldHandle`** — long-lived handle to the world runtime. Pure read/write operations: `get_block`, `set_block`, `get_block_entity`, `set_block_entity`, `mark_chunk_dirty`, `persist_chunk`, `dirty_chunks`, `check_overlap`, `ray_cast`, `resolve_movement`. Implemented by `basalt_world::World` (production) and `MockWorld` (tests). Plugins receive `Arc<dyn WorldHandle + Send + Sync>` from `PluginRegistrar::world()`.
+- **`RecipeRegistryHandle`** — long-lived handle to the recipe registry. Mutation and query: `add_shaped`, `add_shapeless`, `remove_by_id`, `remove_by_result`, `clear`, `contains`, `find_by_id`, `shaped_count`, `shapeless_count`. Implemented by `basalt_recipes::RecipeRegistry` (production) and `MockRecipeRegistry` (tests). Plugins access it via `PluginRegistrar::recipes()`.
+
+Two dispatch-time traits extend `WorldHandle`:
+
+- **`WorldContext: WorldHandle`** — adds response-queueing methods: `send_block_ack`, `stream_chunks`, `queue_persist_chunk`, `destroy_block_entity`. Available via `ctx.world_ctx()`.
+- **`SystemContext: WorldHandle`** — adds ECS-only methods: `spawn`, `despawn`, `get`, `get_mut`, `set`, `query`, `world`. Available in system closures.
 
 ### Feature development workflow — events first
 
@@ -170,6 +186,15 @@ crates/basalt-server/
 │   ├── messages.rs
 │   ├── helpers.rs
 │   ├── state.rs
+│   ├── context/
+│   │   ├── mod.rs             # ServerContext struct + Context impl
+│   │   ├── player.rs          # PlayerContext for ServerContext
+│   │   ├── chat.rs            # ChatContext for ServerContext
+│   │   ├── world.rs           # WorldContext + WorldHandle for ServerContext
+│   │   ├── entity.rs          # EntityContext for ServerContext
+│   │   ├── container.rs       # ContainerContext for ServerContext
+│   │   ├── recipe.rs          # RecipeContext for ServerContext
+│   │   └── tests.rs           # ServerContext unit tests
 │   ├── net/
 │   │   ├── mod.rs
 │   │   ├── connection.rs
@@ -251,6 +276,8 @@ crates/basalt-server/
 
 ### basalt-world architecture
 
+Block state constants (`block.rs`), block entity types (`block_entity.rs`), and collision algorithms (`collision.rs`) live in `basalt-api/src/world/`. `basalt-world` depends on `basalt-api` and provides the runtime implementation.
+
 ```
 crates/basalt-world/
 ├── src/
@@ -258,8 +285,7 @@ crates/basalt-world/
 │   ├── world.rs         # World: DashMap chunk cache, LRU eviction, lazy generation
 │   ├── chunk.rs         # ChunkColumn: 24 sections, set/get block, encode_sections(), compute_heightmaps()
 │   ├── palette.rs       # PalettedContainer: single-value + indirect palette encoding
-│   ├── collision.rs     # AABB collision, ray_cast, resolve_movement
-│   ├── block.rs         # Block state IDs, is_solid()
+│   ├── handle.rs        # impl WorldHandle for World (delegates to World's inherent methods)
 │   ├── format.rs        # BSR chunk serialization (bitmap + sections)
 │   ├── generator.rs     # FlatWorldGenerator: bedrock/dirt/grass layers
 │   └── noise_gen.rs     # NoiseTerrainGenerator: Perlin noise terrain
@@ -268,6 +294,7 @@ crates/basalt-world/
 - `World::with_chunk(cx, cz, |col| ...)` ensures loaded (generate or disk) and gives access to the `ChunkColumn`
 - `ChunkColumn::encode_sections()` and `compute_heightmaps()` provide raw data; protocol packet construction lives in basalt-server's `ChunkPacketCache`
 - `PalettedContainer` handles single-value optimization and indirect palettes with proper bits-per-entry
+- `impl WorldHandle for World` in `handle.rs` delegates trait methods to `World`'s inherent API
 - Chunk streaming: server tracks player chunk position, sends new chunks on boundary crossing, unloads old ones via `UnloadChunk`
 
 ## Architectural principles
@@ -315,12 +342,12 @@ basalt/
 │   ├── basalt-net/
 │   ├── basalt-events/         # Event bus with staged handler dispatch (Validate/Process/Post)
 │   ├── basalt-core/           # Context trait, components, SystemContext, shared types
-│   ├── basalt-api/            # Public plugin API: Plugin trait, ServerContext, events
+│   ├── basalt-api/            # Standalone foundation: Plugin trait, events, WorldHandle, testing mocks
 │   ├── basalt-command/        # Typed argument API, Command trait, parsing
-│   ├── basalt-world/          # World generation, chunk cache, paletted containers
+│   ├── basalt-world/          # World runtime: chunk cache, generation, paletted containers
+│   ├── basalt-recipes/        # Recipe registry runtime: vanilla recipes, matching
 │   ├── basalt-storage/        # BSR region format, LZ4 compression, disk persistence
-│   ├── basalt-testkit/        # Testing framework: PluginTestHarness, SystemTestContext
-│   └── basalt-server/         # Server runtime: connection lifecycle, play loop
+│   └── basalt-server/         # Server runtime: game loop, net tasks, ServerContext
 ├── plugins/                   # Features (each plugin = independent crate)
 │   ├── chat/                  # ChatPlugin: chat broadcast
 │   ├── command/               # CommandPlugin: /tp, /gamemode, /say, /help, /stop, /kick, /list
@@ -652,11 +679,11 @@ Benchmarks (`criterion`) from day one: encode/decode throughput, allocations per
 
 ### Plugin testing
 
-Two test utilities are available:
+Two test utilities are available, both in `basalt-api/src/testing/` (gated behind the `testing` feature):
 
-**`PluginTestHarness`** (`basalt-testkit`) — for event-based plugins. Returns `DispatchResult` with high-level assertion methods — plugins never import `Response` directly:
+**`PluginTestHarness`** (`basalt_api::testing`) — for event-based plugins. Uses `MockWorld` and `MockRecipeRegistry` internally. Returns `DispatchResult` with high-level assertion methods — plugins never import `Response` directly:
 ```rust
-use basalt_testkit::PluginTestHarness;
+use basalt_api::testing::PluginTestHarness;
 
 let mut harness = PluginTestHarness::new();
 harness.register(MyPlugin);
@@ -670,9 +697,9 @@ assert!(result.has_block_change_broadcast());
 
 `DispatchResult` methods: `len()`, `is_empty()`, `has_block_ack()`, `has_block_ack_seq(n)`, `has_system_chat()`, `has_teleport()`, `has_game_state_change()`, `has_chat_broadcast()`, `has_block_change_broadcast()`, `has_entity_moved_broadcast()`, `has_player_joined_broadcast()`, `has_player_left_broadcast()`, `has_stream_chunks(x, z)`, `has_spawn_dropped_item(item_id, count)`, `has_any_spawn_dropped_item()`.
 
-**`SystemTestContext`** (`basalt-testkit`) — for system plugins:
+**`SystemTestContext`** (`basalt_api::testing`) — for system plugins:
 ```rust
-use basalt_testkit::SystemTestContext;
+use basalt_api::testing::SystemTestContext;
 
 let mut ctx = SystemTestContext::new();
 let e = ctx.spawn();
@@ -682,7 +709,11 @@ physics_tick(&mut ctx);
 let pos = ctx.get::<Position>(e).unwrap();
 ```
 
-**`NoopContext`** (`basalt-core::testing`) — for internal crates that need a `&dyn Context` (e.g., command dispatch tests). All methods are no-ops. Prefer `PluginTestHarness` for plugin tests.
+**`NoopContext`** (`basalt_api::testing`) — for internal crates that need a `&dyn Context` (e.g., command dispatch tests). All methods are no-ops. Prefer `PluginTestHarness` for plugin tests.
+
+**`MockWorld`** (`basalt_api::testing`) — in-memory `HashMap`-backed block store implementing `WorldHandle`. Use `harness.world()` to access the mock world and pre-populate blocks for testing.
+
+**`MockRecipeRegistry`** (`basalt_api::testing`) — `Vec<Recipe>`-backed implementation of `RecipeRegistryHandle`. Pre-populated via `harness.register()` when plugins add recipes during `on_enable`.
 
 ### Fuzz testing
 
@@ -766,6 +797,6 @@ Use SniffCraft (MITM proxy in `sniffcraft/`) to capture and validate packets bet
 14. **IR-based codegen**: the xtask pipeline uses a `ProtocolType` IR — never go directly from JSON to Rust strings.
 15. **README reflects reality**: when a feature ships or a roadmap item is completed, update `README.md`. Move items from "What's missing" to "What works today". Update the Roadmap section when specs are implemented. Don't update for internal refactors unless they change user-facing behavior.
 16. **No unsafe**: zero `unsafe` blocks in the codebase. Find safe abstractions (Arc<Mutex>, trait objects, type erasure) instead of raw pointers.
-17. **basalt-api is the facade**: plugins see ONLY basalt-api. Internal crates (basalt-ecs, basalt-core, basalt-world) are never direct plugin dependencies.
+17. **basalt-api is the standalone facade**: plugins see ONLY basalt-api. Internal crates (basalt-ecs, basalt-core, basalt-world, basalt-recipes) are never direct plugin dependencies. Plugins access world and recipe state through `WorldHandle` and `RecipeRegistryHandle` trait objects.
 18. **Structured event types**: events use `BlockPosition`, `Position`, `Rotation`, `ChunkPosition` — never inline `x, y, z` fields. Player identity comes from `ctx.player()`, never from event fields.
 19. **File size limit**: keep files under ~400 lines. Split into domain sub-modules when a file grows beyond this.
