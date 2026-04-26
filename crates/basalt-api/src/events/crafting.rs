@@ -2,7 +2,7 @@
 //! and recipe-registry lifecycle.
 
 use crate::context::UnlockReason;
-use basalt_recipes::{Recipe, RecipeId};
+use crate::recipes::{Recipe, RecipeId};
 use basalt_types::Slot;
 
 /// The contents of a crafting grid have changed.
@@ -255,6 +255,7 @@ crate::game_event!(RecipeBookFilledEvent);
 #[cfg(test)]
 mod tests {
     use crate::events::{BusKind, Event, EventRouting};
+    use crate::recipes::OwnedShapedRecipe;
 
     use super::*;
 
@@ -341,7 +342,7 @@ mod tests {
     }
 
     fn sample_recipe(path: &str) -> Recipe {
-        Recipe::Shaped(basalt_recipes::OwnedShapedRecipe {
+        Recipe::Shaped(OwnedShapedRecipe {
             id: RecipeId::new("plugin", path),
             width: 1,
             height: 1,

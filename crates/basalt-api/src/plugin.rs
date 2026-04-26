@@ -368,7 +368,7 @@ mod tests {
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
-        let mut recipes = basalt_recipes::RecipeRegistry::empty();
+        let mut recipes = crate::testing::MockRecipeRegistry::new();
         let world = std::sync::Arc::new(crate::testing::MockWorld::flat())
             as std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>;
         let ctx = NoopContext;
@@ -396,7 +396,7 @@ mod tests {
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
-        let mut recipes = basalt_recipes::RecipeRegistry::empty();
+        let mut recipes = crate::testing::MockRecipeRegistry::new();
         let world = std::sync::Arc::new(crate::testing::MockWorld::flat())
             as std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>;
         let ctx = NoopContext;
@@ -431,7 +431,7 @@ mod tests {
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
-        let mut recipes = basalt_recipes::RecipeRegistry::empty();
+        let mut recipes = crate::testing::MockRecipeRegistry::new();
         let world = std::sync::Arc::new(crate::testing::MockWorld::flat())
             as std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>;
         let ctx = NoopContext;
@@ -469,7 +469,7 @@ mod tests {
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
-        let mut recipes = basalt_recipes::RecipeRegistry::empty();
+        let mut recipes = crate::testing::MockRecipeRegistry::new();
         let world = std::sync::Arc::new(crate::testing::MockWorld::flat())
             as std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>;
         let ctx = NoopContext;
@@ -497,7 +497,7 @@ mod tests {
     #[test]
     fn recipes_accessor_exposes_registrar_with_dispatch() {
         use crate::events::RecipeRegisteredEvent;
-        use basalt_recipes::{OwnedShapedRecipe, RecipeId};
+        use crate::recipes::{OwnedShapedRecipe, RecipeId};
         use std::sync::Arc;
         use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -505,7 +505,7 @@ mod tests {
         let mut game_bus = EventBus::new();
         let mut commands = Vec::new();
         let mut systems = Vec::new();
-        let mut recipes = basalt_recipes::RecipeRegistry::empty();
+        let mut recipes = crate::testing::MockRecipeRegistry::new();
         let world = std::sync::Arc::new(crate::testing::MockWorld::flat())
             as std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>;
         let ctx = NoopContext;

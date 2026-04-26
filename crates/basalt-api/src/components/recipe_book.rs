@@ -7,7 +7,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use basalt_recipes::RecipeId;
+use crate::recipes::RecipeId;
 
 use crate::components::Component;
 

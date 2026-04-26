@@ -17,11 +17,11 @@ use crate::gamemode::Gamemode;
 use crate::logger::PluginLogger;
 use crate::player::PlayerInfo;
 use crate::plugin::PluginRegistrar;
+use crate::recipes::RecipeId;
 use crate::testing::noop::NoopContext;
 use crate::world::collision::{Aabb, RayHit};
 use crate::world::handle::WorldHandle;
 use crate::{Event, EventBus, Plugin, Stage};
-use basalt_recipes::RecipeId;
 use basalt_types::{Slot, TextComponent, Uuid};
 
 use super::mock_world::MockWorld;
@@ -377,6 +377,8 @@ impl Context for HarnessContext {
     }
 }
 
+use super::mock_recipes::MockRecipeRegistry;
+
 // ── PluginTestHarness ───────────────────────────────────────────────
 
 /// Test harness for plugin development.
@@ -394,7 +396,7 @@ pub struct PluginTestHarness {
     /// Collected command entries.
     commands: Vec<crate::plugin::CommandEntry>,
     /// Recipe registry for plugin customisation.
-    recipes: basalt_recipes::RecipeRegistry,
+    recipes: MockRecipeRegistry,
 }
 
 impl PluginTestHarness {
@@ -405,7 +407,7 @@ impl PluginTestHarness {
             instant_bus: EventBus::new(),
             game_bus: EventBus::new(),
             commands: Vec::new(),
-            recipes: basalt_recipes::RecipeRegistry::empty(),
+            recipes: MockRecipeRegistry::new(),
         }
     }
 
@@ -416,7 +418,7 @@ impl PluginTestHarness {
             instant_bus: EventBus::new(),
             game_bus: EventBus::new(),
             commands: Vec::new(),
-            recipes: basalt_recipes::RecipeRegistry::empty(),
+            recipes: MockRecipeRegistry::new(),
         }
     }
 
@@ -758,7 +760,7 @@ impl DispatchResult {
     }
 
     /// Returns true if any response unlocks the given recipe id.
-    pub fn has_unlock_recipe(&self, id: &basalt_recipes::RecipeId) -> bool {
+    pub fn has_unlock_recipe(&self, id: &RecipeId) -> bool {
         self.responses.iter().any(|r| {
             matches!(
                 r,
@@ -768,7 +770,7 @@ impl DispatchResult {
     }
 
     /// Returns true if any response locks the given recipe id.
-    pub fn has_lock_recipe(&self, id: &basalt_recipes::RecipeId) -> bool {
+    pub fn has_lock_recipe(&self, id: &RecipeId) -> bool {
         self.responses.iter().any(|r| {
             matches!(
                 r,

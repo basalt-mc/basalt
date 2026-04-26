@@ -7,8 +7,8 @@ use crate::context::{
 };
 use crate::gamemode::Gamemode;
 use crate::logger::PluginLogger;
+use crate::recipes::RecipeId;
 use crate::world::handle::WorldHandle;
-use basalt_recipes::RecipeId;
 use basalt_types::{TextComponent, Uuid};
 
 /// A no-op [`Context`] implementation for unit tests.

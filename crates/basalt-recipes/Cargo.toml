@@ -7,4 +7,4 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-# No external dependencies — pure data + matching logic.
+basalt-api = { workspace = true }

@@ -96,5 +96,5 @@ pub mod prelude {
     };
 
     // Recipe types referenced by registry-lifecycle events.
-    pub use basalt_recipes::{OwnedShapedRecipe, OwnedShapelessRecipe, Recipe, RecipeId};
+    pub use crate::recipes::{OwnedShapedRecipe, OwnedShapelessRecipe, Recipe, RecipeId};
 }

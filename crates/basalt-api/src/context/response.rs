@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use crate::broadcast::BroadcastMessage;
 use crate::components::{BlockPosition, ChunkPosition, Position, Rotation};
 use crate::context::UnlockReason;
-use basalt_recipes::RecipeId;
+use crate::recipes::RecipeId;
 use basalt_types::Slot;
 use basalt_types::nbt::NbtCompound;
 

@@ -17,12 +17,14 @@
 //! assert!(result.has_block_ack());
 //! ```
 
+mod mock_recipes;
 mod mock_world;
 mod noop;
 
 #[cfg(feature = "testing")]
 mod harness;
 
+pub use mock_recipes::MockRecipeRegistry;
 pub use mock_world::MockWorld;
 pub use noop::NoopContext;
 
