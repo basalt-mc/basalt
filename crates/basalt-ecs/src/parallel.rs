@@ -93,6 +93,8 @@ impl<'scope> ParallelSystemContext<'scope> {
     }
 }
 
+/// Provides the `WorldHandle` delegation for `ParallelSystemContext`
+/// (forwards to the borrowed `World` reference).
 impl basalt_api::world::handle::WorldHandle for ParallelSystemContext<'_> {
     fn get_block(&self, x: i32, y: i32, z: i32) -> u16 {
         self.world.get_block(x, y, z)

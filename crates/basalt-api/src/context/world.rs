@@ -76,7 +76,7 @@ impl WorldContext for ServerContext {
             .push(Response::StreamChunks(ChunkPosition { x: cx, z: cz }));
     }
 
-    fn persist_chunk(&self, cx: i32, cz: i32) {
+    fn queue_persist_chunk(&self, cx: i32, cz: i32) {
         self.responses
             .push(Response::PersistChunk(ChunkPosition { x: cx, z: cz }));
     }

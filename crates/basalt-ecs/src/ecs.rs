@@ -622,8 +622,9 @@ impl Default for Ecs {
 impl Ecs {
     /// Returns a reference to the internal world.
     ///
-    /// Used by the `SystemContext` implementation to delegate typed
-    /// world methods. Panics if `set_world()` was not called.
+    /// Used by the `WorldHandle` and `SystemContext` implementations
+    /// to access the inner `World`. Panics if `set_world()` was not
+    /// called.
     fn world_ref(&self) -> &basalt_world::World {
         self.world
             .as_ref()
@@ -631,6 +632,8 @@ impl Ecs {
     }
 }
 
+/// Provides the `WorldHandle` delegation for `Ecs` (forwards to the
+/// inner `Arc<World>`).
 impl basalt_api::world::handle::WorldHandle for Ecs {
     fn get_block(&self, x: i32, y: i32, z: i32) -> u16 {
         self.world_ref().get_block(x, y, z)
