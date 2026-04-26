@@ -101,10 +101,11 @@ pub trait ChatContext {
 /// world ops (`get_block`, `set_block`, `check_overlap`, ...) come
 /// from `WorldHandle` and are not redeclared here.
 ///
-/// `persist_chunk` is intentionally re-declared: the `WorldHandle`
-/// version is synchronous (calls `World::persist_chunk` directly),
-/// while this version queues a `Response::PersistChunk` for the
-/// game loop to route to the I/O thread asynchronously.
+/// Persistence is split between the two traits:
+/// [`WorldHandle::persist_chunk`](crate::world::handle::WorldHandle::persist_chunk)
+/// is synchronous, while [`queue_persist_chunk`](Self::queue_persist_chunk)
+/// queues a `Response::PersistChunk` for async I/O-thread routing.
+/// The distinct names prevent E0034 ambiguity on `&dyn WorldContext`.
 pub trait WorldContext: crate::world::handle::WorldHandle {
     /// Sends a block action acknowledgement to the current player.
     fn send_block_ack(&self, sequence: i32);
@@ -114,10 +115,12 @@ pub trait WorldContext: crate::world::handle::WorldHandle {
 
     /// Schedules a chunk for asynchronous persistence on the I/O thread.
     ///
-    /// Unlike [`WorldHandle::persist_chunk`](crate::world::handle::WorldHandle::persist_chunk)
-    /// which is synchronous, this version queues a deferred response
-    /// that the game loop routes to the I/O thread.
-    fn persist_chunk(&self, cx: i32, cz: i32);
+    /// Named `queue_persist_chunk` to avoid ambiguity with
+    /// [`WorldHandle::persist_chunk`](crate::world::handle::WorldHandle::persist_chunk)
+    /// (synchronous, calls `World::persist_chunk` directly). This
+    /// version queues a `Response::PersistChunk` for the game loop to
+    /// route to the I/O thread asynchronously.
+    fn queue_persist_chunk(&self, cx: i32, cz: i32);
 
     /// Removes a block entity at the given position and fires a
     /// `BlockEntityDestroyedEvent` carrying the last state.

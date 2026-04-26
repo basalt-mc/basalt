@@ -2,7 +2,10 @@
 //!
 //! [`WorldHandle`] is the abstract interface plugins use to access world
 //! state from anywhere -- captured in system closures, stored in plugin
-//! state, shared across threads. Distinct from
+//! state. The trait itself does not require `Send + Sync` -- concrete
+//! implementors that need to be shared across threads (e.g.
+//! `basalt_world::World` wrapped in `Arc`) satisfy these bounds
+//! independently. Distinct from
 //! [`WorldContext`](crate::context::WorldContext) which extends this trait
 //! with dispatch-only methods (response queueing).
 //!

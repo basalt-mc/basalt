@@ -13,8 +13,8 @@ use basalt_types::{TextComponent, Uuid};
 
 /// A no-op [`Context`] implementation for unit tests.
 ///
-/// All methods are stubs that do nothing and return sensible defaults.
-/// The world is a shared memory-only instance (seed 42).
+/// All methods are stubs that return sensible defaults (air for blocks,
+/// no collision, no block entities).
 pub struct NoopContext;
 
 impl PlayerContext for NoopContext {
@@ -102,7 +102,7 @@ impl WorldHandle for NoopContext {
 impl WorldContext for NoopContext {
     fn send_block_ack(&self, _sequence: i32) {}
     fn stream_chunks(&self, _cx: i32, _cz: i32) {}
-    fn persist_chunk(&self, _cx: i32, _cz: i32) {}
+    fn queue_persist_chunk(&self, _cx: i32, _cz: i32) {}
     fn destroy_block_entity(&self, _x: i32, _y: i32, _z: i32) {}
 }
 
