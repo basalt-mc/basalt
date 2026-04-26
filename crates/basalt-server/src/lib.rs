@@ -19,6 +19,7 @@
 //! ```
 
 pub mod config;
+pub mod context;
 pub mod error;
 mod game;
 mod helpers;

@@ -5,10 +5,10 @@
 //! (`has`, `unlocked`) hit the snapshot of the player's
 //! [`KnownRecipes`] captured at context construction.
 
-use crate::context::{RecipeContext, UnlockReason};
+use basalt_api::context::{RecipeContext, Response, UnlockReason};
 use basalt_recipes::RecipeId;
 
-use super::{Response, ServerContext};
+use super::ServerContext;
 
 impl RecipeContext for ServerContext {
     fn unlock(&self, id: &RecipeId, reason: UnlockReason) {

@@ -1,12 +1,11 @@
 //! WorldHandle and WorldContext implementations for ServerContext.
 
-use crate::components::{BlockPosition, ChunkPosition};
-use crate::context::WorldContext;
-use crate::world::collision::{Aabb, RayHit};
-use crate::world::handle::WorldHandle;
+use basalt_api::components::{BlockPosition, ChunkPosition};
+use basalt_api::context::{Response, WorldContext};
+use basalt_api::world::collision::{Aabb, RayHit};
+use basalt_api::world::handle::WorldHandle;
 
 use super::ServerContext;
-use super::response::Response;
 
 impl WorldHandle for ServerContext {
     fn get_block(&self, x: i32, y: i32, z: i32) -> u16 {
@@ -49,7 +48,7 @@ impl WorldHandle for ServerContext {
     }
 
     fn check_overlap(&self, aabb: &Aabb) -> bool {
-        crate::world::collision::check_overlap(&self.world, aabb)
+        basalt_api::world::collision::check_overlap(&self.world, aabb)
     }
 
     fn ray_cast(
@@ -58,11 +57,11 @@ impl WorldHandle for ServerContext {
         direction: (f64, f64, f64),
         max_distance: f64,
     ) -> Option<RayHit> {
-        crate::world::collision::ray_cast(&self.world, origin, direction, max_distance)
+        basalt_api::world::collision::ray_cast(&self.world, origin, direction, max_distance)
     }
 
     fn resolve_movement(&self, aabb: &Aabb, dx: f64, dy: f64, dz: f64) -> (f64, f64, f64) {
-        crate::world::collision::resolve_movement(&self.world, aabb, dx, dy, dz)
+        basalt_api::world::collision::resolve_movement(&self.world, aabb, dx, dy, dz)
     }
 }
 

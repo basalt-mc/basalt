@@ -8,7 +8,7 @@ use std::fmt;
 
 /// A logger scoped to a specific plugin.
 ///
-/// Obtained via [`ServerContext::logger()`](crate::ServerContext::logger).
+/// Obtained via [`Context::logger()`](crate::context::Context::logger).
 /// All messages are logged with target `basalt::plugin::<name>`,
 /// making them easy to filter in log output.
 ///

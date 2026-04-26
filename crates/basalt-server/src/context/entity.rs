@@ -1,11 +1,10 @@
 //! EntityContext implementation for ServerContext.
 
-use crate::broadcast::BroadcastMessage;
-use crate::components::BlockPosition;
-use crate::context::EntityContext;
+use basalt_api::broadcast::BroadcastMessage;
+use basalt_api::components::BlockPosition;
+use basalt_api::context::{EntityContext, Response};
 
 use super::ServerContext;
-use super::response::Response;
 
 impl EntityContext for ServerContext {
     fn spawn_dropped_item(&self, x: i32, y: i32, z: i32, item_id: i32, count: i32) {
@@ -49,7 +48,7 @@ impl EntityContext for ServerContext {
     fn broadcast_player_joined(&self) {
         self.responses
             .push(Response::Broadcast(BroadcastMessage::PlayerJoined {
-                info: crate::broadcast::PlayerSnapshot {
+                info: basalt_api::broadcast::PlayerSnapshot {
                     username: self.player.username.clone(),
                     uuid: self.player.uuid,
                     entity_id: self.player.entity_id,

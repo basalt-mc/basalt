@@ -2,15 +2,14 @@
 
 use std::sync::Arc;
 
-use crate::broadcast::BroadcastMessage;
-use crate::components::Rotation;
-use crate::context::Context;
-use crate::gamemode::Gamemode;
-use crate::player::PlayerInfo;
+use basalt_api::broadcast::BroadcastMessage;
+use basalt_api::components::Rotation;
+use basalt_api::context::{Context, Response};
+use basalt_api::gamemode::Gamemode;
+use basalt_api::player::PlayerInfo;
 use basalt_types::Uuid;
 
 use super::ServerContext;
-use super::response::Response;
 
 fn test_world() -> Arc<basalt_world::World> {
     Arc::new(basalt_world::World::new_memory(42))
@@ -27,7 +26,7 @@ fn test_ctx() -> ServerContext {
                 yaw: 0.0,
                 pitch: 0.0,
             },
-            position: crate::components::Position {
+            position: basalt_api::components::Position {
                 x: 0.0,
                 y: 64.0,
                 z: 0.0,
@@ -108,7 +107,7 @@ fn context_trait_is_usable_as_dyn() {
 
 #[test]
 fn recipes_unlock_queues_response() {
-    use crate::context::UnlockReason;
+    use basalt_api::context::UnlockReason;
     use basalt_recipes::RecipeId;
 
     let ctx = test_ctx();
@@ -146,7 +145,7 @@ fn recipes_lock_queues_response() {
 
 #[test]
 fn recipes_has_reads_snapshot() {
-    use crate::components::KnownRecipes;
+    use basalt_api::components::KnownRecipes;
     use basalt_recipes::RecipeId;
 
     let id = RecipeId::vanilla("oak_planks");
@@ -163,7 +162,7 @@ fn recipes_has_reads_snapshot() {
                 yaw: 0.0,
                 pitch: 0.0,
             },
-            position: crate::components::Position {
+            position: basalt_api::components::Position {
                 x: 0.0,
                 y: 64.0,
                 z: 0.0,

@@ -1,11 +1,10 @@
 //! ChatContext implementation for ServerContext.
 
-use crate::broadcast::BroadcastMessage;
-use crate::context::ChatContext;
+use basalt_api::broadcast::BroadcastMessage;
+use basalt_api::context::{ChatContext, Response};
 use basalt_types::TextComponent;
 
 use super::ServerContext;
-use super::response::Response;
 
 impl ChatContext for ServerContext {
     fn send(&self, text: &str) {

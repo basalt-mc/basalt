@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
+use crate::context::ServerContext;
 use basalt_api::Event;
-use basalt_api::context::ServerContext;
 use basalt_api::events::{BlockBrokenEvent, BlockPlacedEvent, PlayerInteractEvent};
 use basalt_types::Uuid;
 

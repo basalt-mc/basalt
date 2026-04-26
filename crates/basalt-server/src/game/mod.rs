@@ -201,7 +201,7 @@ impl GameLoop {
     pub(super) fn dispatch_event(
         &self,
         event: &mut dyn basalt_api::Event,
-        ctx: &basalt_api::context::ServerContext,
+        ctx: &crate::context::ServerContext,
     ) {
         let ctx_dyn: &dyn basalt_api::context::Context = ctx;
         if self.crash_on_plugin_panic {
@@ -333,7 +333,7 @@ pub(super) mod tests {
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::with_vanilla();
-        let bootstrap_ctx = basalt_api::context::ServerContext::new(
+        let bootstrap_ctx = crate::context::ServerContext::new(
             Arc::clone(&world),
             basalt_api::player::PlayerInfo::stub(),
         );

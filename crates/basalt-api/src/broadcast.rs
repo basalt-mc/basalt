@@ -52,8 +52,8 @@ pub struct PlayerSnapshot {
 ///
 /// Sent through the `broadcast::Sender` and received by each player's
 /// `broadcast::Receiver` in their play loop. Plugins use
-/// [`ServerContext::broadcast`](crate::ServerContext::broadcast) to
-/// send these.
+/// [`ChatContext::broadcast`](crate::context::ChatContext::broadcast)
+/// to send these.
 #[derive(Debug, Clone)]
 pub enum BroadcastMessage {
     /// A chat message to display in all players' chat windows.
