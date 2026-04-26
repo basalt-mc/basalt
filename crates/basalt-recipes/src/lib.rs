@@ -10,15 +10,17 @@
 //!
 //! # Design
 //!
-//! - **Zero dependencies**: pure Rust data structures and matching logic.
 //! - **Static lifetime**: all recipe data lives in read-only program memory.
 //! - **No serde**: recipes are baked in at compile time via codegen, not
 //!   loaded from files at runtime.
 
 pub mod generated;
-pub mod id;
+mod handle;
 pub mod registry;
 
 pub use generated::{SHAPED_RECIPES, SHAPELESS_RECIPES, ShapedRecipe, ShapelessRecipe};
-pub use id::RecipeId;
-pub use registry::{OwnedShapedRecipe, OwnedShapelessRecipe, Recipe, RecipeRegistry};
+pub use registry::RecipeRegistry;
+
+// Re-export from basalt-api so existing `basalt_recipes::Recipe` paths
+// in basalt-server keep working.
+pub use basalt_api::recipes::{OwnedShapedRecipe, OwnedShapelessRecipe, Recipe, RecipeId};

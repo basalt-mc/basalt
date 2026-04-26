@@ -12,7 +12,7 @@ pub mod response;
 pub use response::Response;
 pub use response::ResponseQueue;
 
-use basalt_recipes::RecipeId;
+use crate::recipes::RecipeId;
 use basalt_types::{TextComponent, Uuid};
 
 use crate::broadcast::BroadcastMessage;

@@ -107,7 +107,6 @@ name = "basalt-api"
 version = "0.1.0"
 dependencies = [
  "basalt-protocol",
- "basalt-recipes",
  "basalt-types",
  "log",
 ]
@@ -239,6 +238,9 @@ dependencies = [
 [[package]]
 name = "basalt-recipes"
 version = "0.1.0"
+dependencies = [
+ "basalt-api",
+]
 
 [[package]]
 name = "basalt-server"

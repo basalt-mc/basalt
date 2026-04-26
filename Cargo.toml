@@ -11,9 +11,9 @@ repository = "https://github.com/basalt-mc/basalt"
 
 [workspace.dependencies]
 # Internal crates
-basalt-types = { path = "crates/basalt-types" }
-basalt-derive = { path = "crates/basalt-derive" }
-basalt-protocol = { path = "crates/basalt-protocol" }
+basalt-types = { path = "crates/basalt-types", version = "0.1.0" }
+basalt-derive = { path = "crates/basalt-derive", version = "0.1.0" }
+basalt-protocol = { path = "crates/basalt-protocol", version = "0.1.0" }
 basalt-net = { path = "crates/basalt-net" }
 basalt-server = { path = "crates/basalt-server" }
 basalt-world = { path = "crates/basalt-world" }

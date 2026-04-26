@@ -19,17 +19,14 @@
 //! would only spam handlers without serving a use case.
 
 pub mod handle;
+pub mod id;
+pub mod types;
+
 pub use handle::RecipeRegistryHandle;
+pub use id::RecipeId;
+pub use types::{OwnedShapedRecipe, OwnedShapelessRecipe, Recipe};
 
 use crate::events::{Event, EventBus};
-
-// Re-export the underlying recipe types so plugins can refer to them
-// from `basalt_api::recipes` without depending on `basalt-recipes`
-// directly.
-pub use basalt_recipes::{
-    OwnedShapedRecipe, OwnedShapelessRecipe, Recipe, RecipeId, RecipeRegistry,
-};
-
 use crate::events::{RecipeRegisterEvent, RecipeRegisteredEvent, RecipeUnregisteredEvent};
 
 /// Plugin-facing handle to the recipe registry with event dispatch.
@@ -176,7 +173,7 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
 
     use crate::events::Stage;
-    use crate::testing::NoopContext;
+    use crate::testing::{MockRecipeRegistry, NoopContext};
 
     use super::*;
 
@@ -202,7 +199,7 @@ mod tests {
 
     #[test]
     fn add_shaped_dispatches_register_then_registered() {
-        let mut registry = RecipeRegistry::empty();
+        let mut registry = MockRecipeRegistry::new();
         let mut bus = EventBus::new();
         let ctx = NoopContext;
 
@@ -237,7 +234,7 @@ mod tests {
 
     #[test]
     fn add_shaped_cancellation_skips_insert_and_post() {
-        let mut registry = RecipeRegistry::empty();
+        let mut registry = MockRecipeRegistry::new();
         let mut bus = EventBus::new();
         let ctx = NoopContext;
 
@@ -270,7 +267,7 @@ mod tests {
 
     #[test]
     fn add_shapeless_round_trip() {
-        let mut registry = RecipeRegistry::empty();
+        let mut registry = MockRecipeRegistry::new();
         let mut bus = EventBus::new();
         let ctx = NoopContext;
 
@@ -285,7 +282,7 @@ mod tests {
 
     #[test]
     fn remove_by_id_dispatches_unregistered() {
-        let mut registry = RecipeRegistry::empty();
+        let mut registry = MockRecipeRegistry::new();
         registry.add_shaped(shaped("temp"));
 
         let mut bus = EventBus::new();
@@ -311,7 +308,7 @@ mod tests {
 
     #[test]
     fn remove_by_id_missing_does_not_dispatch() {
-        let mut registry = RecipeRegistry::empty();
+        let mut registry = MockRecipeRegistry::new();
         let mut bus = EventBus::new();
         let ctx = NoopContext;
         let unreg_seen = Arc::new(AtomicU32::new(0));
@@ -333,7 +330,7 @@ mod tests {
 
     #[test]
     fn remove_by_result_dispatches_per_removed() {
-        let mut registry = RecipeRegistry::empty();
+        let mut registry = MockRecipeRegistry::new();
         registry.add_shaped(shaped("a"));
         registry.add_shaped(shaped("b"));
         // Both produce result_id 42 (shaped helper).
@@ -359,7 +356,7 @@ mod tests {
 
     #[test]
     fn clear_dispatches_per_recipe() {
-        let mut registry = RecipeRegistry::empty();
+        let mut registry = MockRecipeRegistry::new();
         registry.add_shaped(shaped("a"));
         registry.add_shapeless(shapeless("b"));
 
@@ -386,7 +383,7 @@ mod tests {
 
     #[test]
     fn registrar_accessors_expose_underlying_state() {
-        let mut registry = RecipeRegistry::empty();
+        let mut registry = MockRecipeRegistry::new();
         let mut bus = EventBus::new();
         let ctx = NoopContext;
         let mut registrar = RecipeRegistrar::new(
