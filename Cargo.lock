@@ -109,7 +109,6 @@ dependencies = [
  "basalt-protocol",
  "basalt-recipes",
  "basalt-types",
- "basalt-world",
  "log",
 ]
 
@@ -296,6 +295,7 @@ dependencies = [
 name = "basalt-world"
 version = "0.1.0"
 dependencies = [
+ "basalt-api",
  "basalt-storage",
  "basalt-types",
  "dashmap",

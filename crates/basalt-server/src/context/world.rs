@@ -21,7 +21,7 @@ impl WorldHandle for ServerContext {
         x: i32,
         y: i32,
         z: i32,
-    ) -> Option<basalt_world::block_entity::BlockEntity> {
+    ) -> Option<basalt_api::world::block_entity::BlockEntity> {
         self.world.get_block_entity(x, y, z).map(|r| r.clone())
     }
 
@@ -30,7 +30,7 @@ impl WorldHandle for ServerContext {
         x: i32,
         y: i32,
         z: i32,
-        entity: basalt_world::block_entity::BlockEntity,
+        entity: basalt_api::world::block_entity::BlockEntity,
     ) {
         self.world.set_block_entity(x, y, z, entity);
     }
@@ -48,7 +48,7 @@ impl WorldHandle for ServerContext {
     }
 
     fn check_overlap(&self, aabb: &Aabb) -> bool {
-        basalt_api::world::collision::check_overlap(&self.world, aabb)
+        basalt_api::world::collision::check_overlap(&*self.world, aabb)
     }
 
     fn ray_cast(
@@ -57,11 +57,11 @@ impl WorldHandle for ServerContext {
         direction: (f64, f64, f64),
         max_distance: f64,
     ) -> Option<RayHit> {
-        basalt_api::world::collision::ray_cast(&self.world, origin, direction, max_distance)
+        basalt_api::world::collision::ray_cast(&*self.world, origin, direction, max_distance)
     }
 
     fn resolve_movement(&self, aabb: &Aabb, dx: f64, dy: f64, dz: f64) -> (f64, f64, f64) {
-        basalt_api::world::collision::resolve_movement(&self.world, aabb, dx, dy, dz)
+        basalt_api::world::collision::resolve_movement(&*self.world, aabb, dx, dy, dz)
     }
 }
 

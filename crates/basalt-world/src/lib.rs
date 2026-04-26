@@ -9,8 +9,6 @@
 //! global `Mutex`. Each chunk is independently lockable, so players
 //! streaming different chunks don't block each other.
 
-pub mod block;
-pub mod block_entity;
 pub mod chunk;
 pub mod format;
 mod generator;
@@ -21,6 +19,7 @@ pub use chunk::ChunkColumn;
 pub use generator::FlatWorldGenerator;
 pub use noise_gen::NoiseTerrainGenerator;
 
+mod handle;
 mod world;
 
 pub use world::World;

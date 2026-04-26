@@ -2,8 +2,8 @@
 
 use crate::components::BlockPosition;
 use crate::container::{ContainerBacking, InventoryType};
+use crate::world::block_entity::BlockEntity;
 use basalt_types::Slot;
-use basalt_world::block_entity::BlockEntity;
 
 // ---------------------------------------------------------------------------
 // Helper enums

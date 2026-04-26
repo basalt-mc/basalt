@@ -4,10 +4,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use basalt_storage::RegionStorage;
 use dashmap::DashMap;
 
-use crate::block_entity::BlockEntity;
 use crate::chunk::ChunkColumn;
 use crate::generator::FlatWorldGenerator;
 use crate::noise_gen::NoiseTerrainGenerator;
+use basalt_api::world::block_entity::BlockEntity;
 
 /// Default maximum number of cached chunks when not configured.
 const DEFAULT_MAX_CHUNKS: usize = 4096;
@@ -441,56 +441,59 @@ mod tests {
         // Load chunk first
         world.with_chunk(0, 0, |_| {});
         // Modify a block
-        world.set_block(5, 64, 3, crate::block::STONE);
-        assert_eq!(world.get_block(5, 64, 3), crate::block::STONE);
+        world.set_block(5, 64, 3, basalt_api::world::block::STONE);
+        assert_eq!(world.get_block(5, 64, 3), basalt_api::world::block::STONE);
     }
 
     #[test]
     fn set_block_generates_chunk_if_needed() {
         let world = World::new_memory(42);
         assert!(!world.is_chunk_loaded(5, 5));
-        world.set_block(80, 64, 80, crate::block::STONE); // chunk (5, 5)
+        world.set_block(80, 64, 80, basalt_api::world::block::STONE); // chunk (5, 5)
         assert!(world.is_chunk_loaded(5, 5));
-        assert_eq!(world.get_block(80, 64, 80), crate::block::STONE);
+        assert_eq!(world.get_block(80, 64, 80), basalt_api::world::block::STONE);
     }
 
     #[test]
     fn get_block_reads_generated_terrain() {
         let world = World::flat();
         // Flat world: bedrock at y=-64
-        assert_eq!(world.get_block(0, -64, 0), crate::block::BEDROCK);
-        assert_eq!(world.get_block(0, -60, 0), crate::block::AIR);
+        assert_eq!(
+            world.get_block(0, -64, 0),
+            basalt_api::world::block::BEDROCK
+        );
+        assert_eq!(world.get_block(0, -60, 0), basalt_api::world::block::AIR);
     }
 
     #[test]
     fn set_block_negative_coordinates() {
         let world = World::new_memory(42);
-        world.set_block(-5, 64, -10, crate::block::DIRT);
-        assert_eq!(world.get_block(-5, 64, -10), crate::block::DIRT);
+        world.set_block(-5, 64, -10, basalt_api::world::block::DIRT);
+        assert_eq!(world.get_block(-5, 64, -10), basalt_api::world::block::DIRT);
     }
 
     #[test]
     fn persist_chunk_writes_to_disk() {
         let dir = tempfile::tempdir().unwrap();
         let world = World::new(42, dir.path());
-        world.set_block(0, 100, 0, crate::block::STONE);
+        world.set_block(0, 100, 0, basalt_api::world::block::STONE);
         world.persist_chunk(0, 0);
 
         // Load from fresh world — should read from disk
         let world2 = World::new(42, dir.path());
-        assert_eq!(world2.get_block(0, 100, 0), crate::block::STONE);
+        assert_eq!(world2.get_block(0, 100, 0), basalt_api::world::block::STONE);
     }
 
     #[test]
     fn set_block_without_persist_is_memory_only() {
         let dir = tempfile::tempdir().unwrap();
         let world = World::new(42, dir.path());
-        world.set_block(0, 100, 0, crate::block::STONE);
+        world.set_block(0, 100, 0, basalt_api::world::block::STONE);
         // No persist_chunk call
 
         // Fresh world should NOT see the change
         let world2 = World::new(42, dir.path());
-        assert_ne!(world2.get_block(0, 100, 0), crate::block::STONE);
+        assert_ne!(world2.get_block(0, 100, 0), basalt_api::world::block::STONE);
     }
 
     #[test]
@@ -514,7 +517,7 @@ mod tests {
         let world = World::new_with_capacity(42, dir.path(), 3);
 
         // Load and modify chunk (0,0)
-        world.set_block(0, 100, 0, crate::block::STONE);
+        world.set_block(0, 100, 0, basalt_api::world::block::STONE);
 
         // Load 4 more chunks to trigger eviction of (0,0)
         for i in 1..5 {
@@ -523,7 +526,7 @@ mod tests {
 
         // (0,0) should have been evicted and persisted
         let world2 = World::new(42, dir.path());
-        assert_eq!(world2.get_block(0, 100, 0), crate::block::STONE);
+        assert_eq!(world2.get_block(0, 100, 0), basalt_api::world::block::STONE);
     }
 
     #[test]

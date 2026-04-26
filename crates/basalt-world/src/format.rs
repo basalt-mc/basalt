@@ -16,9 +16,9 @@
 //!     block_data: [u16; 4096]  — raw block state IDs (8KB)
 //! ```
 
-use crate::block_entity::BlockEntity;
 use crate::chunk::{ChunkColumn, SECTIONS_PER_CHUNK};
 use crate::palette::PalettedContainer;
+use basalt_api::world::block_entity::BlockEntity;
 
 /// Section type: all blocks are the same state.
 const SECTION_SINGLE_VALUE: u8 = 0;
@@ -35,7 +35,7 @@ pub fn serialize_chunk(chunk: &ChunkColumn) -> Vec<u8> {
     // Section bitmap — which sections have non-air data
     let mut bitmap: u32 = 0;
     for (i, section) in chunk.sections.iter().enumerate() {
-        if section.single_value() != Some(crate::block::AIR) {
+        if section.single_value() != Some(basalt_api::world::block::AIR) {
             bitmap |= 1 << i;
         }
     }
@@ -234,7 +234,7 @@ pub fn deserialize_chunk_with_cursor(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block;
+    use basalt_api::world::block;
 
     #[test]
     fn empty_chunk_roundtrip() {

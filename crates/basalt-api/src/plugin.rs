@@ -59,10 +59,9 @@ pub struct CommandEntry {
 /// which loop handles their events.
 ///
 /// World and recipe fields are trait objects so that basalt-api does not
-/// depend on the concrete `basalt_world::World` or
-/// `basalt_recipes::RecipeRegistry` types at the struct level. Call
-/// sites coerce concrete types to the trait objects when constructing
-/// the registrar.
+/// depend on concrete runtime types at the struct level. Call sites
+/// coerce concrete types to the trait objects when constructing the
+/// registrar.
 pub struct PluginRegistrar<'a> {
     /// Event bus for the network loop (movement, chat, commands).
     instant_bus: &'a mut EventBus,
@@ -370,7 +369,8 @@ mod tests {
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::empty();
-        let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
+        let world = std::sync::Arc::new(crate::testing::MockWorld::flat())
+            as std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>;
         let ctx = NoopContext;
         {
             let mut registrar = PluginRegistrar::new(
@@ -397,7 +397,8 @@ mod tests {
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::empty();
-        let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
+        let world = std::sync::Arc::new(crate::testing::MockWorld::flat())
+            as std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>;
         let ctx = NoopContext;
         {
             let mut registrar = PluginRegistrar::new(
@@ -431,7 +432,8 @@ mod tests {
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::empty();
-        let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
+        let world = std::sync::Arc::new(crate::testing::MockWorld::flat())
+            as std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>;
         let ctx = NoopContext;
         {
             let mut registrar = PluginRegistrar::new(
@@ -468,7 +470,8 @@ mod tests {
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::empty();
-        let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
+        let world = std::sync::Arc::new(crate::testing::MockWorld::flat())
+            as std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>;
         let ctx = NoopContext;
         {
             let mut registrar = PluginRegistrar::new(
@@ -503,7 +506,8 @@ mod tests {
         let mut commands = Vec::new();
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::empty();
-        let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
+        let world = std::sync::Arc::new(crate::testing::MockWorld::flat())
+            as std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>;
         let ctx = NoopContext;
 
         let post_seen = Arc::new(AtomicU32::new(0));
