@@ -19,12 +19,36 @@ pub enum BlockEntity {
     },
 }
 
+/// Type discriminator for [`BlockEntity`].
+///
+/// A small `Copy`/`Eq`/`Hash` enum used to identify the kind of a
+/// block entity without owning its data. Use [`BlockEntity::kind`] to
+/// extract the discriminator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BlockEntityKind {
+    /// A chest block entity.
+    Chest,
+}
+
 impl BlockEntity {
     /// Creates a new empty chest block entity.
     pub fn empty_chest() -> Self {
         Self::Chest {
             slots: Box::new(std::array::from_fn(|_| Slot::empty())),
         }
+    }
+
+    /// Returns the [`BlockEntityKind`] discriminator.
+    pub fn kind(&self) -> BlockEntityKind {
+        match self {
+            Self::Chest { .. } => BlockEntityKind::Chest,
+        }
+    }
+}
+
+impl From<&BlockEntity> for BlockEntityKind {
+    fn from(be: &BlockEntity) -> Self {
+        be.kind()
     }
 }
 
@@ -41,5 +65,12 @@ mod tests {
                 assert!(slots.iter().all(|s| s.is_empty()));
             }
         }
+    }
+
+    #[test]
+    fn empty_chest_has_chest_kind() {
+        let be = BlockEntity::empty_chest();
+        assert_eq!(be.kind(), BlockEntityKind::Chest);
+        assert_eq!(BlockEntityKind::from(&be), BlockEntityKind::Chest);
     }
 }
