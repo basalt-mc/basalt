@@ -18,6 +18,9 @@
 //! handler is registered, so retroactively dispatching 1557 events
 //! would only spam handlers without serving a use case.
 
+pub mod handle;
+pub use handle::RecipeRegistryHandle;
+
 use crate::events::{Event, EventBus};
 
 // Re-export the underlying recipe types so plugins can refer to them
@@ -27,19 +30,18 @@ pub use basalt_recipes::{
     OwnedShapedRecipe, OwnedShapelessRecipe, Recipe, RecipeId, RecipeRegistry,
 };
 
-use crate::context::ServerContext;
 use crate::events::{RecipeRegisterEvent, RecipeRegisteredEvent, RecipeUnregisteredEvent};
 
 /// Plugin-facing handle to the recipe registry with event dispatch.
 ///
-/// Holds mutable references to the registry and the game event bus,
-/// plus a shared reference to a stub dispatch context. Every mutation
-/// method dispatches the appropriate lifecycle event and respects
-/// Validate-stage cancellation.
+/// Holds mutable references to a [`RecipeRegistryHandle`] trait object
+/// and the game event bus, plus a shared reference to a dispatch
+/// context. Every mutation method dispatches the appropriate lifecycle
+/// event and respects Validate-stage cancellation.
 pub struct RecipeRegistrar<'a> {
-    registry: &'a mut RecipeRegistry,
+    registry: &'a mut dyn RecipeRegistryHandle,
     bus: &'a mut EventBus,
-    ctx: &'a ServerContext,
+    ctx: &'a dyn crate::context::Context,
 }
 
 impl<'a> RecipeRegistrar<'a> {
@@ -47,9 +49,9 @@ impl<'a> RecipeRegistrar<'a> {
     ///
     /// Internal — called by [`PluginRegistrar::recipes`](crate::PluginRegistrar::recipes).
     pub(crate) fn new(
-        registry: &'a mut RecipeRegistry,
+        registry: &'a mut dyn RecipeRegistryHandle,
         bus: &'a mut EventBus,
-        ctx: &'a ServerContext,
+        ctx: &'a dyn crate::context::Context,
     ) -> Self {
         Self { registry, bus, ctx }
     }
@@ -66,8 +68,7 @@ impl<'a> RecipeRegistrar<'a> {
             recipe: Recipe::Shaped(recipe),
             cancelled: false,
         };
-        self.bus
-            .dispatch(&mut event, self.ctx as &dyn crate::context::Context);
+        self.bus.dispatch(&mut event, self.ctx);
         if event.is_cancelled() {
             return false;
         }
@@ -80,8 +81,7 @@ impl<'a> RecipeRegistrar<'a> {
             }
         }
         let mut post = RecipeRegisteredEvent { recipe_id: id };
-        self.bus
-            .dispatch(&mut post, self.ctx as &dyn crate::context::Context);
+        self.bus.dispatch(&mut post, self.ctx);
         true
     }
 
@@ -96,8 +96,7 @@ impl<'a> RecipeRegistrar<'a> {
             recipe: Recipe::Shapeless(recipe),
             cancelled: false,
         };
-        self.bus
-            .dispatch(&mut event, self.ctx as &dyn crate::context::Context);
+        self.bus.dispatch(&mut event, self.ctx);
         if event.is_cancelled() {
             return false;
         }
@@ -106,8 +105,7 @@ impl<'a> RecipeRegistrar<'a> {
             Recipe::Shaped(_) => return false,
         }
         let mut post = RecipeRegisteredEvent { recipe_id: id };
-        self.bus
-            .dispatch(&mut post, self.ctx as &dyn crate::context::Context);
+        self.bus.dispatch(&mut post, self.ctx);
         true
     }
 
@@ -121,8 +119,7 @@ impl<'a> RecipeRegistrar<'a> {
             let mut event = RecipeUnregisteredEvent {
                 recipe_id: id.clone(),
             };
-            self.bus
-                .dispatch(&mut event, self.ctx as &dyn crate::context::Context);
+            self.bus.dispatch(&mut event, self.ctx);
             true
         } else {
             false
@@ -137,8 +134,7 @@ impl<'a> RecipeRegistrar<'a> {
         let count = removed.len();
         for recipe_id in removed {
             let mut event = RecipeUnregisteredEvent { recipe_id };
-            self.bus
-                .dispatch(&mut event, self.ctx as &dyn crate::context::Context);
+            self.bus.dispatch(&mut event, self.ctx);
         }
         count
     }
@@ -149,18 +145,28 @@ impl<'a> RecipeRegistrar<'a> {
         let removed = self.registry.clear();
         for recipe_id in removed {
             let mut event = RecipeUnregisteredEvent { recipe_id };
-            self.bus
-                .dispatch(&mut event, self.ctx as &dyn crate::context::Context);
+            self.bus.dispatch(&mut event, self.ctx);
         }
     }
 
-    /// Returns a read-only view of the underlying registry.
-    ///
-    /// Useful for plugins that need to enumerate or query the registry
-    /// without mutating it (e.g. count vanilla recipes, check
-    /// existence of an id before registering).
-    pub fn registry(&self) -> &RecipeRegistry {
-        self.registry
+    /// Returns `true` if the registry contains a recipe with the given id.
+    pub fn contains(&self, id: &RecipeId) -> bool {
+        self.registry.contains(id)
+    }
+
+    /// Returns a clone of the recipe with the given id, or `None`.
+    pub fn get(&self, id: &RecipeId) -> Option<Recipe> {
+        self.registry.find_by_id(id)
+    }
+
+    /// Returns the number of registered shaped recipes.
+    pub fn shaped_count(&self) -> usize {
+        self.registry.shaped_count()
+    }
+
+    /// Returns the number of registered shapeless recipes.
+    pub fn shapeless_count(&self) -> usize {
+        self.registry.shapeless_count()
     }
 }
 
@@ -170,15 +176,9 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
 
     use crate::events::Stage;
+    use crate::testing::NoopContext;
 
     use super::*;
-
-    fn ctx() -> ServerContext {
-        ServerContext::new(
-            Arc::new(basalt_world::World::new_memory(42)),
-            crate::player::PlayerInfo::stub(),
-        )
-    }
 
     fn shaped(path: &str) -> OwnedShapedRecipe {
         OwnedShapedRecipe {
@@ -204,7 +204,7 @@ mod tests {
     fn add_shaped_dispatches_register_then_registered() {
         let mut registry = RecipeRegistry::empty();
         let mut bus = EventBus::new();
-        let ctx = ctx();
+        let ctx = NoopContext;
 
         let validate_seen: Arc<AtomicU32> = Arc::new(AtomicU32::new(0));
         let post_seen = Arc::new(AtomicU32::new(0));
@@ -222,7 +222,11 @@ mod tests {
             });
         }
 
-        let mut registrar = RecipeRegistrar::new(&mut registry, &mut bus, &ctx);
+        let mut registrar = RecipeRegistrar::new(
+            &mut registry as &mut dyn RecipeRegistryHandle,
+            &mut bus,
+            &ctx as &dyn crate::context::Context,
+        );
         let inserted = registrar.add_shaped(shaped("magic_sword"));
 
         assert!(inserted);
@@ -235,7 +239,7 @@ mod tests {
     fn add_shaped_cancellation_skips_insert_and_post() {
         let mut registry = RecipeRegistry::empty();
         let mut bus = EventBus::new();
-        let ctx = ctx();
+        let ctx = NoopContext;
 
         bus.on::<RecipeRegisterEvent>(Stage::Validate, 0, |event, _| {
             event.cancel();
@@ -249,7 +253,11 @@ mod tests {
             });
         }
 
-        let mut registrar = RecipeRegistrar::new(&mut registry, &mut bus, &ctx);
+        let mut registrar = RecipeRegistrar::new(
+            &mut registry as &mut dyn RecipeRegistryHandle,
+            &mut bus,
+            &ctx as &dyn crate::context::Context,
+        );
         let inserted = registrar.add_shaped(shaped("forbidden"));
 
         assert!(
@@ -264,15 +272,15 @@ mod tests {
     fn add_shapeless_round_trip() {
         let mut registry = RecipeRegistry::empty();
         let mut bus = EventBus::new();
-        let ctx = ctx();
+        let ctx = NoopContext;
 
-        let mut registrar = RecipeRegistrar::new(&mut registry, &mut bus, &ctx);
-        assert!(registrar.add_shapeless(shapeless("bread")));
-        assert!(
-            registrar
-                .registry()
-                .contains(&RecipeId::new("plugin", "bread"))
+        let mut registrar = RecipeRegistrar::new(
+            &mut registry as &mut dyn RecipeRegistryHandle,
+            &mut bus,
+            &ctx as &dyn crate::context::Context,
         );
+        assert!(registrar.add_shapeless(shapeless("bread")));
+        assert!(registrar.contains(&RecipeId::new("plugin", "bread")));
     }
 
     #[test]
@@ -281,7 +289,7 @@ mod tests {
         registry.add_shaped(shaped("temp"));
 
         let mut bus = EventBus::new();
-        let ctx = ctx();
+        let ctx = NoopContext;
         let unreg_seen = Arc::new(AtomicU32::new(0));
         {
             let u = Arc::clone(&unreg_seen);
@@ -290,7 +298,11 @@ mod tests {
             });
         }
 
-        let mut registrar = RecipeRegistrar::new(&mut registry, &mut bus, &ctx);
+        let mut registrar = RecipeRegistrar::new(
+            &mut registry as &mut dyn RecipeRegistryHandle,
+            &mut bus,
+            &ctx as &dyn crate::context::Context,
+        );
         let id = RecipeId::new("plugin", "temp");
         assert!(registrar.remove_by_id(&id));
         assert_eq!(unreg_seen.load(Ordering::Relaxed), 1);
@@ -301,7 +313,7 @@ mod tests {
     fn remove_by_id_missing_does_not_dispatch() {
         let mut registry = RecipeRegistry::empty();
         let mut bus = EventBus::new();
-        let ctx = ctx();
+        let ctx = NoopContext;
         let unreg_seen = Arc::new(AtomicU32::new(0));
         {
             let u = Arc::clone(&unreg_seen);
@@ -310,7 +322,11 @@ mod tests {
             });
         }
 
-        let mut registrar = RecipeRegistrar::new(&mut registry, &mut bus, &ctx);
+        let mut registrar = RecipeRegistrar::new(
+            &mut registry as &mut dyn RecipeRegistryHandle,
+            &mut bus,
+            &ctx as &dyn crate::context::Context,
+        );
         assert!(!registrar.remove_by_id(&RecipeId::new("plugin", "missing")));
         assert_eq!(unreg_seen.load(Ordering::Relaxed), 0);
     }
@@ -323,7 +339,7 @@ mod tests {
         // Both produce result_id 42 (shaped helper).
 
         let mut bus = EventBus::new();
-        let ctx = ctx();
+        let ctx = NoopContext;
         let unreg_seen = Arc::new(AtomicU32::new(0));
         {
             let u = Arc::clone(&unreg_seen);
@@ -332,7 +348,11 @@ mod tests {
             });
         }
 
-        let mut registrar = RecipeRegistrar::new(&mut registry, &mut bus, &ctx);
+        let mut registrar = RecipeRegistrar::new(
+            &mut registry as &mut dyn RecipeRegistryHandle,
+            &mut bus,
+            &ctx as &dyn crate::context::Context,
+        );
         assert_eq!(registrar.remove_by_result(42), 2);
         assert_eq!(unreg_seen.load(Ordering::Relaxed), 2);
     }
@@ -344,7 +364,7 @@ mod tests {
         registry.add_shapeless(shapeless("b"));
 
         let mut bus = EventBus::new();
-        let ctx = ctx();
+        let ctx = NoopContext;
         let unreg_seen = Arc::new(AtomicU32::new(0));
         {
             let u = Arc::clone(&unreg_seen);
@@ -353,7 +373,11 @@ mod tests {
             });
         }
 
-        let mut registrar = RecipeRegistrar::new(&mut registry, &mut bus, &ctx);
+        let mut registrar = RecipeRegistrar::new(
+            &mut registry as &mut dyn RecipeRegistryHandle,
+            &mut bus,
+            &ctx as &dyn crate::context::Context,
+        );
         registrar.clear();
         assert_eq!(unreg_seen.load(Ordering::Relaxed), 2);
         assert_eq!(registry.shaped_count(), 0);
@@ -361,13 +385,17 @@ mod tests {
     }
 
     #[test]
-    fn registry_view_exposes_underlying_state() {
+    fn registrar_accessors_expose_underlying_state() {
         let mut registry = RecipeRegistry::empty();
         let mut bus = EventBus::new();
-        let ctx = ctx();
-        let mut registrar = RecipeRegistrar::new(&mut registry, &mut bus, &ctx);
-        assert_eq!(registrar.registry().shaped_count(), 0);
+        let ctx = NoopContext;
+        let mut registrar = RecipeRegistrar::new(
+            &mut registry as &mut dyn RecipeRegistryHandle,
+            &mut bus,
+            &ctx as &dyn crate::context::Context,
+        );
+        assert_eq!(registrar.shaped_count(), 0);
         registrar.add_shaped(shaped("only"));
-        assert_eq!(registrar.registry().shaped_count(), 1);
+        assert_eq!(registrar.shaped_count(), 1);
     }
 }

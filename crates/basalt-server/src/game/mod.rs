@@ -343,9 +343,9 @@ pub(super) mod tests {
                 &mut bus,
                 &mut commands,
                 &mut systems,
-                Arc::clone(&world),
-                &mut recipes,
-                &bootstrap_ctx,
+                Arc::clone(&world) as Arc<dyn basalt_api::world::handle::WorldHandle + Send + Sync>,
+                &mut recipes as &mut dyn basalt_api::recipes::RecipeRegistryHandle,
+                &bootstrap_ctx as &dyn basalt_api::context::Context,
             );
             basalt_plugin_block::BlockPlugin.on_enable(&mut registrar);
             basalt_plugin_item::ItemPlugin.on_enable(&mut registrar);

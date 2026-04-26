@@ -83,9 +83,10 @@ impl ServerState {
                 &mut game_bus,
                 &mut commands,
                 &mut systems,
-                std::sync::Arc::clone(&world),
-                &mut recipes,
-                &bootstrap_ctx,
+                std::sync::Arc::clone(&world)
+                    as std::sync::Arc<dyn basalt_api::world::handle::WorldHandle + Send + Sync>,
+                &mut recipes as &mut dyn basalt_api::recipes::RecipeRegistryHandle,
+                &bootstrap_ctx as &dyn basalt_api::context::Context,
             );
             for plugin in &plugins {
                 log::info!(target: "basalt::plugin", "Enabling {} v{}", plugin.metadata().name, plugin.metadata().version);

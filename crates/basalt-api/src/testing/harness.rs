@@ -74,9 +74,9 @@ impl PluginTestHarness {
             &mut self.game_bus,
             &mut self.commands,
             &mut systems,
-            Arc::clone(&self.world),
-            &mut self.recipes,
-            &bootstrap_ctx,
+            Arc::clone(&self.world) as Arc<dyn crate::world::handle::WorldHandle + Send + Sync>,
+            &mut self.recipes as &mut dyn crate::recipes::RecipeRegistryHandle,
+            &bootstrap_ctx as &dyn crate::context::Context,
         );
         plugin.on_enable(&mut registrar);
     }
