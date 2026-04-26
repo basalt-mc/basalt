@@ -143,11 +143,220 @@ impl Default for EventBus {
 
 #[cfg(test)]
 mod tests {
-    // EventBus tests are temporarily disabled — they used arbitrary
-    // context types like () or stub structs as the C type parameter.
-    // After dropping the generic C parameter, the bus requires &dyn
-    // Context. These tests are restored in Task 9 once MockContext
-    // is defined as part of the testing harness rewrite.
-    //
-    // See docs/superpowers/plans/2026-04-26-finish-api-standalone.md Task 9.
+    use super::*;
+    use crate::events::traits::BusKind;
+    use crate::testing::noop::NoopContext;
+    use std::any::Any;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicI32, Ordering};
+
+    // -- Test event types --
+
+    struct CounterEvent {
+        value: i32,
+        cancelled: bool,
+    }
+
+    impl Event for CounterEvent {
+        fn is_cancelled(&self) -> bool {
+            self.cancelled
+        }
+        fn cancel(&mut self) {
+            self.cancelled = true;
+        }
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+        fn bus_kind(&self) -> BusKind {
+            BusKind::Game
+        }
+    }
+
+    struct OtherEvent;
+
+    impl Event for OtherEvent {
+        fn is_cancelled(&self) -> bool {
+            false
+        }
+        fn cancel(&mut self) {}
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+        fn bus_kind(&self) -> BusKind {
+            BusKind::Game
+        }
+    }
+
+    #[test]
+    fn dispatch_runs_handlers_in_priority_order() {
+        let mut bus = EventBus::new();
+        let order = Arc::new(std::sync::Mutex::new(Vec::<i32>::new()));
+
+        for &priority in &[10, 5, 1, 20] {
+            let order_ref = Arc::clone(&order);
+            bus.on::<CounterEvent>(Stage::Process, priority, move |_, _| {
+                order_ref.lock().unwrap().push(priority);
+            });
+        }
+
+        let mut event = CounterEvent {
+            value: 0,
+            cancelled: false,
+        };
+        bus.dispatch(&mut event, &NoopContext);
+
+        assert_eq!(*order.lock().unwrap(), vec![1, 5, 10, 20]);
+    }
+
+    #[test]
+    fn dispatch_skips_post_when_cancelled_in_validate() {
+        let mut bus = EventBus::new();
+        let post_ran = Arc::new(AtomicI32::new(0));
+
+        bus.on::<CounterEvent>(Stage::Validate, 0, |event, _| {
+            event.cancel();
+        });
+        let post_ref = Arc::clone(&post_ran);
+        bus.on::<CounterEvent>(Stage::Post, 0, move |_, _| {
+            post_ref.fetch_add(1, Ordering::Relaxed);
+        });
+
+        let mut event = CounterEvent {
+            value: 0,
+            cancelled: false,
+        };
+        bus.dispatch(&mut event, &NoopContext);
+
+        assert_eq!(post_ran.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn dispatch_skips_process_when_cancelled_in_validate() {
+        let mut bus = EventBus::new();
+        let process_ran = Arc::new(AtomicI32::new(0));
+
+        bus.on::<CounterEvent>(Stage::Validate, 0, |event, _| {
+            event.cancel();
+        });
+        let proc_ref = Arc::clone(&process_ran);
+        bus.on::<CounterEvent>(Stage::Process, 0, move |_, _| {
+            proc_ref.fetch_add(1, Ordering::Relaxed);
+        });
+
+        let mut event = CounterEvent {
+            value: 0,
+            cancelled: false,
+        };
+        bus.dispatch(&mut event, &NoopContext);
+
+        assert_eq!(process_ran.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn dispatch_runs_remaining_validate_handlers_after_cancel() {
+        let mut bus = EventBus::new();
+        let count = Arc::new(AtomicI32::new(0));
+
+        // Priority 0: cancel early
+        bus.on::<CounterEvent>(Stage::Validate, 0, |event, _| {
+            event.cancel();
+        });
+        // Priority 1: should still run (same stage, higher priority value)
+        let c = Arc::clone(&count);
+        bus.on::<CounterEvent>(Stage::Validate, 1, move |_, _| {
+            c.fetch_add(1, Ordering::Relaxed);
+        });
+
+        let mut event = CounterEvent {
+            value: 0,
+            cancelled: false,
+        };
+        bus.dispatch(&mut event, &NoopContext);
+
+        assert_eq!(count.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn dispatch_with_no_handlers_is_noop() {
+        let bus = EventBus::new();
+        let mut event = CounterEvent {
+            value: 42,
+            cancelled: false,
+        };
+        bus.dispatch(&mut event, &NoopContext);
+        assert_eq!(event.value, 42);
+    }
+
+    #[test]
+    fn handlers_for_different_events_are_isolated() {
+        let mut bus = EventBus::new();
+        let counter_ran = Arc::new(AtomicI32::new(0));
+        let other_ran = Arc::new(AtomicI32::new(0));
+
+        let cr = Arc::clone(&counter_ran);
+        bus.on::<CounterEvent>(Stage::Process, 0, move |_, _| {
+            cr.fetch_add(1, Ordering::Relaxed);
+        });
+        let or = Arc::clone(&other_ran);
+        bus.on::<OtherEvent>(Stage::Process, 0, move |_, _| {
+            or.fetch_add(1, Ordering::Relaxed);
+        });
+
+        let mut counter = CounterEvent {
+            value: 0,
+            cancelled: false,
+        };
+        bus.dispatch(&mut counter, &NoopContext);
+
+        assert_eq!(counter_ran.load(Ordering::Relaxed), 1);
+        assert_eq!(other_ran.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn dispatch_dyn_routes_by_runtime_type_id() {
+        let mut bus = EventBus::new();
+        let count = Arc::new(AtomicI32::new(0));
+
+        let c = Arc::clone(&count);
+        bus.on::<CounterEvent>(Stage::Process, 0, move |_, _| {
+            c.fetch_add(1, Ordering::Relaxed);
+        });
+
+        let mut event: Box<dyn Event> = Box::new(CounterEvent {
+            value: 0,
+            cancelled: false,
+        });
+        bus.dispatch_dyn(&mut *event, &NoopContext);
+        assert_eq!(count.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn event_type_count_tracks_distinct_types() {
+        let mut bus = EventBus::new();
+        assert_eq!(bus.event_type_count(), 0);
+
+        bus.on::<CounterEvent>(Stage::Process, 0, |_, _| {});
+        assert_eq!(bus.event_type_count(), 1);
+
+        bus.on::<CounterEvent>(Stage::Post, 0, |_, _| {});
+        assert_eq!(bus.event_type_count(), 1);
+
+        bus.on::<OtherEvent>(Stage::Process, 0, |_, _| {});
+        assert_eq!(bus.event_type_count(), 2);
+    }
+
+    #[test]
+    fn handler_count_sums_across_types_and_stages() {
+        let mut bus = EventBus::new();
+        bus.on::<CounterEvent>(Stage::Process, 0, |_, _| {});
+        bus.on::<CounterEvent>(Stage::Post, 0, |_, _| {});
+        bus.on::<OtherEvent>(Stage::Process, 0, |_, _| {});
+        assert_eq!(bus.handler_count(), 3);
+    }
 }
