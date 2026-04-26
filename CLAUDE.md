@@ -15,7 +15,7 @@ Eleven crates in `crates/` (infrastructure), ten plugin crates in `plugins/` (fe
 
 ```
 basalt-derive ─┐
-basalt-types ──┴→ basalt-protocol
+basalt-types ──┴→ basalt-mc-protocol
         │              │
         └──→ basalt-api ←──── basalt-world ←──── basalt-server
                   ↑                  ↑               ↑
@@ -23,14 +23,14 @@ basalt-types ──┴→ basalt-protocol
                                  basalt-storage   basalt-ecs
 ```
 
-`basalt-api` is the standalone foundation crate. Its only `basalt-*` dependency is the optional `basalt-protocol` (gated behind the `raw-packets` feature). `basalt-world` and `basalt-recipes` depend ON `basalt-api`, not the reverse.
+`basalt-api` is the standalone foundation crate. Its only `basalt-*` dependency is the optional `basalt-mc-protocol` (gated behind the `raw-packets` feature). `basalt-world` and `basalt-recipes` depend ON `basalt-api`, not the reverse.
 
 | Crate | Purpose | Key dependencies |
 |-------|---------|-----------------|
 | `basalt-types` | Primitive Minecraft types, `Encode`/`Decode`/`EncodedSize` traits | `thiserror` |
 | `basalt-derive` | Proc macros for `Encode`/`Decode`/`EncodedSize` | `syn`, `quote`, `proc-macro2` |
-| `basalt-protocol` | Packet definitions, version-aware registry, registry data | `basalt-types`, `basalt-derive` |
-| `basalt-net` | Async networking, encryption, compression, connection typestate, middleware pipeline | `basalt-protocol`, `tokio`, `aes`, `cfb8`, `flate2` |
+| `basalt-mc-protocol` | Packet definitions, version-aware registry, registry data | `basalt-types`, `basalt-derive` |
+| `basalt-net` | Async networking, encryption, compression, connection typestate, middleware pipeline | `basalt-mc-protocol`, `tokio`, `aes`, `cfb8`, `flate2` |
 | `basalt-events` | Generic event bus with staged handler dispatch (Validate → Process → Post) | none |
 | `basalt-core` | Context trait, component types, SystemContext, Phase, shared types | `basalt-types`, `basalt-world` |
 | `basalt-command` | Typed argument API (Arg, Validation, parsing), `Command` trait | `basalt-core` |
@@ -70,7 +70,7 @@ Plugin crates under `plugins/`:
 - `basalt-api` provides the `Context` trait, `Plugin` trait, `PluginRegistrar` with fluent command builder (`.command("tp").arg("pos", Arg::Vec3).handler(...)`), `WorldHandle`/`RecipeRegistryHandle` trait abstractions, block/block_entity data types, recipe data types, collision algorithms, and built-in testing mocks (`MockWorld`, `MockRecipeRegistry`). `ServerContext` (the production `Context` impl) lives in `basalt-server`.
 - `basalt-server` owns `ServerContext` (the production `Context` implementation). Builds the DeclareCommands Brigadier tree from registered command args, handles TabComplete requests, and dispatches commands with auto-parsing/validation.
 - Plugin crates depend only on `basalt-api`. External plugins follow the same pattern as built-in ones.
-- `xtask` is a standalone binary that generates code into `basalt-protocol`.
+- `xtask` is a standalone binary that generates code into `basalt-mc-protocol`.
 
 ### basalt-events architecture
 
@@ -305,11 +305,11 @@ Serialization works on `&[u8]` / `&mut Vec<u8>` — sync byte slices, no async. 
 
 ### Per-crate ownership
 
-Each crate owns its types, errors, tests, and benchmarks. There is no shared `common` crate. Error types are per-crate: `basalt_types::Error`, `basalt_protocol::Error`, `basalt_net::Error`. Higher crates wrap lower errors via `#[from]`.
+Each crate owns its types, errors, tests, and benchmarks. There is no shared `common` crate. Error types are per-crate: `basalt_types::Error`, `basalt_mc_protocol::Error`, `basalt_net::Error`. Higher crates wrap lower errors via `#[from]`.
 
 ### Sync by default, async at the boundary
 
-`basalt-types` and `basalt-protocol` are fully synchronous. Async is introduced only in `basalt-net` for IO. This keeps the core testable without async runtimes.
+`basalt-types` and `basalt-mc-protocol` are fully synchronous. Async is introduced only in `basalt-net` for IO. This keeps the core testable without async runtimes.
 
 ### Multi-version without duplication
 
@@ -338,7 +338,7 @@ basalt/
 ├── crates/                   # Infrastructure (never optional)
 │   ├── basalt-types/
 │   ├── basalt-derive/
-│   ├── basalt-protocol/
+│   ├── basalt-mc-protocol/
 │   ├── basalt-net/
 │   ├── basalt-events/         # Event bus with staged handler dispatch (Validate/Process/Post)
 │   ├── basalt-core/           # Context trait, components, SystemContext, shared types
@@ -457,7 +457,7 @@ cargo xt codegen              # Regenerate all packets
 make codegen                  # Same + cargo fmt
 ```
 
-After running codegen, the generated files in `crates/basalt-protocol/src/packets/` must be committed. CI runs a codegen drift check on PRs to catch uncommitted changes.
+After running codegen, the generated files in `crates/basalt-mc-protocol/src/packets/` must be committed. CI runs a codegen drift check on PRs to catch uncommitted changes.
 
 ## Derive macros
 
