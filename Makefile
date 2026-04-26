@@ -43,6 +43,7 @@ release:
 	@test -n "$(VERSION)" || (echo "Usage: make release VERSION=x.y.z" && exit 1)
 	@echo "Releasing v$(VERSION)..."
 	sed -i.bak 's/^version = ".*"/version = "$(VERSION)"/' Cargo.toml && rm Cargo.toml.bak
+	sed -i.bak -E 's/^(basalt-[a-z]+ = \{ path = "crates\/basalt-[a-z]+", version = ")[^"]*"/\1$(VERSION)"/' Cargo.toml && rm Cargo.toml.bak
 	cargo check --workspace --lib --bins --examples
 	git-cliff --tag "v$(VERSION)" --output CHANGELOG.md
 	git add Cargo.toml CHANGELOG.md

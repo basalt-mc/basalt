@@ -17,7 +17,7 @@ basalt-protocol = { path = "crates/basalt-protocol", version = "0.1.0" }
 basalt-net = { path = "crates/basalt-net" }
 basalt-server = { path = "crates/basalt-server" }
 basalt-world = { path = "crates/basalt-world" }
-basalt-api = { path = "crates/basalt-api" }
+basalt-api = { path = "crates/basalt-api", version = "0.1.0" }
 basalt-storage = { path = "crates/basalt-storage" }
 basalt-ecs = { path = "crates/basalt-ecs" }
 basalt-recipes = { path = "crates/basalt-recipes" }
