@@ -78,13 +78,7 @@ pub enum ContainerClickType {
     OffhandSwap,
 }
 
-/// Identifies the kind of block entity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BlockEntityKind {
-    /// A chest (single or part of a double chest).
-    Chest,
-    // Future: Furnace, Hopper, ShulkerBox, BrewingStand, etc.
-}
+pub use crate::world::block_entity::BlockEntityKind;
 
 // ---------------------------------------------------------------------------
 // Container lifecycle events
