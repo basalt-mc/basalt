@@ -19,129 +19,101 @@ A Minecraft server written from scratch in Rust. No wrappers, no JVM, no legacy 
 
 **Hackable.** The plugin API is the same for built-in and external plugins. There's no backdoor. Register event handlers, declare typed commands with tab-completion, access the world. If a built-in plugin does it, your plugin can too.
 
-**Tested.** 600+ tests, property-based fuzzing on protocol decoders, 90%+ code coverage enforced in CI. The protocol layer is generated from [PrismarineJS/minecraft-data](https://github.com/PrismarineJS/minecraft-data), so packet definitions stay in sync with the real protocol.
+**Tested.** 1100+ tests, property-based fuzzing on protocol decoders, 90%+ code coverage enforced in CI. The protocol layer is generated from [PrismarineJS/minecraft-data](https://github.com/PrismarineJS/minecraft-data), so packet definitions stay in sync with the real protocol.
 
 ---
 
 ## Status
 
-Basalt is in **active early development**. It's not ready for production, but it works.
+Basalt is in **active early development**. Production-ready for hobbyist servers and plugin experimentation; not yet for high-traffic public servers.
 
-**What works today:**
+**What you can do today:**
 
-- Full protocol flow: handshake, login, configuration, play (Minecraft 1.21.4)
-- World generation with Perlin noise terrain (hills, water, beaches)
-- Block breaking and placing with persistence to disk
-- Chat, commands (`/tp`, `/gamemode`, `/say`, `/help`, `/kick`, `/list`, `/stop`)
-- Multi-player: player join/leave, movement broadcast, skin loading
-- Chunk streaming on movement with LRU cache and configurable memory limit
-- Plugin system with three-stage event bus (Validate, Process, Post)
+- Connect a vanilla Minecraft 1.21.4 client
+- Explore procedurally generated terrain (hills, water, beaches)
+- Break and place blocks — the world persists to disk
+- Chat with other players in real time
+- Use built-in commands: `/tp`, `/gamemode`, `/say`, `/help`, `/kick`, `/list`, `/stop`
+- Open chests (single + double), drop items into the world
+- Craft items at a crafting table (full recipe matching engine)
+- Enable or disable any feature via plugin config — disabled = zero cost
 
-**What's missing:**
+**What's coming next:**
 
-- Entities (mobs, items, projectiles)
-- Combat and survival mechanics
-- Inventory and crafting
+- Mobs, projectiles, other entities
+- Combat (damage, fall damage, PvP)
+- Online mode (real Mojang authentication)
+- Multi-version support (1.21.0 – 1.21.11)
 - Redstone and block updates
-- Multi-version support (only 1.21.4 for now)
-- Authentication (offline mode only)
 
 ---
 
 ## Roadmap
 
-Two major architecture pieces are designed and ready to implement:
+**Multi-Version Protocol Support** — One server, many client versions. Each connection picks a protocol adapter at handshake time that translates packet IDs and registry data; game logic stays version-agnostic. Players on 1.21.0 through 1.21.11 share the same world.
 
-### Server Runtime Architecture
+**Entity simulation** — Mobs, projectiles, dropped items with AI running on parallel ticks. The game loop simulates the world; players never wait on simulation lag.
 
-Transform Basalt from a reactive server (packet in, response out) into a tick-based game server with active simulation. A dedicated **network loop** handles player-facing responsiveness (movement, chat, commands) while a separate **game loop** runs physics, AI, and world simulation at 20 TPS. Heavy systems (pathfinding, AI evaluation) are parallelized on a thread pool. Even under heavy simulation load, players can still move and chat without lag.
-
-### Multi-Version Protocol Support
-
-Accept clients from 1.21.0 through 1.21.11 simultaneously. Each connection gets a protocol adapter selected at handshake time that translates packet IDs, block states, and registry data. The game logic runs one version; only the wire format adapts. Built on a code-generation pipeline that produces per-version packet definitions, ID mappings, and block state tables from minecraft-data.
+**Online mode** — Real Mojang authentication and end-to-end encryption.
 
 ---
 
 ## Quick Start
 
-**Requirements:** Rust 1.85+ (edition 2024), Git.
+**Run a server**
 
 ```bash
-# Clone
 git clone https://github.com/basalt-mc/basalt.git
 cd basalt
-
-# Build
-cargo build --release
-
-# Run
 cargo run --release --package basalt-server --example server
 ```
 
 Connect with a Minecraft 1.21.4 client to `localhost:25565`.
 
----
+**Develop a plugin**
 
-## Configuration
-
-Create a `basalt.toml` in the working directory. All fields are optional; missing values use sensible defaults.
-
-```toml
-[server]
-bind = "0.0.0.0:25565"
-log_level = "info"       # trace, debug, info, warn, error
-
-[server.performance]
-chunk_cache_max_entries = 4096  # ~768 MB max. Each chunk ~ 192 KB.
-
-[world]
-seed = 42
-storage = "read-write"   # "none" | "read-only" | "read-write"
-
-[plugins]
-chat = true
-command = true
-block = true
-world = true
-lifecycle = true
-movement = true
+```bash
+cargo new --lib my-plugin
+cd my-plugin
+cargo add basalt-api
 ```
 
-Disable plugins you don't need. A lobby server might only enable `chat`, `command`, and `lifecycle`.
+Implement the `Plugin` trait, register event handlers and commands, link into a server. Full example: [basalt-example-plugin](https://github.com/basalt-mc/basalt-example-plugin).
+
+Requirements: Rust 1.85+.
 
 ---
 
-## Project Structure
+## Plugin Development
 
+Basalt's plugin API ships as a single crate on crates.io: [`basalt-api`](https://crates.io/crates/basalt-api). External plugins add it as a dependency and get the same surface as built-in plugins — there's no privileged backdoor.
+
+```rust
+use basalt_api::prelude::*;
+
+pub struct GreeterPlugin;
+
+impl Plugin for GreeterPlugin {
+    fn metadata(&self) -> PluginMetadata {
+        PluginMetadata {
+            name: "greeter",
+            version: "0.1.0",
+            author: Some("you"),
+            dependencies: &[],
+        }
+    }
+
+    fn on_enable(&self, registrar: &mut PluginRegistrar) {
+        registrar.on::<ChatMessageEvent>(Stage::Process, 0, |event, ctx| {
+            if event.message.starts_with("!hello") {
+                ctx.chat().broadcast(&format!("Hi {}!", ctx.player().username()));
+            }
+        });
+    }
+}
 ```
-basalt/
-  crates/
-    basalt-types      # Protocol primitives (VarInt, NBT, Slot, Position...)
-    basalt-derive      # Proc macros for Encode/Decode
-    basalt-mc-protocol # Packet definitions, generated from minecraft-data
-    basalt-net         # Async networking (TCP, encryption, compression)
-    basalt-events      # Generic event bus with staged dispatch
-    basalt-core        # Shared traits (Context, Gamemode, PluginLogger)
-    basalt-command     # Typed command arguments and parsing
-    basalt-api         # Standalone plugin API (Plugin trait, events, WorldHandle)
-    basalt-world       # World runtime, chunk cache, paletted containers
-    basalt-recipes     # Recipe registry, vanilla recipe data
-    basalt-storage     # BSR region file format with LZ4 compression
-    basalt-server      # Server runtime: game loop, net tasks, ServerContext
-  plugins/
-    chat/              # Chat broadcast
-    command/           # /tp, /gamemode, /say, /help, /stop, /kick, /list
-    block/             # Block breaking and placing
-    world/             # Chunk streaming
-    storage/           # Chunk persistence
-    lifecycle/         # Join/leave broadcast
-    movement/          # Position broadcast
-    physics/           # Gravity, AABB collision
-    item/              # Item drops on block break
-    container/         # Chest interaction, double chests
-  fuzz/                # Fuzz targets for protocol decoders
-  xtask/               # Code generation from minecraft-data
-```
+
+Full API docs: [docs.rs/basalt-api](https://docs.rs/basalt-api). The plugin lifecycle (`Validate` → `Process` → `Post`), typed command args with tab-completion, and handle-based world access are all documented there.
 
 ---
 
