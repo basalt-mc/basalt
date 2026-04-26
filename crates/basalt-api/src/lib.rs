@@ -50,7 +50,7 @@ pub mod world;
 pub use basalt_protocol::packets;
 
 // Top-level re-exports for non-prelude usage.
-pub use context::{Response, ServerContext};
+pub use context::Response;
 pub use events::{Event, EventBus, Stage};
 pub use plugin::{CommandEntry, Plugin, PluginMetadata, PluginRegistrar};
 
@@ -65,7 +65,7 @@ pub use plugin::{CommandEntry, Plugin, PluginMetadata, PluginRegistrar};
 /// ```
 pub mod prelude {
     // Plugin registration
-    pub use crate::context::{Response, ServerContext};
+    pub use crate::context::Response;
     pub use crate::plugin::{Plugin, PluginMetadata, PluginRegistrar};
 
     // Context traits

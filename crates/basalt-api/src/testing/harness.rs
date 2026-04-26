@@ -3,16 +3,380 @@
 //! Provides [`PluginTestHarness`] for event-based plugin testing and
 //! [`SystemTestContext`] for ECS system plugin testing.
 
+use std::cell::RefCell;
 use std::sync::Arc;
 
-use crate::components::Rotation;
-use crate::context::ServerContext;
+use crate::broadcast::BroadcastMessage;
+use crate::components::{KnownRecipes, Rotation};
+use crate::context::{
+    ChatContext, ContainerContext, Context, EntityContext, PlayerContext, RecipeContext, Response,
+    ResponseQueue, UnlockReason, WorldContext,
+};
 use crate::events::{BusKind, EventRouting};
+use crate::gamemode::Gamemode;
+use crate::logger::PluginLogger;
 use crate::player::PlayerInfo;
 use crate::plugin::PluginRegistrar;
-use crate::{Event, EventBus, Plugin, Response, Stage};
-use basalt_types::Uuid;
+use crate::testing::noop::NoopContext;
+use crate::world::collision::{Aabb, RayHit};
+use crate::world::handle::WorldHandle;
+use crate::{Event, EventBus, Plugin, Stage};
+use basalt_recipes::RecipeId;
+use basalt_types::{Slot, TextComponent, Uuid};
 use basalt_world::World;
+
+// ── HarnessContext ──────────────────────────────────────────────────
+
+/// Lightweight context for the test harness.
+///
+/// Mirrors the production `ServerContext` (in basalt-server) but lives
+/// in basalt-api so the harness does not depend on basalt-server. It
+/// implements [`Context`] and all sub-context traits with real
+/// response queueing and world delegation, which is all the harness
+/// needs for event dispatch assertions.
+struct HarnessContext {
+    /// Shared world reference for block access and chunk persistence.
+    world: Arc<World>,
+    /// Queue for deferred async responses.
+    responses: ResponseQueue,
+    /// Identity and state of the player who triggered this action.
+    player: PlayerInfo,
+    /// Snapshot of the player's known recipes.
+    known_recipes: KnownRecipes,
+    /// Name of the plugin currently being dispatched.
+    plugin_name: RefCell<String>,
+    /// Registered command list (name, description) for /help.
+    command_list: RefCell<Vec<(String, String)>>,
+}
+
+impl HarnessContext {
+    /// Creates a new harness context for a single event dispatch.
+    fn new(world: Arc<World>, player: PlayerInfo) -> Self {
+        Self {
+            world,
+            responses: ResponseQueue::new(),
+            player,
+            known_recipes: KnownRecipes::default(),
+            plugin_name: RefCell::new(String::new()),
+            command_list: RefCell::new(Vec::new()),
+        }
+    }
+
+    /// Sets the registered command list for /help.
+    fn set_command_list(&self, commands: Vec<(String, String)>) {
+        *self.command_list.borrow_mut() = commands;
+    }
+
+    /// Drains all queued responses.
+    fn drain_responses(&self) -> Vec<Response> {
+        self.responses.drain()
+    }
+}
+
+impl PlayerContext for HarnessContext {
+    fn uuid(&self) -> Uuid {
+        self.player.uuid
+    }
+    fn entity_id(&self) -> i32 {
+        self.player.entity_id
+    }
+    fn username(&self) -> &str {
+        &self.player.username
+    }
+    fn yaw(&self) -> f32 {
+        self.player.rotation.yaw
+    }
+    fn pitch(&self) -> f32 {
+        self.player.rotation.pitch
+    }
+    fn position(&self) -> (f64, f64, f64) {
+        let p = self.player.position;
+        (p.x, p.y, p.z)
+    }
+    fn teleport(&self, x: f64, y: f64, z: f64, yaw: f32, pitch: f32) {
+        use std::sync::atomic::{AtomicI32, Ordering};
+        static TELEPORT_COUNTER: AtomicI32 = AtomicI32::new(1);
+        let teleport_id = TELEPORT_COUNTER.fetch_add(1, Ordering::Relaxed);
+        self.responses.push(Response::SendPosition {
+            teleport_id,
+            position: crate::components::Position { x, y, z },
+            rotation: Rotation { yaw, pitch },
+        });
+    }
+    fn set_gamemode(&self, mode: Gamemode) {
+        self.responses.push(Response::SendGameStateChange {
+            reason: 3,
+            value: mode.id() as f32,
+        });
+    }
+    fn registered_commands(&self) -> Vec<(String, String)> {
+        self.command_list.borrow().clone()
+    }
+}
+
+impl ChatContext for HarnessContext {
+    fn send(&self, text: &str) {
+        let component = TextComponent::text(text);
+        self.send_component(&component);
+    }
+    fn send_component(&self, component: &TextComponent) {
+        self.responses.push(Response::SendSystemChat {
+            content: component.to_nbt(),
+            action_bar: false,
+        });
+    }
+    fn action_bar(&self, text: &str) {
+        let component = TextComponent::text(text);
+        self.responses.push(Response::SendSystemChat {
+            content: component.to_nbt(),
+            action_bar: true,
+        });
+    }
+    fn broadcast(&self, text: &str) {
+        let component = TextComponent::text(text);
+        self.broadcast_component(&component);
+    }
+    fn broadcast_component(&self, component: &TextComponent) {
+        self.responses
+            .push(Response::Broadcast(BroadcastMessage::Chat {
+                content: component.to_nbt(),
+            }));
+    }
+}
+
+impl WorldHandle for HarnessContext {
+    fn get_block(&self, x: i32, y: i32, z: i32) -> u16 {
+        self.world.get_block(x, y, z)
+    }
+    fn set_block(&self, x: i32, y: i32, z: i32, state: u16) {
+        self.world.set_block(x, y, z, state);
+    }
+    fn get_block_entity(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> Option<basalt_world::block_entity::BlockEntity> {
+        self.world.get_block_entity(x, y, z).map(|r| r.clone())
+    }
+    fn set_block_entity(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+        entity: basalt_world::block_entity::BlockEntity,
+    ) {
+        self.world.set_block_entity(x, y, z, entity);
+    }
+    fn mark_chunk_dirty(&self, cx: i32, cz: i32) {
+        self.world.mark_chunk_dirty(cx, cz);
+    }
+    fn persist_chunk(&self, cx: i32, cz: i32) {
+        self.world.persist_chunk(cx, cz);
+    }
+    fn dirty_chunks(&self) -> Vec<(i32, i32)> {
+        self.world.dirty_chunks()
+    }
+    fn check_overlap(&self, aabb: &Aabb) -> bool {
+        crate::world::collision::check_overlap(&self.world, aabb)
+    }
+    fn ray_cast(
+        &self,
+        origin: (f64, f64, f64),
+        direction: (f64, f64, f64),
+        max_distance: f64,
+    ) -> Option<RayHit> {
+        crate::world::collision::ray_cast(&self.world, origin, direction, max_distance)
+    }
+    fn resolve_movement(&self, aabb: &Aabb, dx: f64, dy: f64, dz: f64) -> (f64, f64, f64) {
+        crate::world::collision::resolve_movement(&self.world, aabb, dx, dy, dz)
+    }
+}
+
+impl WorldContext for HarnessContext {
+    fn send_block_ack(&self, sequence: i32) {
+        self.responses.push(Response::SendBlockAck { sequence });
+    }
+    fn stream_chunks(&self, cx: i32, cz: i32) {
+        self.responses
+            .push(Response::StreamChunks(crate::components::ChunkPosition {
+                x: cx,
+                z: cz,
+            }));
+    }
+    fn queue_persist_chunk(&self, cx: i32, cz: i32) {
+        self.responses
+            .push(Response::PersistChunk(crate::components::ChunkPosition {
+                x: cx,
+                z: cz,
+            }));
+    }
+    fn destroy_block_entity(&self, x: i32, y: i32, z: i32) {
+        self.responses.push(Response::DestroyBlockEntity {
+            position: crate::components::BlockPosition { x, y, z },
+        });
+    }
+}
+
+impl EntityContext for HarnessContext {
+    fn spawn_dropped_item(&self, x: i32, y: i32, z: i32, item_id: i32, count: i32) {
+        self.responses.push(Response::SpawnDroppedItem {
+            position: crate::components::BlockPosition { x, y, z },
+            item_id,
+            count,
+        });
+    }
+    fn broadcast_block_change(&self, x: i32, y: i32, z: i32, block_state: i32) {
+        self.responses
+            .push(Response::Broadcast(BroadcastMessage::BlockChanged {
+                x,
+                y,
+                z,
+                block_state,
+            }));
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn broadcast_entity_moved(
+        &self,
+        entity_id: i32,
+        x: f64,
+        y: f64,
+        z: f64,
+        yaw: f32,
+        pitch: f32,
+        on_ground: bool,
+    ) {
+        self.responses
+            .push(Response::Broadcast(BroadcastMessage::EntityMoved {
+                entity_id,
+                x,
+                y,
+                z,
+                yaw,
+                pitch,
+                on_ground,
+            }));
+    }
+    fn broadcast_player_joined(&self) {
+        self.responses
+            .push(Response::Broadcast(BroadcastMessage::PlayerJoined {
+                info: crate::broadcast::PlayerSnapshot {
+                    username: self.player.username.clone(),
+                    uuid: self.player.uuid,
+                    entity_id: self.player.entity_id,
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                    yaw: self.player.rotation.yaw,
+                    pitch: self.player.rotation.pitch,
+                    skin_properties: Vec::new(),
+                },
+            }));
+    }
+    fn broadcast_player_left(&self) {
+        self.responses
+            .push(Response::Broadcast(BroadcastMessage::PlayerLeft {
+                uuid: self.player.uuid,
+                entity_id: self.player.entity_id,
+                username: self.player.username.clone(),
+            }));
+    }
+    fn broadcast_raw(&self, msg: BroadcastMessage) {
+        self.responses.push(Response::Broadcast(msg));
+    }
+    fn broadcast_block_action(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+        action_id: u8,
+        action_param: u8,
+        block_id: i32,
+    ) {
+        self.responses.push(Response::BroadcastBlockAction {
+            position: crate::components::BlockPosition { x, y, z },
+            action_id,
+            action_param,
+            block_id,
+        });
+    }
+}
+
+impl ContainerContext for HarnessContext {
+    fn open_chest(&self, x: i32, y: i32, z: i32) {
+        self.responses
+            .push(Response::OpenChest(crate::components::BlockPosition {
+                x,
+                y,
+                z,
+            }));
+    }
+    fn open_crafting_table(&self, x: i32, y: i32, z: i32) {
+        self.responses.push(Response::OpenCraftingTable {
+            position: crate::components::BlockPosition { x, y, z },
+        });
+    }
+    fn open(&self, container: &crate::container::Container) {
+        self.responses
+            .push(Response::OpenContainer(container.clone()));
+    }
+    fn notify_viewers(&self, x: i32, y: i32, z: i32, slot_index: i16, item: Slot) {
+        self.responses.push(Response::NotifyContainerViewers {
+            position: crate::components::BlockPosition { x, y, z },
+            slot_index,
+            item,
+        });
+    }
+}
+
+impl RecipeContext for HarnessContext {
+    fn unlock(&self, id: &RecipeId, reason: UnlockReason) {
+        self.responses.push(Response::UnlockRecipe {
+            recipe_id: id.clone(),
+            reason,
+        });
+    }
+    fn lock(&self, id: &RecipeId) {
+        self.responses.push(Response::LockRecipe {
+            recipe_id: id.clone(),
+        });
+    }
+    fn has(&self, id: &RecipeId) -> bool {
+        self.known_recipes.has(id)
+    }
+    fn unlocked(&self) -> Vec<RecipeId> {
+        self.known_recipes
+            .iter()
+            .map(|(id, _)| id.clone())
+            .collect()
+    }
+}
+
+impl Context for HarnessContext {
+    fn logger(&self) -> PluginLogger {
+        PluginLogger::new(&self.plugin_name.borrow())
+    }
+    fn player(&self) -> &dyn PlayerContext {
+        self
+    }
+    fn chat(&self) -> &dyn ChatContext {
+        self
+    }
+    fn world_ctx(&self) -> &dyn WorldContext {
+        self
+    }
+    fn entities(&self) -> &dyn EntityContext {
+        self
+    }
+    fn containers(&self) -> &dyn ContainerContext {
+        self
+    }
+    fn recipes(&self) -> &dyn RecipeContext {
+        self
+    }
+}
+
+// ── PluginTestHarness ───────────────────────────────────────────────
 
 /// Test harness for plugin development.
 ///
@@ -62,13 +426,13 @@ impl PluginTestHarness {
 
     /// Registers a plugin's event handlers and commands.
     ///
-    /// Builds a stub `ServerContext` so that any registry-lifecycle
-    /// events fired during `on_enable` (e.g. `RecipeRegisteredEvent`)
-    /// dispatch through the harness in the same way the production
-    /// server does.
+    /// Uses a [`NoopContext`] as bootstrap context for any
+    /// registry-lifecycle events fired during `on_enable` (e.g.
+    /// `RecipeRegisteredEvent`). No real player operations happen
+    /// during plugin loading.
     pub fn register(&mut self, plugin: impl Plugin) {
         let mut systems = Vec::new();
-        let bootstrap_ctx = ServerContext::new(Arc::clone(&self.world), PlayerInfo::stub());
+        let bootstrap_ctx = NoopContext;
         let mut registrar = PluginRegistrar::new(
             &mut self.instant_bus,
             &mut self.game_bus,
@@ -111,9 +475,9 @@ impl PluginTestHarness {
         }
     }
 
-    /// Creates a default server context for "Steve" with entity ID 1.
-    pub fn context(&self) -> ServerContext {
-        ServerContext::new(
+    /// Creates a default harness context for "Steve" with entity ID 1.
+    fn context(&self) -> HarnessContext {
+        HarnessContext::new(
             Arc::clone(&self.world),
             PlayerInfo {
                 uuid: Uuid::default(),
@@ -132,9 +496,9 @@ impl PluginTestHarness {
         )
     }
 
-    /// Creates a server context with custom player identity.
-    pub fn context_for(&self, uuid: Uuid, entity_id: i32, username: &str) -> ServerContext {
-        ServerContext::new(
+    /// Creates a harness context with custom player identity.
+    fn context_for(&self, uuid: Uuid, entity_id: i32, username: &str) -> HarnessContext {
+        HarnessContext::new(
             Arc::clone(&self.world),
             PlayerInfo {
                 uuid,
@@ -166,9 +530,17 @@ impl PluginTestHarness {
         DispatchResult { responses }
     }
 
-    /// Dispatches an event with a specific context and returns a [`DispatchResult`].
-    pub fn dispatch_with(&self, event: &mut dyn Event, ctx: &ServerContext) -> DispatchResult {
-        self.dispatch_routed(event, ctx);
+    /// Dispatches an event with a specific player identity and returns
+    /// a [`DispatchResult`].
+    pub fn dispatch_as(
+        &self,
+        event: &mut dyn Event,
+        uuid: Uuid,
+        entity_id: i32,
+        username: &str,
+    ) -> DispatchResult {
+        let ctx = self.context_for(uuid, entity_id, username);
+        self.dispatch_routed(event, &ctx);
         DispatchResult {
             responses: ctx.drain_responses(),
         }
@@ -214,7 +586,7 @@ impl PluginTestHarness {
     }
 
     /// Routes a type-erased event to the correct bus.
-    fn dispatch_routed(&self, event: &mut dyn Event, ctx: &ServerContext) {
+    fn dispatch_routed(&self, event: &mut dyn Event, ctx: &HarnessContext) {
         let ctx_dyn: &dyn crate::context::Context = ctx;
         match event.bus_kind() {
             BusKind::Instant => self.instant_bus.dispatch_dyn(event, ctx_dyn),

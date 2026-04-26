@@ -2,13 +2,12 @@
 
 use std::sync::atomic::{AtomicI32, Ordering};
 
-use crate::components::{Position, Rotation};
-use crate::context::PlayerContext;
-use crate::gamemode::Gamemode;
+use basalt_api::components::{Position, Rotation};
+use basalt_api::context::{PlayerContext, Response};
+use basalt_api::gamemode::Gamemode;
 use basalt_types::Uuid;
 
 use super::ServerContext;
-use super::response::Response;
 
 /// Game state change reason code for gamemode changes.
 const GAME_STATE_CHANGE_GAMEMODE: u8 = 3;

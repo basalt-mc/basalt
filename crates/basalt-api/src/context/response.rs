@@ -137,22 +137,36 @@ pub enum Response {
 }
 
 /// Thread-local queue for deferred async responses.
-pub(crate) struct ResponseQueue {
+///
+/// Used by `ServerContext` implementations (basalt-server) to collect
+/// deferred operations during handler dispatch. Visibility is `pub`
+/// so that the production `ServerContext` in basalt-server can
+/// construct and read from it.
+pub struct ResponseQueue {
     inner: RefCell<Vec<Response>>,
 }
 
+impl Default for ResponseQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ResponseQueue {
-    pub(crate) fn new() -> Self {
+    /// Creates an empty response queue.
+    pub fn new() -> Self {
         Self {
             inner: RefCell::new(Vec::new()),
         }
     }
 
-    pub(crate) fn push(&self, response: Response) {
+    /// Pushes a deferred response onto the queue.
+    pub fn push(&self, response: Response) {
         self.inner.borrow_mut().push(response);
     }
 
-    pub(crate) fn drain(&self) -> Vec<Response> {
+    /// Drains all queued responses, returning them as a `Vec`.
+    pub fn drain(&self) -> Vec<Response> {
         self.inner.borrow_mut().drain(..).collect()
     }
 }

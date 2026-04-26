@@ -73,7 +73,7 @@ impl ServerState {
         // Stub dispatch context for system-level events fired during
         // plugin loading (today: recipe registry lifecycle). Carries
         // `PlayerInfo::stub()` — handlers must ignore `ctx.player()`.
-        let bootstrap_ctx = basalt_api::context::ServerContext::new(
+        let bootstrap_ctx = crate::context::ServerContext::new(
             std::sync::Arc::clone(&world),
             basalt_api::player::PlayerInfo::stub(),
         );
