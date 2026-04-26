@@ -4,20 +4,20 @@ members = ["crates/*", "plugins/*", "xtask"]
 exclude = ["fuzz"]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/basalt-mc/basalt"
 
 [workspace.dependencies]
 # Internal crates
-basalt-types = { path = "crates/basalt-types", version = "0.2.0" }
-basalt-derive = { path = "crates/basalt-derive", version = "0.2.0" }
+basalt-types = { path = "crates/basalt-types", version = "0.2.1" }
+basalt-derive = { path = "crates/basalt-derive", version = "0.2.1" }
 basalt-mc-protocol = { path = "crates/basalt-mc-protocol", version = "0.2.0" }
 basalt-net = { path = "crates/basalt-net" }
 basalt-server = { path = "crates/basalt-server" }
 basalt-world = { path = "crates/basalt-world" }
-basalt-api = { path = "crates/basalt-api", version = "0.2.0" }
+basalt-api = { path = "crates/basalt-api", version = "0.2.1" }
 basalt-storage = { path = "crates/basalt-storage" }
 basalt-ecs = { path = "crates/basalt-ecs" }
 basalt-recipes = { path = "crates/basalt-recipes" }

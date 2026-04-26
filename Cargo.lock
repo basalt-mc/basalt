@@ -104,7 +104,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "basalt-api"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-mc-protocol",
  "basalt-types",
@@ -113,7 +113,7 @@ dependencies = [
 
 [[package]]
 name = "basalt-derive"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -122,7 +122,7 @@ dependencies = [
 
 [[package]]
 name = "basalt-ecs"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-api",
  "basalt-world",
@@ -132,7 +132,7 @@ dependencies = [
 
 [[package]]
 name = "basalt-mc-protocol"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-derive",
  "basalt-types",
@@ -143,7 +143,7 @@ dependencies = [
 
 [[package]]
 name = "basalt-net"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "aes",
  "basalt-mc-protocol",
@@ -156,28 +156,28 @@ dependencies = [
 
 [[package]]
 name = "basalt-plugin-block"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-api",
 ]
 
 [[package]]
 name = "basalt-plugin-chat"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-api",
 ]
 
 [[package]]
 name = "basalt-plugin-command"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-api",
 ]
 
 [[package]]
 name = "basalt-plugin-container"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-api",
  "basalt-plugin-block",
@@ -185,7 +185,7 @@ dependencies = [
 
 [[package]]
 name = "basalt-plugin-item"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-api",
  "basalt-plugin-block",
@@ -193,35 +193,35 @@ dependencies = [
 
 [[package]]
 name = "basalt-plugin-lifecycle"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-api",
 ]
 
 [[package]]
 name = "basalt-plugin-movement"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-api",
 ]
 
 [[package]]
 name = "basalt-plugin-physics"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-api",
 ]
 
 [[package]]
 name = "basalt-plugin-recipe"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-api",
 ]
 
 [[package]]
 name = "basalt-plugin-storage"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-api",
  "basalt-plugin-block",
@@ -230,21 +230,21 @@ dependencies = [
 
 [[package]]
 name = "basalt-plugin-world"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-api",
 ]
 
 [[package]]
 name = "basalt-recipes"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-api",
 ]
 
 [[package]]
 name = "basalt-server"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-api",
  "basalt-ecs",
@@ -278,7 +278,7 @@ dependencies = [
 
 [[package]]
 name = "basalt-storage"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "lz4_flex",
  "tempfile",
@@ -286,7 +286,7 @@ dependencies = [
 
 [[package]]
 name = "basalt-types"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "indexmap",
  "proptest",
@@ -295,7 +295,7 @@ dependencies = [
 
 [[package]]
 name = "basalt-world"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "basalt-api",
  "basalt-storage",
@@ -2573,7 +2573,7 @@ checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
 
 [[package]]
 name = "xtask"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "serde",
  "serde_json",

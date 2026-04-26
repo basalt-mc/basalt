@@ -1,6 +1,22 @@
 # Changelog
 
 All notable changes to Basalt are documented here.
+## [0.2.1] - 2026-04-26
+
+### Documentation
+
+- Rename basalt-protocol references to basalt-mc-protocol
+
+
+### Other
+
+- Include Cargo.lock in release commit
+
+- Rename basalt-protocol crate to basalt-mc-protocol
+
+- Update packet_play fuzz target to use basalt_mc_protocol
+
+
 ## [0.2.0] - 2026-04-26
 
 ### Block Plugin
