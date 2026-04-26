@@ -8,8 +8,6 @@ use crate::command::{Arg, CommandArg, CommandArgs, Validation};
 use crate::context::Context;
 use crate::events::{BusKind, Event, EventBus, EventRouting, Stage};
 
-use crate::context::ServerContext;
-
 /// A server plugin that registers event handlers and lifecycle hooks.
 pub trait Plugin: Send + Sync + 'static {
     /// Returns the plugin's identity metadata.
@@ -59,6 +57,12 @@ pub struct CommandEntry {
 /// Handler registration is routed automatically based on the event
 /// type's [`EventRouting::BUS`] constant — plugins do not specify
 /// which loop handles their events.
+///
+/// World and recipe fields are trait objects so that basalt-api does not
+/// depend on the concrete `basalt_world::World` or
+/// `basalt_recipes::RecipeRegistry` types at the struct level. Call
+/// sites coerce concrete types to the trait objects when constructing
+/// the registrar.
 pub struct PluginRegistrar<'a> {
     /// Event bus for the network loop (movement, chat, commands).
     instant_bus: &'a mut EventBus,
@@ -68,21 +72,21 @@ pub struct PluginRegistrar<'a> {
     commands: &'a mut Vec<CommandEntry>,
     /// Collected system descriptors.
     systems: &'a mut Vec<crate::system::SystemDescriptor>,
-    /// Shared world reference, available to all plugins.
-    world: std::sync::Arc<basalt_world::World>,
+    /// Shared world handle, available to all plugins.
+    world: std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>,
     /// Mutable recipe registry for plugin customisation.
-    recipes: &'a mut basalt_recipes::RecipeRegistry,
+    recipes: &'a mut dyn crate::recipes::RecipeRegistryHandle,
     /// Stub dispatch context for system-level events fired during
     /// plugin loading (e.g. recipe registry lifecycle). The context
     /// carries `PlayerInfo::stub()` — handlers must rely on the event
     /// payload, not `ctx.player()`.
-    bootstrap_ctx: &'a ServerContext,
+    bootstrap_ctx: &'a dyn crate::context::Context,
 }
 
 impl<'a> PluginRegistrar<'a> {
     /// Creates a new registrar with dual event buses and recipe registry.
     ///
-    /// `bootstrap_ctx` is a stub [`ServerContext`] used only to dispatch
+    /// `bootstrap_ctx` is a stub context used only to dispatch
     /// system-level events (today: the recipe registry lifecycle) that
     /// fire before any player exists.
     #[allow(clippy::too_many_arguments)]
@@ -91,9 +95,9 @@ impl<'a> PluginRegistrar<'a> {
         game_bus: &'a mut EventBus,
         commands: &'a mut Vec<CommandEntry>,
         systems: &'a mut Vec<crate::system::SystemDescriptor>,
-        world: std::sync::Arc<basalt_world::World>,
-        recipes: &'a mut basalt_recipes::RecipeRegistry,
-        bootstrap_ctx: &'a ServerContext,
+        world: std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>,
+        recipes: &'a mut dyn crate::recipes::RecipeRegistryHandle,
+        bootstrap_ctx: &'a dyn crate::context::Context,
     ) -> Self {
         Self {
             instant_bus,
@@ -110,7 +114,7 @@ impl<'a> PluginRegistrar<'a> {
     ///
     /// Available to all plugins — use this to capture the world
     /// in system closures for block access, collision checks, etc.
-    pub fn world(&self) -> std::sync::Arc<basalt_world::World> {
+    pub fn world(&self) -> std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync> {
         std::sync::Arc::clone(&self.world)
     }
 
@@ -329,12 +333,7 @@ impl VariantBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Builds a stub bootstrap [`ServerContext`] for tests that need
-    /// to construct a [`PluginRegistrar`] without a real player.
-    fn bootstrap_ctx(world: std::sync::Arc<basalt_world::World>) -> ServerContext {
-        ServerContext::new(world, crate::player::PlayerInfo::stub())
-    }
+    use crate::testing::NoopContext;
 
     struct TestPlugin;
 
@@ -372,16 +371,17 @@ mod tests {
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::empty();
         let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
-        let ctx = bootstrap_ctx(std::sync::Arc::clone(&world));
+        let ctx = NoopContext;
         {
             let mut registrar = PluginRegistrar::new(
                 &mut instant_bus,
                 &mut game_bus,
                 &mut commands,
                 &mut systems,
-                world,
-                &mut recipes,
-                &ctx,
+                std::sync::Arc::clone(&world)
+                    as std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>,
+                &mut recipes as &mut dyn crate::recipes::RecipeRegistryHandle,
+                &ctx as &dyn crate::context::Context,
             );
             registrar.on::<ChatMessageEvent>(Stage::Post, 0, |_event, _ctx| {});
             registrar.on::<BlockBrokenEvent>(Stage::Process, 0, |_event, _ctx| {});
@@ -398,16 +398,17 @@ mod tests {
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::empty();
         let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
-        let ctx = bootstrap_ctx(std::sync::Arc::clone(&world));
+        let ctx = NoopContext;
         {
             let mut registrar = PluginRegistrar::new(
                 &mut instant_bus,
                 &mut game_bus,
                 &mut commands,
                 &mut systems,
-                world,
-                &mut recipes,
-                &ctx,
+                std::sync::Arc::clone(&world)
+                    as std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>,
+                &mut recipes as &mut dyn crate::recipes::RecipeRegistryHandle,
+                &ctx as &dyn crate::context::Context,
             );
             registrar
                 .command("tp")
@@ -431,16 +432,17 @@ mod tests {
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::empty();
         let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
-        let ctx = bootstrap_ctx(std::sync::Arc::clone(&world));
+        let ctx = NoopContext;
         {
             let mut registrar = PluginRegistrar::new(
                 &mut instant_bus,
                 &mut game_bus,
                 &mut commands,
                 &mut systems,
-                world,
-                &mut recipes,
-                &ctx,
+                std::sync::Arc::clone(&world)
+                    as std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>,
+                &mut recipes as &mut dyn crate::recipes::RecipeRegistryHandle,
+                &ctx as &dyn crate::context::Context,
             );
             registrar
                 .command("tp")
@@ -467,16 +469,17 @@ mod tests {
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::empty();
         let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
-        let ctx = bootstrap_ctx(std::sync::Arc::clone(&world));
+        let ctx = NoopContext;
         {
             let mut registrar = PluginRegistrar::new(
                 &mut instant_bus,
                 &mut game_bus,
                 &mut commands,
                 &mut systems,
-                world,
-                &mut recipes,
-                &ctx,
+                std::sync::Arc::clone(&world)
+                    as std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>,
+                &mut recipes as &mut dyn crate::recipes::RecipeRegistryHandle,
+                &ctx as &dyn crate::context::Context,
             );
             registrar
                 .command("help")
@@ -501,7 +504,7 @@ mod tests {
         let mut systems = Vec::new();
         let mut recipes = basalt_recipes::RecipeRegistry::empty();
         let world = std::sync::Arc::new(basalt_world::World::new_memory(42));
-        let ctx = bootstrap_ctx(std::sync::Arc::clone(&world));
+        let ctx = NoopContext;
 
         let post_seen = Arc::new(AtomicU32::new(0));
         {
@@ -517,9 +520,10 @@ mod tests {
                 &mut game_bus,
                 &mut commands,
                 &mut systems,
-                world,
-                &mut recipes,
-                &ctx,
+                std::sync::Arc::clone(&world)
+                    as std::sync::Arc<dyn crate::world::handle::WorldHandle + Send + Sync>,
+                &mut recipes as &mut dyn crate::recipes::RecipeRegistryHandle,
+                &ctx as &dyn crate::context::Context,
             );
             let inserted = registrar.recipes().add_shaped(OwnedShapedRecipe {
                 id: RecipeId::new("plugin", "demo"),
