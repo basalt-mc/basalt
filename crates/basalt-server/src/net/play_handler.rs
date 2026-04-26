@@ -72,7 +72,10 @@ pub(super) async fn handle_packet(
         cancelled: false,
     };
     if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        instant_bus.dispatch(&mut raw_event, &raw_ctx);
+        instant_bus.dispatch(
+            &mut raw_event,
+            &raw_ctx as &dyn basalt_api::context::Context,
+        );
     })) {
         let msg = panic
             .downcast_ref::<&str>()
@@ -127,7 +130,8 @@ pub(super) async fn handle_packet(
                 cancelled: false,
             };
             if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                instant_bus.dispatch(&mut event, &ctx);
+                instant_bus
+                    .dispatch(&mut event, &ctx as &dyn basalt_api::context::Context);
             })) {
                 let msg = panic
                     .downcast_ref::<&str>()
@@ -179,7 +183,8 @@ pub(super) async fn handle_packet(
                 cancelled: false,
             };
             if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                instant_bus.dispatch(&mut event, &ctx);
+                instant_bus
+                    .dispatch(&mut event, &ctx as &dyn basalt_api::context::Context);
             })) {
                 let msg = panic
                     .downcast_ref::<&str>()

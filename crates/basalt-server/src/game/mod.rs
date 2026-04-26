@@ -203,11 +203,12 @@ impl GameLoop {
         event: &mut dyn basalt_api::Event,
         ctx: &basalt_api::context::ServerContext,
     ) {
+        let ctx_dyn: &dyn basalt_api::context::Context = ctx;
         if self.crash_on_plugin_panic {
-            self.bus.dispatch_dyn(event, ctx);
+            self.bus.dispatch_dyn(event, ctx_dyn);
         } else {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                self.bus.dispatch_dyn(event, ctx);
+                self.bus.dispatch_dyn(event, ctx_dyn);
             }));
             if let Err(panic) = result {
                 let msg = panic
