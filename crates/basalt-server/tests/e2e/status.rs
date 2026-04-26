@@ -1,5 +1,5 @@
 use super::*;
-use basalt_protocol::packets::status::{
+use basalt_mc_protocol::packets::status::{
     ClientboundStatusPing, ClientboundStatusServerInfo, ServerboundStatusPing,
     ServerboundStatusPingStart,
 };

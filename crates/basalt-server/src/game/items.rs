@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use basalt_protocol::packets::play::entity::{
+use basalt_mc_protocol::packets::play::entity::{
     ClientboundPlayCollect, ClientboundPlayEntityDestroy, ClientboundPlayEntityHeadRotation,
     ClientboundPlayEntityMetadata, ClientboundPlaySpawnEntity, ClientboundPlaySyncEntityPosition,
 };
@@ -249,7 +249,7 @@ impl GameLoop {
 
                 // Send SetSlot to sync (raw internal index = SetPlayerInventory slot)
                 self.send_to(*player_eid, |tx| {
-                    use basalt_protocol::packets::play::inventory::ClientboundPlaySetPlayerInventory;
+                    use basalt_mc_protocol::packets::play::inventory::ClientboundPlaySetPlayerInventory;
                     let _ = tx.try_send(ServerOutput::plain(
                         ClientboundPlaySetPlayerInventory::PACKET_ID,
                         ClientboundPlaySetPlayerInventory {

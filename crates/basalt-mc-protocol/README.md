@@ -1,4 +1,4 @@
-# basalt-protocol
+# basalt-mc-protocol
 
 Minecraft packet definitions and version-aware packet registry for the
 [Basalt](https://github.com/basalt-mc/basalt) Minecraft server.
@@ -26,7 +26,7 @@ connection state, direction, and packet ID, it decodes raw bytes into a typed
 enum variant.
 
 ```rust,ignore
-use basalt_protocol::{PacketRegistry, ConnectionState, ProtocolVersion};
+use basalt_mc_protocol::{PacketRegistry, ConnectionState, ProtocolVersion};
 
 let registry = PacketRegistry::new(ProtocolVersion::V1_21_4);
 

@@ -118,7 +118,7 @@ basalt/
   crates/
     basalt-types      # Protocol primitives (VarInt, NBT, Slot, Position...)
     basalt-derive      # Proc macros for Encode/Decode
-    basalt-protocol    # Packet definitions, generated from minecraft-data
+    basalt-mc-protocol # Packet definitions, generated from minecraft-data
     basalt-net         # Async networking (TCP, encryption, compression)
     basalt-events      # Generic event bus with staged dispatch
     basalt-core        # Shared traits (Context, Gamemode, PluginLogger)

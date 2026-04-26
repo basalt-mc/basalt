@@ -157,7 +157,7 @@ fn collect_imports_from_fields(
 /// it lives under `basalt_types::nbt::NbtCompound`.
 ///
 /// Used by the play-codegen pass when generating
-/// `crates/basalt-protocol/src/packets/play/types.rs` — that file
+/// `crates/basalt-mc-protocol/src/packets/play/types.rs` — that file
 /// always pulls in the derive macros, so we only need the runtime
 /// import set.
 pub(crate) fn collect_basalt_imports_from_fields(

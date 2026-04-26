@@ -19,7 +19,7 @@ impl GameLoop {
                     z,
                     block_state,
                 }) => {
-                    use basalt_protocol::packets::play::world::ClientboundPlayBlockChange;
+                    use basalt_mc_protocol::packets::play::world::ClientboundPlayBlockChange;
                     // Invalidate chunk cache for this block's chunk
                     self.chunk_cache.invalidate(*x >> 4, *z >> 4);
                     let bc = Arc::new(SharedBroadcast::single(
@@ -36,7 +36,7 @@ impl GameLoop {
                     }
                 }
                 Response::Broadcast(basalt_api::broadcast::BroadcastMessage::Chat { content }) => {
-                    use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
+                    use basalt_mc_protocol::packets::play::chat::ClientboundPlaySystemChat;
                     let bc = Arc::new(SharedBroadcast::single(
                         ClientboundPlaySystemChat::PACKET_ID,
                         ClientboundPlaySystemChat {
@@ -52,7 +52,7 @@ impl GameLoop {
                 }
                 Response::Broadcast(_) => {}
                 Response::SendBlockAck { sequence } => {
-                    use basalt_protocol::packets::play::world::ClientboundPlayAcknowledgePlayerDigging;
+                    use basalt_mc_protocol::packets::play::world::ClientboundPlayAcknowledgePlayerDigging;
                     if let Some(eid) = self.find_by_uuid(source_uuid)
                         && let Some(handle) = self.ecs.get::<OutputHandle>(eid)
                     {
@@ -68,7 +68,7 @@ impl GameLoop {
                     content,
                     action_bar,
                 } => {
-                    use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
+                    use basalt_mc_protocol::packets::play::chat::ClientboundPlaySystemChat;
                     if let Some(eid) = self.find_by_uuid(source_uuid)
                         && let Some(handle) = self.ecs.get::<OutputHandle>(eid)
                     {
@@ -86,7 +86,7 @@ impl GameLoop {
                     position,
                     rotation,
                 } => {
-                    use basalt_protocol::packets::play::player::ClientboundPlayPosition;
+                    use basalt_mc_protocol::packets::play::player::ClientboundPlayPosition;
                     if let Some(eid) = self.find_by_uuid(source_uuid) {
                         if let Some(pos) = self.ecs.get_mut::<basalt_api::components::Position>(eid)
                         {
@@ -119,7 +119,7 @@ impl GameLoop {
                     }
                 }
                 Response::SendGameStateChange { reason, value } => {
-                    use basalt_protocol::packets::play::player::ClientboundPlayGameStateChange;
+                    use basalt_mc_protocol::packets::play::player::ClientboundPlayGameStateChange;
                     if let Some(eid) = self.find_by_uuid(source_uuid)
                         && let Some(handle) = self.ecs.get::<OutputHandle>(eid)
                     {
@@ -174,7 +174,7 @@ impl GameLoop {
                     let aid = *action_id;
                     let ap = *action_param;
                     let bid = *block_id;
-                    use basalt_protocol::packets::play::world::ClientboundPlayBlockAction;
+                    use basalt_mc_protocol::packets::play::world::ClientboundPlayBlockAction;
                     for (e, _) in self.ecs.iter::<OutputHandle>() {
                         self.send_to(e, |tx| {
                             let _ = tx.try_send(ServerOutput::plain(

@@ -106,7 +106,7 @@ jobs:
       - run: cargo fmt --all
       - name: Check generated code is up to date
         run: |
-          if ! git diff --exit-code crates/basalt-protocol/src/packets/; then
+          if ! git diff --exit-code crates/basalt-mc-protocol/src/packets/; then
             echo "::error::Generated packets are out of date. Run 'cargo xt codegen && cargo fmt --all' and commit the result."
             exit 1
           fi

@@ -197,7 +197,7 @@ impl GameLoop {
         };
         let Some(slot) = proto_slot else { return };
         self.send_to(eid, |tx| {
-            use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+            use basalt_mc_protocol::packets::play::inventory::ClientboundPlaySetSlot;
             let _ = tx.try_send(ServerOutput::plain(
                 ClientboundPlaySetSlot::PACKET_ID,
                 ClientboundPlaySetSlot {
@@ -222,7 +222,7 @@ impl GameLoop {
             .map(|inv| inv.cursor.clone())
             .unwrap_or_default();
         self.send_to(eid, |tx| {
-            use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+            use basalt_mc_protocol::packets::play::inventory::ClientboundPlaySetSlot;
             let _ = tx.try_send(ServerOutput::plain(
                 ClientboundPlaySetSlot::PACKET_ID,
                 ClientboundPlaySetSlot {

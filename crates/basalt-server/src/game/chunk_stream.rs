@@ -8,7 +8,7 @@
 //! `dispatch.rs`); on join it's seeded from
 //! `chunk_batch_initial_rate`.
 
-use basalt_protocol::packets::play::world::{
+use basalt_mc_protocol::packets::play::world::{
     ClientboundPlayChunkBatchFinished, ClientboundPlayChunkBatchStart,
 };
 

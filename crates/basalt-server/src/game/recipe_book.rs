@@ -14,10 +14,10 @@ use basalt_api::events::{
     RecipeBookFillRequestEvent, RecipeBookFilledEvent, RecipeLockedEvent, RecipeUnlockedEvent,
 };
 use basalt_ecs::EntityId;
-use basalt_protocol::packets::play::misc::{
+use basalt_mc_protocol::packets::play::misc::{
     ClientboundPlayRecipeBookAddEntries, ClientboundPlayRecipeBookAddEntriesRecipe,
 };
-use basalt_protocol::packets::play::types::{RecipeDisplay, SlotDisplay};
+use basalt_mc_protocol::packets::play::types::{RecipeDisplay, SlotDisplay};
 use basalt_recipes::{Recipe, RecipeId};
 use basalt_types::{Slot, Uuid};
 
@@ -85,7 +85,7 @@ impl GameLoop {
             flags: 0x01,
         };
         self.send_to(eid, |tx| {
-            use basalt_protocol::packets::play::misc::ClientboundPlayRecipeBookAdd;
+            use basalt_mc_protocol::packets::play::misc::ClientboundPlayRecipeBookAdd;
             let _ = tx.try_send(ServerOutput::plain(
                 ClientboundPlayRecipeBookAdd::PACKET_ID,
                 ClientboundPlayRecipeBookAdd {
@@ -119,7 +119,7 @@ impl GameLoop {
         };
 
         self.send_to(eid, |tx| {
-            use basalt_protocol::packets::play::misc::ClientboundPlayRecipeBookRemove;
+            use basalt_mc_protocol::packets::play::misc::ClientboundPlayRecipeBookRemove;
             let _ = tx.try_send(ServerOutput::plain(
                 ClientboundPlayRecipeBookRemove::PACKET_ID,
                 ClientboundPlayRecipeBookRemove {
@@ -176,7 +176,7 @@ impl GameLoop {
         // visual preview is always reliable.
         let display = to_display(&recipe);
         self.send_to(eid, |tx| {
-            use basalt_protocol::packets::play::inventory::ClientboundPlayCraftRecipeResponse;
+            use basalt_mc_protocol::packets::play::inventory::ClientboundPlayCraftRecipeResponse;
             let _ = tx.try_send(ServerOutput::plain(
                 ClientboundPlayCraftRecipeResponse::PACKET_ID,
                 ClientboundPlayCraftRecipeResponse {
@@ -321,7 +321,7 @@ impl GameLoop {
         };
         let slots = inv.to_protocol_slots();
         self.send_to(eid, |tx| {
-            use basalt_protocol::packets::play::inventory::ClientboundPlayWindowItems;
+            use basalt_mc_protocol::packets::play::inventory::ClientboundPlayWindowItems;
             let _ = tx.try_send(ServerOutput::plain(
                 ClientboundPlayWindowItems::PACKET_ID,
                 ClientboundPlayWindowItems {
@@ -381,7 +381,7 @@ impl GameLoop {
             .unwrap_or_default();
 
         if let Some(handle) = self.ecs.get::<OutputHandle>(eid) {
-            use basalt_protocol::packets::play::misc::ClientboundPlayRecipeBookAdd;
+            use basalt_mc_protocol::packets::play::misc::ClientboundPlayRecipeBookAdd;
             let _ = handle.tx.try_send(ServerOutput::plain(
                 ClientboundPlayRecipeBookAdd::PACKET_ID,
                 ClientboundPlayRecipeBookAdd {
@@ -948,7 +948,7 @@ mod tests {
         assert!(known.has(&id));
         assert_eq!(known.display_id(&id), Some(0));
 
-        use basalt_protocol::packets::play::misc::ClientboundPlayRecipeBookAdd;
+        use basalt_mc_protocol::packets::play::misc::ClientboundPlayRecipeBookAdd;
         let mut saw_add = false;
         while let Ok(out) = rx.try_recv() {
             if let crate::messages::ServerOutput::Plain(ep) = &out
@@ -1002,7 +1002,7 @@ mod tests {
         // Second call — should be a no-op.
         game_loop.unlock_recipe(uuid, id, UnlockReason::Manual);
 
-        use basalt_protocol::packets::play::misc::ClientboundPlayRecipeBookAdd;
+        use basalt_mc_protocol::packets::play::misc::ClientboundPlayRecipeBookAdd;
         let mut saw_add = false;
         while let Ok(out) = rx.try_recv() {
             if let crate::messages::ServerOutput::Plain(ep) = &out
@@ -1037,7 +1037,7 @@ mod tests {
         let known = game_loop.ecs.get::<KnownRecipes>(eid).unwrap();
         assert!(!known.has(&id));
 
-        use basalt_protocol::packets::play::misc::ClientboundPlayRecipeBookRemove;
+        use basalt_mc_protocol::packets::play::misc::ClientboundPlayRecipeBookRemove;
         let mut saw_remove = false;
         while let Ok(out) = rx.try_recv() {
             if let crate::messages::ServerOutput::Plain(ep) = &out
@@ -1073,7 +1073,7 @@ mod tests {
         // Display id 0 was assigned by KnownRecipes::unlock above.
         game_loop.handle_place_recipe(uuid, 0, 0, false);
 
-        use basalt_protocol::packets::play::inventory::ClientboundPlayCraftRecipeResponse;
+        use basalt_mc_protocol::packets::play::inventory::ClientboundPlayCraftRecipeResponse;
         let mut saw_ghost = false;
         while let Ok(out) = rx.try_recv() {
             if let crate::messages::ServerOutput::Plain(ep) = &out
@@ -1101,7 +1101,7 @@ mod tests {
 
         game_loop.handle_place_recipe(uuid, 0, 9999, false);
 
-        use basalt_protocol::packets::play::inventory::ClientboundPlayCraftRecipeResponse;
+        use basalt_mc_protocol::packets::play::inventory::ClientboundPlayCraftRecipeResponse;
         let saw_ghost = std::iter::from_fn(|| rx.try_recv().ok()).any(|o| {
             matches!(&o, crate::messages::ServerOutput::Plain(ep) if ep.id() == ClientboundPlayCraftRecipeResponse::PACKET_ID)
         });
@@ -1121,7 +1121,7 @@ mod tests {
         let uuid = Uuid::from_bytes([1; 16]);
         let mut rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
 
-        use basalt_protocol::packets::play::misc::ClientboundPlayRecipeBookAdd;
+        use basalt_mc_protocol::packets::play::misc::ClientboundPlayRecipeBookAdd;
         let mut found = false;
         while let Ok(out) = rx.try_recv() {
             if let crate::messages::ServerOutput::Plain(ep) = &out

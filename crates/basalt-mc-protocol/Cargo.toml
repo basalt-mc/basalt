@@ -1,12 +1,12 @@
 [package]
-name = "basalt-protocol"
+name = "basalt-mc-protocol"
 version.workspace = true
 publish = true
 description = "Minecraft packet definitions and version-aware packet registry"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-documentation = "https://docs.rs/basalt-protocol"
+documentation = "https://docs.rs/basalt-mc-protocol"
 readme = "README.md"
 rust-version = "1.85"
 keywords = ["minecraft", "protocol", "packets", "network", "wire"]

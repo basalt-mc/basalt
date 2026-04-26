@@ -68,7 +68,7 @@ impl GameLoop {
         }
 
         self.send_to(eid, |tx| {
-            use basalt_protocol::packets::play::inventory::{
+            use basalt_mc_protocol::packets::play::inventory::{
                 ClientboundPlayOpenWindow, ClientboundPlayWindowItems,
             };
             let _ = tx.try_send(ServerOutput::plain(
@@ -301,7 +301,7 @@ impl GameLoop {
             .unwrap_or(0);
 
         self.send_to(eid, |tx| {
-            use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+            use basalt_mc_protocol::packets::play::inventory::ClientboundPlaySetSlot;
             let _ = tx.try_send(ServerOutput::plain(
                 ClientboundPlaySetSlot::PACKET_ID,
                 ClientboundPlaySetSlot {
@@ -370,7 +370,7 @@ impl GameLoop {
             (data, sc.min(9), wid)
         };
 
-        use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+        use basalt_mc_protocol::packets::play::inventory::ClientboundPlaySetSlot;
         for (i, item) in slots_data.into_iter().enumerate().take(slot_count) {
             let window_slot = (i + 1) as i16;
             self.send_to(eid, |tx| {
@@ -424,7 +424,7 @@ impl GameLoop {
 
             let item = item.clone();
             self.send_to(eid, |tx| {
-                use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+                use basalt_mc_protocol::packets::play::inventory::ClientboundPlaySetSlot;
                 let _ = tx.try_send(ServerOutput::plain(
                     ClientboundPlaySetSlot::PACKET_ID,
                     ClientboundPlaySetSlot {
@@ -738,7 +738,7 @@ mod tests {
         assert_eq!(grid.output.item_count, 1);
 
         // Client should have received SetContainerSlot for the output
-        use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+        use basalt_mc_protocol::packets::play::inventory::ClientboundPlaySetSlot;
         let mut got_output_slot = false;
         while let Ok(msg) = rx.try_recv() {
             if let ServerOutput::Plain(ep) = &msg
@@ -994,7 +994,7 @@ mod tests {
         game_loop.open_crafting_table(eid, 5, 64, 3);
 
         // Check OpenWindow was sent with inventory_type 11
-        use basalt_protocol::packets::play::inventory::ClientboundPlayOpenWindow;
+        use basalt_mc_protocol::packets::play::inventory::ClientboundPlayOpenWindow;
         let mut got_open = false;
         let mut inv_type = 0;
         while let Ok(msg) = rx.try_recv() {
@@ -1127,7 +1127,7 @@ mod tests {
         game_loop.tick(1);
 
         // Server should sync consumed grid slots AND the cursor
-        use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+        use basalt_mc_protocol::packets::play::inventory::ClientboundPlaySetSlot;
         let mut grid_slot_syncs = 0;
         let mut cursor_syncs = 0;
         while let Ok(msg) = rx.try_recv() {
@@ -1192,7 +1192,7 @@ mod tests {
         game_loop.tick(1);
 
         // Shift-click should sync both grid AND inventory slots to client
-        use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+        use basalt_mc_protocol::packets::play::inventory::ClientboundPlaySetSlot;
         let mut grid_slot_syncs = 0;
         let mut inv_slot_syncs = 0;
         while let Ok(msg) = rx.try_recv() {

@@ -4,16 +4,16 @@
 //! that speaks the Minecraft protocol. This validates the full pipeline:
 //! types → derive → protocol → framing → connection.
 
-use basalt_net::connection::{Connection, Handshake, HandshakeResult};
-use basalt_net::framing;
-use basalt_protocol::packets::handshake::ServerboundHandshakeSetProtocol;
-use basalt_protocol::packets::login::{
+use basalt_mc_protocol::packets::handshake::ServerboundHandshakeSetProtocol;
+use basalt_mc_protocol::packets::login::{
     ClientboundLoginDisconnect, ServerboundLoginLoginStart, ServerboundLoginPacket,
 };
-use basalt_protocol::packets::status::{
+use basalt_mc_protocol::packets::status::{
     ClientboundStatusPing, ClientboundStatusServerInfo, ServerboundStatusPacket,
     ServerboundStatusPing, ServerboundStatusPingStart,
 };
+use basalt_net::connection::{Connection, Handshake, HandshakeResult};
+use basalt_net::framing;
 use basalt_types::{Decode, Encode, EncodedSize, Uuid};
 use tokio::net::{TcpListener, TcpStream};
 

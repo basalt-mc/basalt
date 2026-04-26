@@ -27,7 +27,7 @@ const VERSION: &str = "1.21.4";
 const MINECRAFT_DATA_PATH: &str = "minecraft-data/data/pc";
 
 /// Output directory for generated packets relative to the workspace root.
-const PACKETS_DIR: &str = "crates/basalt-protocol/src/packets";
+const PACKETS_DIR: &str = "crates/basalt-mc-protocol/src/packets";
 
 /// Protocol states to generate, mapped to their JSON key and Rust module name.
 const STATES: &[(&str, &str)] = &[

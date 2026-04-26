@@ -106,7 +106,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 name = "basalt-api"
 version = "0.2.0"
 dependencies = [
- "basalt-protocol",
+ "basalt-mc-protocol",
  "basalt-types",
  "log",
 ]
@@ -131,11 +131,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "basalt-mc-protocol"
+version = "0.2.0"
+dependencies = [
+ "basalt-derive",
+ "basalt-types",
+ "criterion",
+ "proptest",
+ "thiserror",
+]
+
+[[package]]
 name = "basalt-net"
 version = "0.2.0"
 dependencies = [
  "aes",
- "basalt-protocol",
+ "basalt-mc-protocol",
  "basalt-types",
  "flate2",
  "log",
@@ -225,17 +236,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "basalt-protocol"
-version = "0.2.0"
-dependencies = [
- "basalt-derive",
- "basalt-types",
- "criterion",
- "proptest",
- "thiserror",
-]
-
-[[package]]
 name = "basalt-recipes"
 version = "0.2.0"
 dependencies = [
@@ -248,6 +248,7 @@ version = "0.2.0"
 dependencies = [
  "basalt-api",
  "basalt-ecs",
+ "basalt-mc-protocol",
  "basalt-net",
  "basalt-plugin-block",
  "basalt-plugin-chat",
@@ -260,7 +261,6 @@ dependencies = [
  "basalt-plugin-recipe",
  "basalt-plugin-storage",
  "basalt-plugin-world",
- "basalt-protocol",
  "basalt-recipes",
  "basalt-types",
  "basalt-world",

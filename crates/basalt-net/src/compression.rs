@@ -26,7 +26,7 @@ pub fn compress_packet_into(data: &[u8], threshold: usize, out: &mut Vec<u8>) ->
         // Compress: write uncompressed length + zlib data
         VarInt(data.len() as i32)
             .encode(out)
-            .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
+            .map_err(|e| Error::Protocol(basalt_mc_protocol::Error::Type(e)))?;
 
         // Level 3 favors speed over ratio — better for game server latency
         let mut encoder = ZlibEncoder::new(&mut *out, Compression::new(3));
@@ -36,7 +36,7 @@ pub fn compress_packet_into(data: &[u8], threshold: usize, out: &mut Vec<u8>) ->
         // Below threshold: write 0 + raw data
         VarInt(0)
             .encode(out)
-            .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
+            .map_err(|e| Error::Protocol(basalt_mc_protocol::Error::Type(e)))?;
         out.extend_from_slice(data);
     }
 
@@ -66,7 +66,7 @@ pub fn compress_packet(data: &[u8], threshold: usize) -> Result<Vec<u8>> {
 pub fn decompress_packet(data: &[u8]) -> Result<Vec<u8>> {
     let mut cursor = data;
     let data_length = VarInt::decode(&mut cursor)
-        .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
+        .map_err(|e| Error::Protocol(basalt_mc_protocol::Error::Type(e)))?;
 
     if data_length.0 == 0 {
         // Not compressed — return remaining bytes as-is
@@ -79,7 +79,7 @@ pub fn decompress_packet(data: &[u8]) -> Result<Vec<u8>> {
     // Minecraft max packet size is ~32 MB after compression.
     const MAX_DECOMPRESSED: usize = 32 * 1024 * 1024;
     if uncompressed_size > MAX_DECOMPRESSED {
-        return Err(Error::Protocol(basalt_protocol::Error::Type(
+        return Err(Error::Protocol(basalt_mc_protocol::Error::Type(
             basalt_types::Error::InvalidData(format!(
                 "decompressed size {uncompressed_size} exceeds max {MAX_DECOMPRESSED}"
             )),
@@ -92,7 +92,7 @@ pub fn decompress_packet(data: &[u8]) -> Result<Vec<u8>> {
     decoder.read_to_end(&mut decompressed).map_err(Error::Io)?;
 
     if decompressed.len() != uncompressed_size {
-        return Err(Error::Protocol(basalt_protocol::Error::Type(
+        return Err(Error::Protocol(basalt_mc_protocol::Error::Type(
             basalt_types::Error::InvalidData(format!(
                 "decompressed size mismatch: expected {}, got {}",
                 uncompressed_size,

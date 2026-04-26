@@ -11,10 +11,10 @@ mod login;
 mod multiplayer;
 mod status;
 
+use basalt_mc_protocol::packets::handshake::ServerboundHandshakeSetProtocol;
+use basalt_mc_protocol::packets::login::ClientboundLoginSuccess;
+use basalt_mc_protocol::packets::play::chat::ClientboundPlaySystemChat;
 use basalt_net::framing;
-use basalt_protocol::packets::handshake::ServerboundHandshakeSetProtocol;
-use basalt_protocol::packets::login::ClientboundLoginSuccess;
-use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
 use basalt_server::Server;
 use basalt_types::{Decode, Encode, EncodedSize, Uuid};
 use tokio::net::{TcpListener, TcpStream};
@@ -84,7 +84,7 @@ pub async fn connect_to_play_as(
     let mut client = TcpStream::connect(addr).await.unwrap();
     client_handshake(&mut client, addr.port(), 2).await;
 
-    use basalt_protocol::packets::login::{
+    use basalt_mc_protocol::packets::login::{
         ServerboundLoginLoginAcknowledged, ServerboundLoginLoginStart,
     };
     send_packet(
@@ -114,14 +114,14 @@ pub async fn connect_to_play_as(
             .await
             .unwrap()
             .unwrap();
-        use basalt_protocol::packets::configuration::ClientboundConfigurationFinishConfiguration;
+        use basalt_mc_protocol::packets::configuration::ClientboundConfigurationFinishConfiguration;
         if raw.id == ClientboundConfigurationFinishConfiguration::PACKET_ID {
             break;
         }
     }
 
     // Send FinishConfiguration ack
-    use basalt_protocol::packets::configuration::ServerboundConfigurationFinishConfiguration;
+    use basalt_mc_protocol::packets::configuration::ServerboundConfigurationFinishConfiguration;
     send_packet(
         &mut client,
         ServerboundConfigurationFinishConfiguration::PACKET_ID,
@@ -149,7 +149,7 @@ pub async fn connect_to_play_as(
     // `ChunkBatchFinished` of the batch that contained the last chunk
     // is deterministic — no timeout race on slow CI runners — and
     // leaves the wire idle so tests can start their real work.
-    use basalt_protocol::packets::play::world::{
+    use basalt_mc_protocol::packets::play::world::{
         ClientboundPlayChunkBatchFinished, ClientboundPlayMapChunk,
     };
     const INITIAL_CHUNK_COUNT: i32 = 121;
@@ -211,7 +211,7 @@ pub async fn give_creative_item(
     item_id: i32,
     count: i32,
 ) {
-    use basalt_protocol::packets::play::ServerboundPlaySetCreativeSlot;
+    use basalt_mc_protocol::packets::play::ServerboundPlaySetCreativeSlot;
     send_packet(
         client,
         ServerboundPlaySetCreativeSlot::PACKET_ID,
@@ -235,7 +235,7 @@ pub async fn give_creative_item(
 
 /// Places a chest via creative slot + BlockPlace, waits for processing.
 pub async fn place_chest(client: &mut TcpStream, x: i32, y: i32, z: i32) {
-    use basalt_protocol::packets::play::world::ServerboundPlayBlockPlace;
+    use basalt_mc_protocol::packets::play::world::ServerboundPlayBlockPlace;
     // Give chest in hotbar slot 0 (item 313)
     give_creative_item(client, 36, 313, 1).await;
     send_packet(

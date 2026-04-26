@@ -3,9 +3,9 @@
 use std::sync::Arc;
 
 use basalt_api::events::{PlayerJoinedEvent, PlayerLeftEvent};
-use basalt_protocol::packets::play::chat::ClientboundPlayDeclareCommands;
-use basalt_protocol::packets::play::player::ClientboundPlayLogin;
-use basalt_protocol::packets::play::player::ClientboundPlayLoginSpawninfo;
+use basalt_mc_protocol::packets::play::chat::ClientboundPlayDeclareCommands;
+use basalt_mc_protocol::packets::play::player::ClientboundPlayLogin;
+use basalt_mc_protocol::packets::play::player::ClientboundPlayLoginSpawninfo;
 use basalt_types::{Position, Uuid};
 use tokio::sync::mpsc;
 
@@ -140,7 +140,7 @@ impl GameLoop {
                     .color(basalt_types::TextColor::Named(
                         basalt_types::NamedColor::Yellow,
                     ));
-                use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
+                use basalt_mc_protocol::packets::play::chat::ClientboundPlaySystemChat;
                 let _ = tx.try_send(ServerOutput::plain(
                     ClientboundPlaySystemChat::PACKET_ID,
                     ClientboundPlaySystemChat {
@@ -156,7 +156,7 @@ impl GameLoop {
             let msg = basalt_types::TextComponent::text(format!("Welcome, {username}!")).color(
                 basalt_types::TextColor::Named(basalt_types::NamedColor::Gold),
             );
-            use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
+            use basalt_mc_protocol::packets::play::chat::ClientboundPlaySystemChat;
             let _ = tx.try_send(ServerOutput::plain(
                 ClientboundPlaySystemChat::PACKET_ID,
                 ClientboundPlaySystemChat {
@@ -228,8 +228,8 @@ impl GameLoop {
         let spawn_y = self.world.spawn_y() as i32;
         self.send_to(eid, |tx| {
             let _ = tx.try_send(ServerOutput::Plain(EncodablePacket::new(
-                basalt_protocol::packets::play::world::ClientboundPlaySpawnPosition::PACKET_ID,
-                basalt_protocol::packets::play::world::ClientboundPlaySpawnPosition {
+                basalt_mc_protocol::packets::play::world::ClientboundPlaySpawnPosition::PACKET_ID,
+                basalt_mc_protocol::packets::play::world::ClientboundPlaySpawnPosition {
                     location: Position::new(0, spawn_y, 0),
                     angle: 0.0,
                 },
@@ -238,7 +238,7 @@ impl GameLoop {
 
         // GameEvent (wait for chunks)
         self.send_to(eid, |tx| {
-            use basalt_protocol::packets::play::player::ClientboundPlayGameStateChange;
+            use basalt_mc_protocol::packets::play::player::ClientboundPlayGameStateChange;
             let _ = tx.try_send(ServerOutput::plain(
                 ClientboundPlayGameStateChange::PACKET_ID,
                 ClientboundPlayGameStateChange {
@@ -254,7 +254,7 @@ impl GameLoop {
         let cx = (position.0 as i32) >> 4;
         let cz = (position.2 as i32) >> 4;
         self.send_to(eid, |tx| {
-            use basalt_protocol::packets::play::world::ClientboundPlayUpdateViewPosition;
+            use basalt_mc_protocol::packets::play::world::ClientboundPlayUpdateViewPosition;
             let _ = tx.try_send(ServerOutput::plain(
                 ClientboundPlayUpdateViewPosition::PACKET_ID,
                 ClientboundPlayUpdateViewPosition {
@@ -274,7 +274,7 @@ impl GameLoop {
 
         // Position
         self.send_to(eid, |tx| {
-            use basalt_protocol::packets::play::player::ClientboundPlayPosition;
+            use basalt_mc_protocol::packets::play::player::ClientboundPlayPosition;
             let _ = tx.try_send(ServerOutput::plain(
                 ClientboundPlayPosition::PACKET_ID,
                 ClientboundPlayPosition {
@@ -296,7 +296,7 @@ impl GameLoop {
         if let Some(inv) = self.ecs.get::<basalt_api::components::Inventory>(eid) {
             let protocol_slots = inv.to_protocol_slots();
             self.send_to(eid, |tx| {
-                use basalt_protocol::packets::play::inventory::ClientboundPlayWindowItems;
+                use basalt_mc_protocol::packets::play::inventory::ClientboundPlayWindowItems;
                 let _ = tx.try_send(ServerOutput::plain(
                     ClientboundPlayWindowItems::PACKET_ID,
                     ClientboundPlayWindowItems {
@@ -358,9 +358,9 @@ impl GameLoop {
         self.rebuild_active_chunks();
 
         // Broadcast leave to remaining players
-        use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
-        use basalt_protocol::packets::play::entity::ClientboundPlayEntityDestroy;
-        use basalt_protocol::packets::play::player::ClientboundPlayPlayerRemove;
+        use basalt_mc_protocol::packets::play::chat::ClientboundPlaySystemChat;
+        use basalt_mc_protocol::packets::play::entity::ClientboundPlayEntityDestroy;
+        use basalt_mc_protocol::packets::play::player::ClientboundPlayPlayerRemove;
         let remove_players = Arc::new(SharedBroadcast::single(
             ClientboundPlayPlayerRemove::PACKET_ID,
             ClientboundPlayPlayerRemove {
@@ -475,7 +475,7 @@ mod tests {
         let uuid = Uuid::from_bytes([1; 16]);
         let mut rx = super::super::tests::connect_player(&mut game_loop, &game_tx, uuid, 1);
 
-        use basalt_protocol::packets::play::inventory::ClientboundPlayWindowItems;
+        use basalt_mc_protocol::packets::play::inventory::ClientboundPlayWindowItems;
         let mut got_sync = false;
         while let Ok(msg) = rx.try_recv() {
             if matches!(&msg, ServerOutput::Plain(ep) if ep.id() == ClientboundPlayWindowItems::PACKET_ID)

@@ -60,8 +60,8 @@ impl GameLoop {
         if event.is_cancelled() {
             if let Some(handle) = self.ecs.get::<OutputHandle>(eid) {
                 let _ = handle.tx.try_send(ServerOutput::plain(
-                    basalt_protocol::packets::play::world::ClientboundPlayBlockChange::PACKET_ID,
-                    basalt_protocol::packets::play::world::ClientboundPlayBlockChange {
+                    basalt_mc_protocol::packets::play::world::ClientboundPlayBlockChange::PACKET_ID,
+                    basalt_mc_protocol::packets::play::world::ClientboundPlayBlockChange {
                         location: basalt_types::Position::new(x, y, z),
                         r#type: i32::from(original_state),
                     },
@@ -177,8 +177,8 @@ impl GameLoop {
         if event.is_cancelled() {
             if let Some(handle) = self.ecs.get::<OutputHandle>(eid) {
                 let _ = handle.tx.try_send(ServerOutput::plain(
-                    basalt_protocol::packets::play::world::ClientboundPlayBlockChange::PACKET_ID,
-                    basalt_protocol::packets::play::world::ClientboundPlayBlockChange {
+                    basalt_mc_protocol::packets::play::world::ClientboundPlayBlockChange::PACKET_ID,
+                    basalt_mc_protocol::packets::play::world::ClientboundPlayBlockChange {
                         location: basalt_types::Position::new(px, py, pz),
                         r#type: i32::from(basalt_api::world::block::AIR),
                     },
@@ -263,14 +263,14 @@ mod tests {
             match &msg {
                 ServerOutput::Plain(ep)
                     if ep.id()
-                        == basalt_protocol::packets::play::world::ClientboundPlayAcknowledgePlayerDigging::PACKET_ID =>
+                        == basalt_mc_protocol::packets::play::world::ClientboundPlayAcknowledgePlayerDigging::PACKET_ID =>
                 {
                     got_ack = true;
                 }
                 ServerOutput::Cached(bc)
                     if bc.packets.iter().any(|ep| {
                         ep.id()
-                            == basalt_protocol::packets::play::world::ClientboundPlayBlockChange::PACKET_ID
+                            == basalt_mc_protocol::packets::play::world::ClientboundPlayBlockChange::PACKET_ID
                     }) =>
                 {
                     got_block_change = true;
@@ -554,7 +554,7 @@ mod tests {
         assert!(game_loop.world.get_block_entity(5, 64, 3).is_none());
 
         // Should have spawned dropped items (chest contents + chest block itself)
-        use basalt_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
+        use basalt_mc_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
         let mut spawn_count = 0;
         while let Ok(msg) = rx.try_recv() {
             if let ServerOutput::Cached(bc) = &msg

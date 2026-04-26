@@ -68,7 +68,7 @@ registrar
 ## Features
 
 - `testing` -- enables `PluginTestHarness` for unit testing plugins
-- `raw-packets` -- exposes wire-level packet definitions via `basalt_protocol`
+- `raw-packets` -- exposes wire-level packet definitions via `basalt_mc_protocol`
 
 ## License
 

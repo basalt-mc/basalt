@@ -15,15 +15,15 @@ use crate::context::ServerContext;
 use basalt_api::events::EventBus;
 use basalt_api::events::{ChatMessageEvent, CommandEvent, RawPacketEvent};
 use basalt_api::player::PlayerInfo;
-use basalt_net::connection::{Connection, Play};
-use basalt_protocol::packets::play::ServerboundPlayPacket;
-use basalt_protocol::packets::play::chat::{
+use basalt_mc_protocol::packets::play::ServerboundPlayPacket;
+use basalt_mc_protocol::packets::play::chat::{
     ClientboundPlaySystemChat, ClientboundPlayTabComplete, ClientboundPlayTabCompleteMatches,
     ServerboundPlayTabComplete,
 };
-use basalt_protocol::packets::play::player::{
+use basalt_mc_protocol::packets::play::player::{
     ClientboundPlayGameStateChange, ClientboundPlayPosition,
 };
+use basalt_net::connection::{Connection, Play};
 use basalt_types::Uuid;
 use dashmap::DashMap;
 use tokio::sync::{broadcast, mpsc};

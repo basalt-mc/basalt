@@ -1,12 +1,12 @@
 use super::*;
-use basalt_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
-use basalt_protocol::packets::play::inventory::{
+use basalt_mc_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
+use basalt_mc_protocol::packets::play::inventory::{
     ClientboundPlayOpenWindow, ClientboundPlaySetPlayerInventory,
 };
-use basalt_protocol::packets::play::world::{
+use basalt_mc_protocol::packets::play::world::{
     ClientboundPlayAcknowledgePlayerDigging, ServerboundPlayBlockDig, ServerboundPlayBlockPlace,
 };
-use basalt_protocol::packets::play::{
+use basalt_mc_protocol::packets::play::{
     ServerboundPlayCloseWindow, ServerboundPlaySetCreativeSlot, ServerboundPlayWindowClick,
 };
 

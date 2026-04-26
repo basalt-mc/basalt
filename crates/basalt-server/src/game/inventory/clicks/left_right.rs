@@ -388,7 +388,7 @@ mod tests {
 
         click(&game_tx, &mut game_loop, uuid, 36, 0, 0);
 
-        use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+        use basalt_mc_protocol::packets::play::inventory::ClientboundPlaySetSlot;
         let mut got_cursor = false;
         while let Ok(msg) = rx.try_recv() {
             if let ServerOutput::Plain(ep) = &msg

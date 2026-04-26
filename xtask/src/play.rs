@@ -440,7 +440,7 @@ fn generate_play_mod(
     out.push('\n');
 
     // Re-export shared types so they're discoverable through
-    // `basalt_protocol::packets::play::*`.
+    // `basalt_mc_protocol::packets::play::*`.
     for (name, _) in shared {
         out.push_str(&format!("pub use types::{name};\n"));
     }

@@ -220,7 +220,7 @@ impl GameLoop {
         );
 
         self.send_to(eid, |tx| {
-            use basalt_protocol::packets::play::inventory::{
+            use basalt_mc_protocol::packets::play::inventory::{
                 ClientboundPlayOpenWindow, ClientboundPlayWindowItems,
             };
             let _ = tx.try_send(ServerOutput::plain(
@@ -376,7 +376,7 @@ impl GameLoop {
                 basalt_api::container::ContainerBacking::Virtual => continue,
             };
             if other_eid != exclude_eid && pos == container_pos {
-                use basalt_protocol::packets::play::inventory::ClientboundPlaySetSlot;
+                use basalt_mc_protocol::packets::play::inventory::ClientboundPlaySetSlot;
                 let oc_window_id = oc.window_id;
                 let item_clone = item.clone();
                 self.send_to(other_eid, |tx| {
@@ -500,7 +500,7 @@ impl GameLoop {
         }
 
         self.send_to(eid, |tx| {
-            use basalt_protocol::packets::play::inventory::{
+            use basalt_mc_protocol::packets::play::inventory::{
                 ClientboundPlayOpenWindow, ClientboundPlayWindowItems,
             };
             let _ = tx.try_send(ServerOutput::plain(
@@ -717,7 +717,7 @@ mod tests {
         });
         game_loop.tick(1);
 
-        use basalt_protocol::packets::play::inventory::ClientboundPlayOpenWindow;
+        use basalt_mc_protocol::packets::play::inventory::ClientboundPlayOpenWindow;
         let mut got_open = false;
         while let Ok(msg) = rx.try_recv() {
             if matches!(&msg, ServerOutput::Plain(ep) if ep.id() == ClientboundPlayOpenWindow::PACKET_ID)

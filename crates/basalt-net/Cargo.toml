@@ -9,7 +9,7 @@ repository.workspace = true
 
 [dependencies]
 basalt-types = { workspace = true }
-basalt-protocol = { workspace = true }
+basalt-mc-protocol = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 aes = { workspace = true }

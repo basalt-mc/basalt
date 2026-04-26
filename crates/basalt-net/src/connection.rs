@@ -2,18 +2,18 @@ use std::marker::PhantomData;
 
 use tokio::net::TcpStream;
 
-use basalt_protocol::packets::configuration::{
+use basalt_mc_protocol::packets::configuration::{
     ClientboundConfigurationDisconnect, ClientboundConfigurationFinishConfiguration,
     ServerboundConfigurationPacket,
 };
-use basalt_protocol::packets::handshake::{
+use basalt_mc_protocol::packets::handshake::{
     ServerboundHandshakePacket, ServerboundHandshakeSetProtocol,
 };
-use basalt_protocol::packets::login::{
+use basalt_mc_protocol::packets::login::{
     ClientboundLoginDisconnect, ClientboundLoginSuccess, ServerboundLoginPacket,
 };
-use basalt_protocol::packets::play::ServerboundPlayPacket;
-use basalt_protocol::packets::status::{
+use basalt_mc_protocol::packets::play::ServerboundPlayPacket;
+use basalt_mc_protocol::packets::status::{
     ClientboundStatusPing, ClientboundStatusServerInfo, ServerboundStatusPacket,
 };
 use basalt_types::{Encode, EncodedSize};
@@ -301,7 +301,7 @@ impl<S> Connection<S> {
         let mut payload = Vec::with_capacity(packet.encoded_size());
         packet
             .encode(&mut payload)
-            .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
+            .map_err(|e| Error::Protocol(basalt_mc_protocol::Error::Type(e)))?;
         self.stream.write_raw_packet(packet_id, &payload).await
     }
 
@@ -318,7 +318,7 @@ impl<S> Connection<S> {
 mod tests {
     use super::*;
     use crate::framing;
-    use basalt_protocol::packets::status::{ServerboundStatusPing, ServerboundStatusPingStart};
+    use basalt_mc_protocol::packets::status::{ServerboundStatusPing, ServerboundStatusPingStart};
     use basalt_types::Decode as _;
     use tokio::net::TcpListener;
 
@@ -470,7 +470,7 @@ mod tests {
 
     #[tokio::test]
     async fn login_to_configuration_transition() {
-        use basalt_protocol::packets::login::{
+        use basalt_mc_protocol::packets::login::{
             ServerboundLoginLoginAcknowledged, ServerboundLoginLoginStart,
         };
         use basalt_types::Uuid;

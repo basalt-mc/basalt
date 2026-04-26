@@ -47,7 +47,7 @@ pub mod world;
 ///
 /// Available only when the `raw-packets` feature is enabled.
 #[cfg(feature = "raw-packets")]
-pub use basalt_protocol::packets;
+pub use basalt_mc_protocol::packets;
 
 // Top-level re-exports for non-prelude usage.
 pub use context::Response;

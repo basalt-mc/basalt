@@ -43,7 +43,7 @@ pub async fn read_raw_packet<R: AsyncReadExt + Unpin>(reader: &mut R) -> Result<
     };
 
     if length < 0 {
-        return Err(Error::Protocol(basalt_protocol::Error::Type(
+        return Err(Error::Protocol(basalt_mc_protocol::Error::Type(
             basalt_types::Error::InvalidData("negative packet length".into()),
         )));
     }
@@ -63,7 +63,7 @@ pub async fn read_raw_packet<R: AsyncReadExt + Unpin>(reader: &mut R) -> Result<
     // Extract packet ID from the frame
     let mut cursor = frame.as_slice();
     let packet_id = basalt_types::VarInt::decode(&mut cursor)
-        .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
+        .map_err(|e| Error::Protocol(basalt_mc_protocol::Error::Type(e)))?;
 
     let payload = cursor.to_vec();
 
@@ -91,10 +91,10 @@ pub async fn write_raw_packet<W: AsyncWriteExt + Unpin>(
     let mut buf = Vec::with_capacity(VarInt(frame_length as i32).encoded_size() + frame_length);
     VarInt(frame_length as i32)
         .encode(&mut buf)
-        .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
+        .map_err(|e| Error::Protocol(basalt_mc_protocol::Error::Type(e)))?;
     id_varint
         .encode(&mut buf)
-        .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
+        .map_err(|e| Error::Protocol(basalt_mc_protocol::Error::Type(e)))?;
     buf.extend_from_slice(payload);
 
     writer.write_all(&buf).await?;
@@ -130,7 +130,7 @@ async fn read_varint<R: AsyncReadExt + Unpin>(reader: &mut R) -> Result<Option<i
         }
 
         if position >= 32 {
-            return Err(Error::Protocol(basalt_protocol::Error::Type(
+            return Err(Error::Protocol(basalt_mc_protocol::Error::Type(
                 basalt_types::Error::VarIntTooLarge,
             )));
         }
