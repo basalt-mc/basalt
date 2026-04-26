@@ -7,6 +7,7 @@ use crate::context::{
 };
 use crate::gamemode::Gamemode;
 use crate::logger::PluginLogger;
+use crate::world::handle::WorldHandle;
 use basalt_recipes::RecipeId;
 use basalt_types::{TextComponent, Uuid};
 
@@ -50,7 +51,7 @@ impl ChatContext for NoopContext {
     fn broadcast_component(&self, _component: &TextComponent) {}
 }
 
-impl WorldContext for NoopContext {
+impl WorldHandle for NoopContext {
     fn get_block(&self, _x: i32, _y: i32, _z: i32) -> u16 {
         0
     }
@@ -72,6 +73,33 @@ impl WorldContext for NoopContext {
     ) {
     }
     fn mark_chunk_dirty(&self, _cx: i32, _cz: i32) {}
+    fn persist_chunk(&self, _cx: i32, _cz: i32) {}
+    fn dirty_chunks(&self) -> Vec<(i32, i32)> {
+        Vec::new()
+    }
+    fn check_overlap(&self, _aabb: &crate::world::collision::Aabb) -> bool {
+        false
+    }
+    fn ray_cast(
+        &self,
+        _origin: (f64, f64, f64),
+        _direction: (f64, f64, f64),
+        _max_distance: f64,
+    ) -> Option<crate::world::collision::RayHit> {
+        None
+    }
+    fn resolve_movement(
+        &self,
+        _aabb: &crate::world::collision::Aabb,
+        dx: f64,
+        dy: f64,
+        dz: f64,
+    ) -> (f64, f64, f64) {
+        (dx, dy, dz)
+    }
+}
+
+impl WorldContext for NoopContext {
     fn send_block_ack(&self, _sequence: i32) {}
     fn stream_chunks(&self, _cx: i32, _cz: i32) {}
     fn persist_chunk(&self, _cx: i32, _cz: i32) {}

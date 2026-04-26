@@ -631,7 +631,7 @@ impl Ecs {
     }
 }
 
-impl basalt_api::system::SystemContext for Ecs {
+impl basalt_api::world::handle::WorldHandle for Ecs {
     fn get_block(&self, x: i32, y: i32, z: i32) -> u16 {
         self.world_ref().get_block(x, y, z)
     }
@@ -665,6 +665,14 @@ impl basalt_api::system::SystemContext for Ecs {
         self.world_ref().mark_chunk_dirty(cx, cz);
     }
 
+    fn persist_chunk(&self, cx: i32, cz: i32) {
+        self.world_ref().persist_chunk(cx, cz);
+    }
+
+    fn dirty_chunks(&self) -> Vec<(i32, i32)> {
+        self.world_ref().dirty_chunks()
+    }
+
     fn check_overlap(&self, aabb: &basalt_api::world::collision::Aabb) -> bool {
         basalt_api::world::collision::check_overlap(self.world_ref(), aabb)
     }
@@ -687,7 +695,9 @@ impl basalt_api::system::SystemContext for Ecs {
     ) -> (f64, f64, f64) {
         basalt_api::world::collision::resolve_movement(self.world_ref(), aabb, dx, dy, dz)
     }
+}
 
+impl basalt_api::system::SystemContext for Ecs {
     fn spawn(&mut self) -> EntityId {
         Ecs::spawn(self)
     }

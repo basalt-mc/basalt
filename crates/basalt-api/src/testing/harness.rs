@@ -470,7 +470,7 @@ impl Default for SystemTestContext {
     }
 }
 
-impl crate::system::SystemContext for SystemTestContext {
+impl crate::world::handle::WorldHandle for SystemTestContext {
     fn get_block(&self, x: i32, y: i32, z: i32) -> u16 {
         self.world.get_block(x, y, z)
     }
@@ -502,6 +502,14 @@ impl crate::system::SystemContext for SystemTestContext {
         self.world.mark_chunk_dirty(cx, cz);
     }
 
+    fn persist_chunk(&self, cx: i32, cz: i32) {
+        self.world.persist_chunk(cx, cz);
+    }
+
+    fn dirty_chunks(&self) -> Vec<(i32, i32)> {
+        self.world.dirty_chunks()
+    }
+
     fn check_overlap(&self, aabb: &crate::world::collision::Aabb) -> bool {
         crate::world::collision::check_overlap(&self.world, aabb)
     }
@@ -524,7 +532,9 @@ impl crate::system::SystemContext for SystemTestContext {
     ) -> (f64, f64, f64) {
         crate::world::collision::resolve_movement(&self.world, aabb, dx, dy, dz)
     }
+}
 
+impl crate::system::SystemContext for SystemTestContext {
     fn spawn(&mut self) -> crate::components::EntityId {
         let id = self.next_id;
         self.next_id += 1;
