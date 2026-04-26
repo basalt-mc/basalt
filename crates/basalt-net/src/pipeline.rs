@@ -1,4 +1,4 @@
-use basalt_protocol::ConnectionState;
+use basalt_mc_protocol::ConnectionState;
 
 /// The result of a middleware processing a packet.
 ///

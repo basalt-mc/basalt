@@ -63,7 +63,7 @@ impl GameLoop {
             .map(|inv| inv.slots[held_idx].clone())
             .unwrap_or_default();
         self.send_to(eid, |tx| {
-            use basalt_protocol::packets::play::inventory::ClientboundPlaySetPlayerInventory;
+            use basalt_mc_protocol::packets::play::inventory::ClientboundPlaySetPlayerInventory;
             let _ = tx.try_send(crate::messages::ServerOutput::plain(
                 ClientboundPlaySetPlayerInventory::PACKET_ID,
                 ClientboundPlaySetPlayerInventory {

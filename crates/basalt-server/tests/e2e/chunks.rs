@@ -23,13 +23,13 @@ use super::*;
 ///    is delivered across multiple batches at the default rate.
 #[tokio::test]
 async fn e2e_initial_chunks_arrive_in_rate_limited_batches() {
-    use basalt_protocol::packets::configuration::{
+    use basalt_mc_protocol::packets::configuration::{
         ClientboundConfigurationFinishConfiguration, ServerboundConfigurationFinishConfiguration,
     };
-    use basalt_protocol::packets::login::{
+    use basalt_mc_protocol::packets::login::{
         ServerboundLoginLoginAcknowledged, ServerboundLoginLoginStart,
     };
-    use basalt_protocol::packets::play::world::{
+    use basalt_mc_protocol::packets::play::world::{
         ClientboundPlayChunkBatchFinished, ClientboundPlayChunkBatchStart, ClientboundPlayMapChunk,
     };
 

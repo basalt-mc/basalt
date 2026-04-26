@@ -9,7 +9,7 @@ async fn e2e_server_login_and_configuration() {
     client_handshake(&mut client, addr.port(), 2).await;
 
     // LoginStart
-    use basalt_protocol::packets::login::ServerboundLoginLoginStart;
+    use basalt_mc_protocol::packets::login::ServerboundLoginLoginStart;
     let login_start = ServerboundLoginLoginStart {
         username: "TestPlayer".into(),
         player_uuid: Uuid::default(),
@@ -27,7 +27,7 @@ async fn e2e_server_login_and_configuration() {
     assert_eq!(success.username, "TestPlayer");
 
     // Send LoginAcknowledged
-    use basalt_protocol::packets::login::ServerboundLoginLoginAcknowledged;
+    use basalt_mc_protocol::packets::login::ServerboundLoginLoginAcknowledged;
     send_packet(
         &mut client,
         ServerboundLoginLoginAcknowledged::PACKET_ID,
@@ -37,7 +37,7 @@ async fn e2e_server_login_and_configuration() {
 
     // Read registry data packets (at least 5: dimension_type, biome,
     // damage_type, painting_variant, wolf_variant)
-    use basalt_protocol::packets::configuration::ClientboundConfigurationRegistryData;
+    use basalt_mc_protocol::packets::configuration::ClientboundConfigurationRegistryData;
     let mut registry_count = 0;
     loop {
         let raw = framing::read_raw_packet(&mut client)
@@ -57,7 +57,7 @@ async fn e2e_server_login_and_configuration() {
     );
 
     // Send FinishConfiguration acknowledged
-    use basalt_protocol::packets::configuration::ServerboundConfigurationFinishConfiguration;
+    use basalt_mc_protocol::packets::configuration::ServerboundConfigurationFinishConfiguration;
     send_packet(
         &mut client,
         ServerboundConfigurationFinishConfiguration::PACKET_ID,
@@ -66,7 +66,7 @@ async fn e2e_server_login_and_configuration() {
     .await;
 
     // Read Play packets: Login, SpawnPosition, GameEvent, ChunkData, PlayerPosition
-    use basalt_protocol::packets::play::player::ClientboundPlayLogin;
+    use basalt_mc_protocol::packets::play::player::ClientboundPlayLogin;
     let (id, login): (_, ClientboundPlayLogin) = recv_packet(&mut client).await;
     assert_eq!(id, ClientboundPlayLogin::PACKET_ID);
     assert_eq!(login.entity_id, 1);
@@ -91,7 +91,7 @@ async fn e2e_server_handles_teleport_confirm() {
     // Fast-track to Play state
     client_handshake(&mut client, addr.port(), 2).await;
 
-    use basalt_protocol::packets::login::{
+    use basalt_mc_protocol::packets::login::{
         ServerboundLoginLoginAcknowledged, ServerboundLoginLoginStart,
     };
     send_packet(
@@ -121,14 +121,14 @@ async fn e2e_server_handles_teleport_confirm() {
             .await
             .unwrap()
             .unwrap();
-        use basalt_protocol::packets::configuration::ClientboundConfigurationFinishConfiguration;
+        use basalt_mc_protocol::packets::configuration::ClientboundConfigurationFinishConfiguration;
         if raw.id == ClientboundConfigurationFinishConfiguration::PACKET_ID {
             break;
         }
     }
 
     // Send FinishConfiguration ack
-    use basalt_protocol::packets::configuration::ServerboundConfigurationFinishConfiguration;
+    use basalt_mc_protocol::packets::configuration::ServerboundConfigurationFinishConfiguration;
     send_packet(
         &mut client,
         ServerboundConfigurationFinishConfiguration::PACKET_ID,
@@ -145,7 +145,7 @@ async fn e2e_server_handles_teleport_confirm() {
     }
 
     // Now in Play state — send TeleportConfirm
-    use basalt_protocol::packets::play::player::ServerboundPlayTeleportConfirm;
+    use basalt_mc_protocol::packets::play::player::ServerboundPlayTeleportConfirm;
     send_packet(
         &mut client,
         ServerboundPlayTeleportConfirm::PACKET_ID,
@@ -154,7 +154,7 @@ async fn e2e_server_handles_teleport_confirm() {
     .await;
 
     // Send PlayerLoaded
-    use basalt_protocol::packets::play::player::ServerboundPlayPlayerLoaded;
+    use basalt_mc_protocol::packets::play::player::ServerboundPlayPlayerLoaded;
     send_packet(
         &mut client,
         ServerboundPlayPlayerLoaded::PACKET_ID,
@@ -163,7 +163,7 @@ async fn e2e_server_handles_teleport_confirm() {
     .await;
 
     // Send a position update
-    use basalt_protocol::packets::play::player::ServerboundPlayPosition;
+    use basalt_mc_protocol::packets::play::player::ServerboundPlayPosition;
     send_packet(
         &mut client,
         ServerboundPlayPosition::PACKET_ID,

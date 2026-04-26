@@ -1,8 +1,8 @@
 use super::*;
-use basalt_protocol::packets::play::chat::{
+use basalt_mc_protocol::packets::play::chat::{
     ClientboundPlaySystemChat, ServerboundPlayChatCommand, ServerboundPlayChatMessage,
 };
-use basalt_protocol::packets::play::player::{
+use basalt_mc_protocol::packets::play::player::{
     ClientboundPlayGameStateChange, ClientboundPlayPosition,
 };
 

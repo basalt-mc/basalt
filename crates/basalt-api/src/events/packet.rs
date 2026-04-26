@@ -2,7 +2,7 @@
 //! that operate at the wire layer (anti-cheat, telemetry, packet
 //! logging, custom protocol gateways).
 
-use basalt_protocol::packets::play::ServerboundPlayPacket;
+use basalt_mc_protocol::packets::play::ServerboundPlayPacket;
 
 /// Fires before a serverbound Play packet is dispatched to its
 /// domain handler. Cancelling drops the packet — no further
@@ -41,8 +41,8 @@ crate::instant_cancellable_event!(RawPacketEvent);
 #[cfg(test)]
 mod tests {
     use crate::events::Event;
-    use basalt_protocol::packets::play::ServerboundPlayPacket;
-    use basalt_protocol::packets::play::misc::ServerboundPlayKeepAlive;
+    use basalt_mc_protocol::packets::play::ServerboundPlayPacket;
+    use basalt_mc_protocol::packets::play::misc::ServerboundPlayKeepAlive;
 
     use super::*;
 

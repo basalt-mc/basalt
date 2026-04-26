@@ -123,7 +123,7 @@ pub(crate) enum SwitchEnumKind {
     /// `{ParentPacket}{Field}` pattern so collisions can't occur.
     Inline,
     /// Shared across multiple packets — emitted once in
-    /// `crates/basalt-protocol/src/packets/play/types.rs` and
+    /// `crates/basalt-mc-protocol/src/packets/play/types.rs` and
     /// re-exported through `play/mod.rs`. Used for standalone named
     /// types like `RecipeDisplay` / `SlotDisplay`.
     Shared,

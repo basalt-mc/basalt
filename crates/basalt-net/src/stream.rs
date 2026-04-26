@@ -154,14 +154,14 @@ impl<W: AsyncReadExt + AsyncWriteExt + Unpin> ProtocolStream<W> {
             }
 
             if position >= 32 {
-                return Err(Error::Protocol(basalt_protocol::Error::Type(
+                return Err(Error::Protocol(basalt_mc_protocol::Error::Type(
                     basalt_types::Error::VarIntTooLarge,
                 )));
             }
         };
 
         if length < 0 {
-            return Err(Error::Protocol(basalt_protocol::Error::Type(
+            return Err(Error::Protocol(basalt_mc_protocol::Error::Type(
                 basalt_types::Error::InvalidData("negative packet length".into()),
             )));
         }
@@ -194,7 +194,7 @@ impl<W: AsyncReadExt + AsyncWriteExt + Unpin> ProtocolStream<W> {
         // Extract packet ID
         let mut cursor = data;
         let packet_id = VarInt::decode(&mut cursor)
-            .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
+            .map_err(|e| Error::Protocol(basalt_mc_protocol::Error::Type(e)))?;
 
         Ok(Some(RawPacket {
             id: packet_id.0,
@@ -236,7 +236,7 @@ impl<W: AsyncReadExt + AsyncWriteExt + Unpin> ProtocolStream<W> {
         self.packet_buf.clear();
         id_varint
             .encode(&mut self.packet_buf)
-            .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
+            .map_err(|e| Error::Protocol(basalt_mc_protocol::Error::Type(e)))?;
         self.packet_buf.extend_from_slice(payload);
 
         // Stage 2: optional compression → compressed_buf. Borrowing
@@ -255,7 +255,7 @@ impl<W: AsyncReadExt + AsyncWriteExt + Unpin> ProtocolStream<W> {
         self.frame_buf.clear();
         VarInt(frame_content.len() as i32)
             .encode(&mut self.frame_buf)
-            .map_err(|e| Error::Protocol(basalt_protocol::Error::Type(e)))?;
+            .map_err(|e| Error::Protocol(basalt_mc_protocol::Error::Type(e)))?;
         self.frame_buf.extend_from_slice(frame_content);
 
         // Stage 4: encrypted write — delegates to a private helper that

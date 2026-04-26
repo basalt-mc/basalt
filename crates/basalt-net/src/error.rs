@@ -21,7 +21,7 @@ pub enum Error {
     /// Wraps errors from basalt-protocol: unknown packet IDs, type
     /// serialization failures (buffer underflow, invalid data, etc.).
     #[error(transparent)]
-    Protocol(#[from] basalt_protocol::Error),
+    Protocol(#[from] basalt_mc_protocol::Error),
 
     /// A packet exceeded the maximum allowed size.
     ///

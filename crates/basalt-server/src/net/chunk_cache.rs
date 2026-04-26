@@ -12,7 +12,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use basalt_protocol::packets::play::world::ClientboundPlayMapChunk;
+use basalt_mc_protocol::packets::play::world::ClientboundPlayMapChunk;
 use basalt_types::{Encode, EncodedSize};
 use basalt_world::chunk::{SECTIONS_PER_CHUNK, build_full_light_mask};
 use dashmap::DashMap;

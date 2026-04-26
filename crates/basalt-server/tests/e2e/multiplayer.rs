@@ -1,7 +1,9 @@
 use super::*;
-use basalt_protocol::packets::play::chat::ServerboundPlayChatMessage;
-use basalt_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
-use basalt_protocol::packets::play::player::{ClientboundPlayPlayerInfo, ServerboundPlayPosition};
+use basalt_mc_protocol::packets::play::chat::ServerboundPlayChatMessage;
+use basalt_mc_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
+use basalt_mc_protocol::packets::play::player::{
+    ClientboundPlayPlayerInfo, ServerboundPlayPosition,
+};
 
 #[tokio::test]
 async fn e2e_two_players_second_gets_player_info() {
@@ -18,7 +20,7 @@ async fn e2e_two_players_second_gets_player_info() {
     let mut client2 = TcpStream::connect(addr).await.unwrap();
     client_handshake(&mut client2, addr.port(), 2).await;
 
-    use basalt_protocol::packets::login::{
+    use basalt_mc_protocol::packets::login::{
         ServerboundLoginLoginAcknowledged, ServerboundLoginLoginStart,
     };
     send_packet(
@@ -44,13 +46,13 @@ async fn e2e_two_players_second_gets_player_info() {
             .await
             .unwrap()
             .unwrap();
-        use basalt_protocol::packets::configuration::ClientboundConfigurationFinishConfiguration;
+        use basalt_mc_protocol::packets::configuration::ClientboundConfigurationFinishConfiguration;
         if raw.id == ClientboundConfigurationFinishConfiguration::PACKET_ID {
             break;
         }
     }
 
-    use basalt_protocol::packets::configuration::ServerboundConfigurationFinishConfiguration;
+    use basalt_mc_protocol::packets::configuration::ServerboundConfigurationFinishConfiguration;
     send_packet(
         &mut client2,
         ServerboundConfigurationFinishConfiguration::PACKET_ID,
@@ -62,7 +64,7 @@ async fn e2e_two_players_second_gets_player_info() {
     // Track whether we see PlayerInfo and SpawnEntity for Alice.
     let mut found_player_info = false;
     let mut found_spawn_entity = false;
-    use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
+    use basalt_mc_protocol::packets::play::chat::ClientboundPlaySystemChat;
     loop {
         let raw = framing::read_raw_packet(&mut client2)
             .await
@@ -115,7 +117,7 @@ async fn e2e_chat_broadcast_to_both_players() {
     let mut client2 = connect_to_play_as(addr, "Player2", uuid2).await;
 
     // Drain PlayerJoined packets until the "joined the game" SystemChat
-    use basalt_protocol::packets::play::chat::ClientboundPlaySystemChat;
+    use basalt_mc_protocol::packets::play::chat::ClientboundPlaySystemChat;
     loop {
         let raw = framing::read_raw_packet(&mut client1)
             .await

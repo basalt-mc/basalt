@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use basalt_api::events::PlayerMovedEvent;
-use basalt_protocol::packets::play::entity::{
+use basalt_mc_protocol::packets::play::entity::{
     ClientboundPlayEntityHeadRotation, ClientboundPlaySyncEntityPosition,
 };
 use basalt_types::Uuid;
@@ -127,7 +127,7 @@ impl GameLoop {
     /// queue. The actual sending happens in `drain_chunk_batches` at the
     /// player's negotiated per-tick rate.
     pub(super) fn stream_chunks(&mut self, eid: basalt_ecs::EntityId, new_cx: i32, new_cz: i32) {
-        use basalt_protocol::packets::play::world::ClientboundPlayUpdateViewPosition;
+        use basalt_mc_protocol::packets::play::world::ClientboundPlayUpdateViewPosition;
         self.send_to(eid, |tx| {
             let _ = tx.try_send(ServerOutput::plain(
                 ClientboundPlayUpdateViewPosition::PACKET_ID,
@@ -158,7 +158,7 @@ impl GameLoop {
             .collect();
 
         for &(cx, cz) in &to_unload {
-            use basalt_protocol::packets::play::world::ClientboundPlayUnloadChunk;
+            use basalt_mc_protocol::packets::play::world::ClientboundPlayUnloadChunk;
             self.send_to(eid, |tx| {
                 let _ = tx.try_send(ServerOutput::plain(
                     ClientboundPlayUnloadChunk::PACKET_ID,

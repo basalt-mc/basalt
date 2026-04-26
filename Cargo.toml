@@ -13,7 +13,7 @@ repository = "https://github.com/basalt-mc/basalt"
 # Internal crates
 basalt-types = { path = "crates/basalt-types", version = "0.2.0" }
 basalt-derive = { path = "crates/basalt-derive", version = "0.2.0" }
-basalt-protocol = { path = "crates/basalt-protocol", version = "0.2.0" }
+basalt-mc-protocol = { path = "crates/basalt-mc-protocol", version = "0.2.0" }
 basalt-net = { path = "crates/basalt-net" }
 basalt-server = { path = "crates/basalt-server" }
 basalt-world = { path = "crates/basalt-world" }

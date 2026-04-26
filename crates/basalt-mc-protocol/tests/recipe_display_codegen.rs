@@ -7,7 +7,7 @@
 //! here means the codegen produces different bytes and would break
 //! 1.21.4 client compatibility.
 
-use basalt_protocol::packets::play::types::{RecipeDisplay, SlotDisplay};
+use basalt_mc_protocol::packets::play::types::{RecipeDisplay, SlotDisplay};
 use basalt_types::{Decode, Encode, EncodedSize, Slot};
 
 /// Encode → check `encoded_size` → decode → compare.
@@ -205,8 +205,8 @@ fn slot_display_item_stack_carries_full_slot() {
 /// validates the bool-prefix encoding rather than typed `IDSet`
 /// content.
 mod crafting_requirements {
-    use basalt_protocol::packets::play::misc::ClientboundPlayRecipeBookAddEntriesRecipe;
-    use basalt_protocol::packets::play::types::{RecipeDisplay, SlotDisplay};
+    use basalt_mc_protocol::packets::play::misc::ClientboundPlayRecipeBookAddEntriesRecipe;
+    use basalt_mc_protocol::packets::play::types::{RecipeDisplay, SlotDisplay};
     use basalt_types::{Decode, Encode, EncodedSize};
 
     fn entry(req: Option<Vec<u8>>) -> ClientboundPlayRecipeBookAddEntriesRecipe {

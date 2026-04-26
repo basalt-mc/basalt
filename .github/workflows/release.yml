@@ -38,8 +38,8 @@ jobs:
         run: cargo publish -p basalt-derive
       - name: Publish basalt-types
         run: cargo publish -p basalt-types
-      - name: Publish basalt-protocol
-        run: cargo publish -p basalt-protocol
+      - name: Publish basalt-mc-protocol
+        run: cargo publish -p basalt-mc-protocol
       - name: Publish basalt-api
         run: cargo publish -p basalt-api
 

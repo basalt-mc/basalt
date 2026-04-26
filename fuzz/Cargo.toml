@@ -10,7 +10,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 basalt-types = { path = "../crates/basalt-types" }
-basalt-protocol = { path = "../crates/basalt-protocol" }
+basalt-mc-protocol = { path = "../crates/basalt-mc-protocol" }
 basalt-net = { path = "../crates/basalt-net" }
 basalt-world = { path = "../crates/basalt-world" }
 

@@ -8,7 +8,7 @@ repository.workspace = true
 
 [dependencies]
 basalt-types = { workspace = true }
-basalt-protocol = { workspace = true }
+basalt-mc-protocol = { workspace = true }
 basalt-api = { workspace = true, features = ["raw-packets"] }
 basalt-ecs = { workspace = true }
 basalt-net = { workspace = true }

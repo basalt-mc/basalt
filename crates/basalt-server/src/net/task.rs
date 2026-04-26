@@ -13,9 +13,9 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use basalt_api::events::EventBus;
+use basalt_mc_protocol::packets::play::ServerboundPlayPacket;
+use basalt_mc_protocol::packets::play::misc::ClientboundPlayKeepAlive;
 use basalt_net::connection::{Connection, Play};
-use basalt_protocol::packets::play::ServerboundPlayPacket;
-use basalt_protocol::packets::play::misc::ClientboundPlayKeepAlive;
 use basalt_types::Uuid;
 use dashmap::DashMap;
 use tokio::sync::{broadcast, mpsc};
@@ -136,7 +136,7 @@ pub(crate) async fn run_net_task(
                         ).await?;
                     }
                     Err(basalt_net::Error::Protocol(
-                        basalt_protocol::Error::UnknownPacket { id, .. }
+                        basalt_mc_protocol::Error::UnknownPacket { id, .. }
                     )) => {
                         log::trace!(target: "basalt::net_task", "[{addr}] {username} unknown packet 0x{id:02x}");
                     }

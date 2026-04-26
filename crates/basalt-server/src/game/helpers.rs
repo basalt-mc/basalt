@@ -5,8 +5,8 @@ use std::sync::Arc;
 use crate::context::ServerContext;
 use basalt_api::components::{Position, Rotation};
 use basalt_api::player::PlayerInfo;
-use basalt_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
-use basalt_protocol::packets::play::world::{
+use basalt_mc_protocol::packets::play::entity::ClientboundPlaySpawnEntity;
+use basalt_mc_protocol::packets::play::world::{
     ClientboundPlayMapChunk, ClientboundPlayTileEntityData,
 };
 use basalt_types::{Encode, Uuid, VarInt, Vec3i16};
@@ -103,7 +103,7 @@ pub(crate) fn send_player_info_add(
     output_tx: &mpsc::Sender<ServerOutput>,
     info: &basalt_api::broadcast::PlayerSnapshot,
 ) {
-    use basalt_protocol::packets::play::player::ClientboundPlayPlayerInfo;
+    use basalt_mc_protocol::packets::play::player::ClientboundPlayPlayerInfo;
 
     let mut buf = Vec::new();
     let actions: u8 = 0x01 | 0x04 | 0x08;
