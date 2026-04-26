@@ -2,7 +2,7 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use basalt_protocol::packets::play::ServerboundPlayPacket;
+use basalt_mc_protocol::packets::play::ServerboundPlayPacket;
 
 fuzz_target!(|data: &[u8]| {
     // First byte is the packet ID, rest is payload
