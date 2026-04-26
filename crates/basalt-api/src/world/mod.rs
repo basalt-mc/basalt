@@ -7,6 +7,7 @@
 //! into `basalt-api` itself as they're decoupled from the runtime.
 
 pub mod collision;
+pub mod handle;
 
 pub use basalt_world::block;
 pub use basalt_world::block_entity;
