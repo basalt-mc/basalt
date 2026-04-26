@@ -145,7 +145,7 @@ impl Default for EventBus {
 mod tests {
     use super::*;
     use crate::events::traits::BusKind;
-    use crate::testing::noop::NoopContext;
+    use crate::testing::NoopContext;
     use std::any::Any;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicI32, Ordering};
