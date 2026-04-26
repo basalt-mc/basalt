@@ -46,7 +46,7 @@ release:
 	sed -i.bak -E 's/^(basalt-[a-z]+ = \{ path = "crates\/basalt-[a-z]+", version = ")[^"]*"/\1$(VERSION)"/' Cargo.toml && rm Cargo.toml.bak
 	cargo check --workspace --lib --bins --examples
 	git-cliff --tag "v$(VERSION)" --output CHANGELOG.md
-	git add Cargo.toml CHANGELOG.md
+	git add Cargo.toml Cargo.lock CHANGELOG.md
 	git commit -m "chore(workspace): release v$(VERSION)"
 	git tag "v$(VERSION)"
 	@echo "Done. Run 'git push && git push --tags' to trigger the release workflow."
