@@ -1715,7 +1715,6 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicU32, Ordering};
 
-    use basalt_api::context::ServerContext;
     use basalt_api::events::{
         CraftingCraftedEvent, CraftingPreCraftEvent, CraftingRecipeClearedEvent,
         CraftingRecipeMatchedEvent, CraftingShiftClickBatchEvent,
